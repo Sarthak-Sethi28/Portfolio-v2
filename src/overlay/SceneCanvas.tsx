@@ -63,7 +63,7 @@ export function SceneCanvas() {
       // re-resolve on every resize rather than trusting the observer alone.
       resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
       gl={{ antialias: true, powerPreference: 'high-performance', alpha: false }}
-      camera={{ fov: 56, near: 0.35, far: 6000, position: [0, 4.6, 58] }}
+      camera={{ fov: 50, near: 0.35, far: 6000, position: [0, 52, 168] }}
       style={{ position: 'absolute', inset: 0 }}
     >
       <Stage />

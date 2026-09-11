@@ -6,7 +6,7 @@ import {
   RGBAFormat,
   UnsignedByteType,
 } from 'three'
-import { createRng } from '@/lib/rng'
+import { createRng, range } from '@/lib/rng'
 
 /**
  * A tiling water surface, as a true NORMAL map.
@@ -31,22 +31,54 @@ function buildNormals(): DataTexture {
   const data = new Uint8Array(SIZE * SIZE * 4)
 
   // A few long crossing swells plus finer ripples riding on them.
-  const waves = Array.from({ length: 9 }, (_, i) => {
-    const long = i < 4
+  // Swell, not ripple. A few long low-frequency trains carrying most of the
+  // amplitude, with finer chop riding on them — which is what a shallow sheet
+  // of water on a flat bed actually does, and what makes crests legible
+  // rather than a uniform fizz.
+  /*
+   * Frequencies must be WHOLE NUMBERS, and directions must land on the
+   * lattice.
+   *
+   * The texture tiles. A wave whose frequency is fractional does not complete
+   * a whole number of cycles across the tile, so its value at the right edge
+   * does not match the left — and every tile boundary shows as a hard line.
+   * At 70 repeats across the plain that was a visible grid drawn over the
+   * water.
+   *
+   * Picking integer wave vectors (kx, ky) instead of an arbitrary angle keeps
+   * every component periodic over the tile in both axes, so the field is
+   * genuinely seamless.
+   */
+  const intVec = (min: number, max: number) => {
+    let kx = 0
+    let ky = 0
+    // Reject (0,0), which is a constant and contributes no slope.
+    while (kx === 0 && ky === 0) {
+      kx = Math.round(range(rng, -max, max))
+      ky = Math.round(range(rng, -max, max))
+      if (Math.hypot(kx, ky) < min) {
+        kx = 0
+        ky = 0
+      }
+    }
+    return { kx, ky }
+  }
+
+  const waves = Array.from({ length: 11 }, (_, i) => {
+    const swell = i < 5
+    const { kx, ky } = swell ? intVec(1, 2) : intVec(3, 8)
     return {
-      angle: rng() * Math.PI * 2,
-      freq: long ? 1 + rng() * 2 : 4 + rng() * 7,
+      kx,
+      ky,
       phase: rng() * Math.PI * 2,
-      amp: long ? 0.55 + rng() * 0.45 : 0.1 + rng() * 0.16,
+      amp: swell ? 1.0 + rng() * 0.8 : 0.12 + rng() * 0.2,
     }
   })
 
   const heightAt = (u: number, v: number) => {
     let h = 0
     for (const w of waves) {
-      const k =
-        Math.cos(w.angle) * u * Math.PI * 2 * w.freq +
-        Math.sin(w.angle) * v * Math.PI * 2 * w.freq
+      const k = (w.kx * u + w.ky * v) * Math.PI * 2
       h += Math.sin(k + w.phase) * w.amp
     }
     return h
@@ -54,7 +86,7 @@ function buildNormals(): DataTexture {
 
   // Central differences give normals that match the height field exactly.
   const e = 1 / SIZE
-  const strength = 0.055
+  const strength = 0.085
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
