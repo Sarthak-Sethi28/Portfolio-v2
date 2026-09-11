@@ -28,19 +28,21 @@ interface Bird {
   beat: number
 }
 
-export function Birds({ count = 9, palette }: { count?: number; palette: Palette }) {
+export function Birds({ count = 16, palette }: { count?: number; palette: Palette }) {
   const group = useRef<Group>(null)
 
   const birds = useMemo<Bird[]>(() => {
     const rng = createRng(SEED.stars + 41)
     return Array.from({ length: count }, () => ({
-      radius: range(rng, 90, 260),
-      height: range(rng, 34, 88),
+      // Closer and lower than before: at 90-260 units out and 88 up they were
+      // a few pixels near the zenith, which is not where anyone is looking.
+      radius: range(rng, 55, 190),
+      height: range(rng, 26, 62),
       // Slow. A bird crossing the frame in two seconds reads as an insect.
       speed: range(rng, 0.022, 0.055) * (rng() < 0.5 ? -1 : 1),
       phase: range(rng, 0, Math.PI * 2),
       tilt: range(rng, -0.22, 0.22),
-      scale: range(rng, 0.8, 1.7),
+      scale: range(rng, 1.5, 3.4),
       beat: range(rng, 2.6, 4.4),
     }))
   }, [count])
@@ -56,7 +58,7 @@ export function Birds({ count = 9, palette }: { count?: number; palette: Palette
       child.position.set(
         Math.cos(a) * b.radius,
         b.height + Math.sin(a * 2.3 + b.phase) * 4.5,
-        Math.sin(a) * b.radius - 120,
+        Math.sin(a) * b.radius - 105,
       )
       // Face along the tangent of travel.
       child.rotation.set(b.tilt, -a + (b.speed > 0 ? Math.PI / 2 : -Math.PI / 2), 0)
@@ -82,7 +84,7 @@ export function Birds({ count = 9, palette }: { count?: number; palette: Palette
                 color={palette.monolith}
                 side={DoubleSide}
                 transparent
-                opacity={0.72}
+                opacity={0.85}
                 toneMapped={false}
               />
             </mesh>
