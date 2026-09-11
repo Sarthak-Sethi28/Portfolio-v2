@@ -46,6 +46,8 @@ Locked against three generated concept frames, stored beside this document:
 | `concept-1.png` | World 1 — the array at dusk |
 | `concept-2.png` | World 2 — the aperture and the colonnade |
 | `concept-3.png` | Night mode |
+| `contact-1.png` | The dish lowered to read the water (§5a) |
+| `contact-2.png` | Transmission (§5a) |
 
 **The world.** A dead-flat salt plain under a centimetre of standing water that
 mirrors the entire sky. Colossal matte-black brutalist monoliths stand in it,
@@ -181,7 +183,7 @@ viewer, each a section. The aperture stands at centre.
 | Monolith N | `ABOUT` |
 | Monolith E | `EXPERIENCE` |
 | Monolith S | `WRITING` |
-| Monolith W | `CONTACT` |
+| Monolith W | `CONTACT` — focuses the dish, not a panel (§5a) |
 | Aperture (centre) | Transition to World 2 |
 
 ### World 2 — THROUGH THE APERTURE
@@ -220,6 +222,42 @@ should sit through the full boot twice.
 | Hold on aperture | Charge-up, then world transition |
 | `Esc` | Close panel, return camera to rest |
 | `Tab` | Cycle monuments — keyboard reaches every section |
+
+### 5a. Contact is a transmission
+
+The reference site's contact is a panel: a friendly line and two links. Every
+portfolio has that panel. Ours does not have it.
+
+The array already contains a radio telescope, and a radio telescope exists to make
+contact. So the dish *is* the contact form. Reference frames `contact-1.png` and
+`contact-2.png`.
+
+**The sequence:**
+
+1. The visitor focuses the dish. It is aimed at the sky. Water goes glass-still.
+2. They type. Characters do not appear as DOM text — the water surface **deforms
+   into the letterforms**, legible in the reflection rather than on the surface.
+3. On send, the dish rotates down to face the water, holds, then swings back to
+   the sky.
+4. Light pulses travel up the lattice struts. The rim's red aircraft lights blink
+   the message in morse. A beam leaves for the sky.
+5. Ripples dissolve. `TRANSMITTED · <UTC timestamp>`.
+
+**How the ripple-text works.** Typed text is rendered to an offscreen 2D canvas.
+That canvas becomes a displacement and normal input to the water shader, so the
+surface is bent into the glyph shapes rather than having text drawn onto it. This
+is why it reads only in reflection — it is geometry, not a texture overlay. A decay
+term relaxes the displacement back to flat over ~4s after send.
+
+**Fallback.** Every step above is ornament on a real form. At Low quality tier,
+with reduced motion, or with no WebGL, contact is a plain accessible `<form>` with
+the same fields and the same endpoint. The transmission never gates the message.
+
+**Delivery.** `POST /api/transmit` → email to Sarthak. Rate-limited by IP via
+Vercel KV, with a honeypot field. No third-party form service.
+
+**Cost.** One additional PR (§10, PR 8b). Justified: contact is the conversion
+point of a portfolio, and this is the moment people will screen-record.
 
 ### SYS.CONFIG
 
@@ -334,6 +372,7 @@ One PR each. Every PR ships a Vercel preview to look at before merge.
 | 6 | Content modules, zod schemas, section panels, keyboard path, `/about` routes | Every section reachable by mouse, keyboard, and URL |
 | 7 | **World 2** — aperture transition, colonnade, project pillars, detail panels | Preview matches `concept-2.png`; round trip works |
 | 8 | `SYS.CONFIG` wired to live uniforms, localStorage, audio + mute, acknowledgments | Every slider visibly changes the world |
+| 8b | **Transmission contact** (§5a) — water displacement text, dish rotation, send animation, `/api/transmit`, rate limit, plain-form fallback | A message typed into the water arrives in Sarthak's inbox; the plain form does too |
 | 9 | Quality tiers, touch controls, reduced-motion, no-WebGL fallback | Budgets in §6 met on a real Pixel; fallback is complete |
 | 10 | OG image, metadata, favicon, sitemap, domain, uwatering webring | Live |
 
@@ -352,6 +391,8 @@ real preview URL before anything is built on top of it.
 | The boot sequence annoys repeat visitors | Abbreviated replay after first visit |
 | Scope creep — this world invites endless additions | Phase table is the contract. New ideas go to a backlog, not into an open PR |
 | Audio autoplay policy | Muted by default, explicit unmute, exactly as the reference does it |
+| Ripple-text is unreadable in practice — too subtle, or illegible on small screens | The plain form is always one click away and is the only path on Low tier. If the effect does not read clearly at 1080p in PR 8b, it ships as ornament behind a legible DOM field rather than as the input itself |
+| The transmission animation makes people think their message did not send | Confirmation is explicit text with a timestamp, not just the animation. Failure states say so in the same place |
 
 ---
 
