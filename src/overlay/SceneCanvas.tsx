@@ -24,7 +24,10 @@ export function SceneCanvas() {
   const setReducedMotion = useScene((s) => s.setReducedMotion)
   const maxDpr = useScene((s) => s.quality.maxDpr)
 
+  const applyFlags = useScene((s) => s.applyFlags)
+
   useEffect(() => {
+    applyFlags()
     setQuality(detectTier())
 
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -33,7 +36,7 @@ export function SceneCanvas() {
     mq.addEventListener('change', onChange)
 
     return () => mq.removeEventListener('change', onChange)
-  }, [setQuality, setReducedMotion])
+  }, [applyFlags, setQuality, setReducedMotion])
 
   return (
     <Canvas

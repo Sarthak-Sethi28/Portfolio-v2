@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { SectionId } from '@/content'
 import { settingsFor, type QualitySettings, type Tier } from '@/lib/quality'
+import { readFlags, type Flags } from '@/lib/flags'
 
 /**
  * The only channel between world/ and overlay/.
@@ -54,6 +55,12 @@ interface SceneState {
   muted: boolean
   quality: QualitySettings
   reducedMotion: boolean
+  /** URL debug flags. Read once at startup; see lib/flags.ts. */
+  flags: Flags
+  applyFlags: () => void
+  /** Peak frame-to-frame luminance delta per probe region. */
+  flicker: number[]
+  setFlicker: (v: number[]) => void
 
   /** Section monolith under the pointer, or null. */
   hovered: SectionId | null
@@ -90,6 +97,15 @@ export const useScene = create<SceneState>((set) => ({
   muted: true,
   quality: settingsFor('high'),
   reducedMotion: false,
+  flags: {
+    still: false,
+    noBloom: false,
+    noMotes: false,
+    noReflect: false,
+    noPost: false,
+    probe: false,
+  },
+  flicker: [],
 
   hovered: null,
   openSection: null,
@@ -105,6 +121,8 @@ export const useScene = create<SceneState>((set) => ({
   toggleMuted: () => set((s) => ({ muted: !s.muted })),
   setQuality: (tier) => set({ quality: settingsFor(tier) }),
   setReducedMotion: (reducedMotion) => set({ reducedMotion }),
+  applyFlags: () => set({ flags: readFlags() }),
+  setFlicker: (flicker) => set({ flicker }),
   setHovered: (hovered) => set({ hovered }),
   openSectionPanel: (openSection) => set({ openSection, openProject: null }),
   openProjectPanel: (openProject) => set({ openProject, openSection: null }),

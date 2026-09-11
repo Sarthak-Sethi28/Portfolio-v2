@@ -14,6 +14,7 @@ import { Water } from './array/Water'
 import { ArrayWorld } from './array/ArrayWorld'
 import { IdleRig } from './camera/IdleRig'
 import { createAnim, type Anim } from './anim'
+import { FlickerProbe } from './FlickerProbe'
 
 /**
  * Composes a world: atmosphere, geometry, lighting, and the grade.
@@ -28,6 +29,8 @@ export function Stage() {
   const quality = useScene((s) => s.quality)
   const rain = useScene((s) => s.rain)
   const moteCount = useScene((s) => effectiveMoteCount({ config: s.config, quality: s.quality }))
+  const flags = useScene((s) => s.flags)
+  const setFlicker = useScene((s) => s.setFlicker)
 
   const palette = useMemo(() => createPalette(), [])
   // NOTE: no chromatic aberration.
@@ -104,13 +107,13 @@ export function Stage() {
         <Water
           palette={palette}
           roughness={config.waterRoughness}
-          reflectorResolution={quality.reflectorResolution}
+          reflectorResolution={flags.noReflect ? 0 : quality.reflectorResolution}
           distort={rain ? 0.32 : 0.04}
         />
         <ArrayWorld palette={palette} />
       </Suspense>
 
-      <Motes count={moteCount} palette={palette} />
+      <Motes count={flags.noMotes ? 0 : moteCount} palette={palette} />
       <IdleRig />
 
       {/* multisampling is NOT optional.
@@ -119,12 +122,15 @@ export function Stage() {
           scene is hard-aliased, and because the idle camera never stops
           drifting those edges crawl pixel by pixel — which is what reads as
           the whole image flickering. There is 120fps of headroom here. */}
+      {flags.probe && <FlickerProbe onSample={setFlicker} />}
+
+      {flags.noPost ? null : (
       <EffectComposer enableNormalPass={false} multisampling={8}>
-        {quality.bloom ? (
+        {quality.bloom && !flags.noBloom ? (
           <Bloom
-            intensity={0.28}
-            luminanceThreshold={0.93}
-            luminanceSmoothing={0.18}
+            intensity={0.22}
+            luminanceThreshold={0.72}
+            luminanceSmoothing={0.5}
             mipmapBlur
           />
         ) : (
@@ -140,6 +146,7 @@ export function Stage() {
             need to be a fixed texture sampled in screen space; a per-frame
             random is unusable regardless of opacity. */}
       </EffectComposer>
+      )}
     </>
   )
 }
