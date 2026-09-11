@@ -105,7 +105,6 @@ function buildConcrete(): DataTexture {
   // where trilinear alone would go mushy.
   tex.minFilter = LinearMipmapLinearFilter
   tex.generateMipmaps = true
-  tex.anisotropy = 8
   tex.needsUpdate = true
   return tex
 }
@@ -125,9 +124,17 @@ function base(): DataTexture {
  * one's value. Clones share the underlying image data and cost only a small
  * wrapper object each.
  */
-export function concreteTiled(repeatX: number, repeatY: number): DataTexture {
+export function concreteTiled(
+  repeatX: number,
+  repeatY: number,
+  anisotropy = 8,
+): DataTexture {
   const tex = base().clone()
   tex.repeat.set(repeatX, repeatY)
+  // Slab faces are large and seen very obliquely, which is the worst case for
+  // mip selection: without high anisotropy each pixel flips between mip levels
+  // as the camera drifts, and the surface crawls.
+  tex.anisotropy = anisotropy
   tex.needsUpdate = true
   return tex
 }

@@ -22,6 +22,8 @@ export interface Flags {
   noPost: boolean
   /** Run the frame-to-frame luminance probe. Costs a pipeline stall. */
   probe: boolean
+  /** Drop the concrete surface map — isolates texture shimmer from edge crawl. */
+  noTex: boolean
 }
 
 const EMPTY: Flags = {
@@ -31,6 +33,7 @@ const EMPTY: Flags = {
   noReflect: false,
   noPost: false,
   probe: false,
+  noTex: false,
 }
 
 export function readFlags(): Flags {
@@ -44,5 +47,6 @@ export function readFlags(): Flags {
     noReflect: plain || q.has('noreflect'),
     noPost: plain || q.has('nopost'),
     probe: q.has('flicker'),
+    noTex: plain || q.has('notex'),
   }
 }

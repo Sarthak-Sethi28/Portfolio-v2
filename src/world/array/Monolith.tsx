@@ -2,9 +2,11 @@
 
 import { useMemo } from 'react'
 import { RoundedBox } from '@react-three/drei'
+import { useThree } from '@react-three/fiber'
 import type { Placement } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
 import { concreteTiled } from '../materials/concrete'
+import { useScene } from '@/store/scene'
 
 /**
  * One slab.
@@ -35,29 +37,31 @@ export function Monolith({
   onClick?: () => void
 }) {
   const { position, rotationY, width, height, depth, shoulder } = placement
+  const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
+  const noTex = useScene((s) => s.flags.noTex)
   // Tiling scaled to world size, so a short slab and a tall one share the same
   // aggregate grain instead of one looking like a scaled photo of the other.
-  const map = useMemo(() => concreteTiled(width / 9, height / 9), [width, height])
+  const map = useMemo(() => concreteTiled(width / 9, height / 9, maxAniso), [width, height, maxAniso])
   const shoulderMap = useMemo(
     () =>
       shoulder
-        ? concreteTiled((width * shoulder.width) / 9, (height * shoulder.height) / 9)
+        ? concreteTiled((width * shoulder.width) / 9, (height * shoulder.height) / 9, maxAniso)
         : null,
-    [width, height, shoulder],
+    [width, height, shoulder, maxAniso],
   )
 
   const material = (tex: typeof map) => (
     <meshStandardMaterial
       color={palette.monolith}
-      roughness={0.86 - emphasis * 0.22}
-      metalness={0.04 + emphasis * 0.24}
-      roughnessMap={tex}
+      roughness={0.86 - emphasis * 0.16}
+      metalness={0.04 + emphasis * 0.1}
+      roughnessMap={noTex ? null : tex}
       // No bumpMap. A perturbed normal under a near-horizontal key light
       // aliases into specular glitter across the whole face — the surface
       // variation has to come from roughness alone, which does not move the
       // normal and therefore cannot sparkle.
       emissive={palette.sunColor}
-      emissiveIntensity={emphasis * 0.05}
+      emissiveIntensity={emphasis * 0.14}
     />
   )
 

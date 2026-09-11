@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { SECTIONS } from '@/content'
 import { useScene } from '@/store/scene'
 import { scatterField, sectionRing } from '../geometry/layout'
@@ -22,6 +22,13 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
   const hovered = useScene((s) => s.hovered)
   const setHovered = useScene((s) => s.setHovered)
   const openSectionPanel = useScene((s) => s.openSectionPanel)
+
+  useEffect(() => {
+    document.body.style.cursor = hovered ? 'pointer' : 'auto'
+    return () => {
+      document.body.style.cursor = 'auto'
+    }
+  }, [hovered])
 
   const sections = useMemo(
     () => sectionRing(SECTIONS.length, config.arraySpacing),
