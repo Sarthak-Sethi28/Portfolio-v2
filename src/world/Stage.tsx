@@ -113,7 +113,13 @@ export function Stage() {
       <Motes count={moteCount} palette={palette} />
       <IdleRig />
 
-      <EffectComposer enableNormalPass={false}>
+      {/* multisampling is NOT optional.
+          EffectComposer renders into its own buffer, which silently discards
+          the `antialias: true` set on the Canvas. Without it every edge in the
+          scene is hard-aliased, and because the idle camera never stops
+          drifting those edges crawl pixel by pixel — which is what reads as
+          the whole image flickering. There is 120fps of headroom here. */}
+      <EffectComposer enableNormalPass={false} multisampling={8}>
         {quality.bloom ? (
           <Bloom
             intensity={0.28}
