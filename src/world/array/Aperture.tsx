@@ -54,7 +54,7 @@ export function Aperture({
   })
 
   return (
-    <group position={[0, radius + 1.2, -104]}>
+    <group position={[-26, radius + 1.2, -150]}>
       {/* Main ring. radialSegments 4 gives a squared section with flat faces. */}
       <mesh rotation={[0, 0, Math.PI / 4]} castShadow>
         <torusGeometry args={[radius, tube, 4, 128]} />

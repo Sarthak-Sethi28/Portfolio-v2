@@ -26,6 +26,8 @@ export interface Flags {
   noTex: boolean
   /** Drop the photographic sky plate, leaving the procedural gradient. */
   noPlate: boolean
+  /** Hide every DOM overlay above the canvas. */
+  noUi: boolean
 }
 
 const EMPTY: Flags = {
@@ -37,6 +39,7 @@ const EMPTY: Flags = {
   probe: false,
   noTex: false,
   noPlate: false,
+  noUi: false,
 }
 
 export function readFlags(): Flags {
@@ -52,5 +55,6 @@ export function readFlags(): Flags {
     probe: q.has('flicker'),
     noTex: plain || q.has('notex'),
     noPlate: plain || q.has('noplate'),
+    noUi: q.has('noui'),
   }
 }
