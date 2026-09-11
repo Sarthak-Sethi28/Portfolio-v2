@@ -65,7 +65,7 @@ export function Monolith({
       if (!m) continue
       m.emissiveIntensity = e * 0.14
       m.roughness = 0.86 - e * 0.16
-      m.metalness = 0.04 + e * 0.1
+      m.envMapIntensity = 0.35 + e * 0.25
     }
   })
 
@@ -78,7 +78,13 @@ export function Monolith({
       ref={collect}
       color={palette.monolith}
       roughness={0.86}
-      metalness={0.04}
+      // Concrete is a dielectric: its metalness is zero, not nearly zero.
+      // Any metalness at all makes the face mirror the environment map, and
+      // that reflection changes with every camera move — correct physics, but
+      // another thing that can only ever shimmer while the view is moving.
+      metalness={0}
+      // The environment still lights these; it just does not mirror in them.
+      envMapIntensity={0.35}
       roughnessMap={noTex ? null : tex}
       emissive={palette.sunColor}
       emissiveIntensity={0}
