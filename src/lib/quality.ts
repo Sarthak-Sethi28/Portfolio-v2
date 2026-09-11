@@ -23,11 +23,14 @@ export interface QualitySettings {
 
 const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
   high: {
-    // 512 was being stretched across a 2560px display — a 5x upscale, which
-    // stair-steps every reflected edge and makes them crawl as the camera
-    // drifts. Measured headroom on this scene is a locked 120fps, so the cost
-    // is affordable and the artefact is not.
-    reflectorResolution: 2048,
+    // 1024, not 2048.
+    //
+    // 512 stair-stepped the reflected edges; 2048 cost roughly 70fps. At DPR 2
+    // the reflector renders the whole scene again into a 2048 target every
+    // frame, and that plus 8x multisampling took a locked 120fps down to a
+    // juddering 43-50 — which, on a 120Hz panel, is what the "flicker"
+    // actually was. 1024 is sharp enough and affordable.
+    reflectorResolution: 1024,
     particleScale: 1,
     bloom: true,
     depthOfField: true,
