@@ -32,7 +32,10 @@ export const CONFIG_DEFAULTS: Config = {
   arraySpacing: 42,
   fieldDensity: 18,
   fogDensity: 0.0019,
-  moteCount: 150,
+  // Off by default. Sub-pixel additive points flicker as they cross pixel
+  // boundaries, and large enough to be stable they read as bright squares.
+  // Available on the slider for anyone who wants them.
+  moteCount: 0,
   cursorRepelForce: 1,
   waterRoughness: 0.11,
 }

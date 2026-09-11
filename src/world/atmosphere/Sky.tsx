@@ -1,11 +1,12 @@
 'use client'
 
 import { useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
 import {
   BackSide,
   Color,
+  LinearMipmapLinearFilter,
   MirroredRepeatWrapping,
   RepeatWrapping,
   ShaderMaterial,
@@ -142,6 +143,8 @@ export function Sky({ palette, anim }: { palette: Palette; anim: AnimRef }) {
   // Wrapping and colour space are configured in the loader callback rather
   // than after the fact: mutating a value returned from a hook is a React
   // Compiler violation, and this is the hook's own construction point.
+  const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
+
   const [dusk, night] = useTexture(['/sky/dusk.jpg', '/sky/night.jpg'], (loaded) => {
     const list = (Array.isArray(loaded) ? loaded : [loaded]) as Texture[]
     list.forEach((tex, i) => {
@@ -150,6 +153,13 @@ export function Sky({ palette, anim }: { palette: Palette; anim: AnimRef }) {
       tex.wrapS = i === 0 ? MirroredRepeatWrapping : RepeatWrapping
       tex.wrapT = RepeatWrapping
       tex.colorSpace = SRGBColorSpace
+      // Without this the horizon band shimmers: the plate is extremely
+      // compressed at grazing angles and single-sample mip selection flips
+      // per pixel as the camera moves.
+      tex.anisotropy = maxAniso
+      tex.generateMipmaps = true
+      tex.minFilter = LinearMipmapLinearFilter
+      tex.needsUpdate = true
     })
   }) as Texture[]
 
@@ -181,7 +191,7 @@ export function Sky({ palette, anim }: { palette: Palette; anim: AnimRef }) {
 
   return (
     <mesh frustumCulled={false} renderOrder={-1000}>
-      <sphereGeometry args={[900, 64, 40]} />
+      <sphereGeometry args={[2200, 64, 40]} />
       <shaderMaterial
         ref={matRef}
         uniforms={uniforms}
