@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { MeshReflectorMaterial } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Vector2 } from 'three'
@@ -36,7 +36,7 @@ export function Water({
   const normals = useMemo(() => waterNormalTexture().clone(), [])
   const normalScale = useMemo(() => new Vector2(0.24, 0.24), [])
 
-  useMemo(() => {
+  useEffect(() => {
     distortion.repeat.set(7, 7)
     normals.repeat.set(13, 13)
     distortion.anisotropy = maxAniso
@@ -67,9 +67,6 @@ export function Water({
             roughness={Math.max(0.18, roughness)}
             depthScale={0}
             color={palette.waterTint}
-            // Water is a dielectric. The planar reflection is already explicit;
-            // setting metalness to 1 was double-counting reflection and made
-            // the surface read as polished chrome/stone.
             metalness={0}
             mirror={0.78}
             distortion={distort * 0.42}
@@ -86,9 +83,6 @@ export function Water({
         )}
       </mesh>
 
-      {/* Physical surface sheen. This is what creates the broad moving light
-          breakup visible in high-end WebGL water without making the planar
-          reflection itself noisy. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]} renderOrder={2}>
         <planeGeometry args={[1600, 1600, 1, 1]} />
         <meshPhysicalMaterial
