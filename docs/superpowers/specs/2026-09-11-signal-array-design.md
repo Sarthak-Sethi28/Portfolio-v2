@@ -192,9 +192,26 @@ Cold. `PROJECTS`. A colonnade of pillars recedes into fog, one per project.
 Clicking a pillar lights it and opens the project panel. The aperture behind the
 viewer returns to World 1.
 
-Projects at launch: `semantic-guardian`, `Chatbot-University-of-Waterloo`,
-`iMoney`, the WPEC deal-group site, `Danier-Chatbot`. Adding a sixth means adding
-one object to `content/projects.ts`; the colonnade sizes itself.
+Projects at launch, carried over from the current portfolio and ordered by weight:
+
+| # | Project | Year | Accolade |
+| --- | --- | --- | --- |
+| 1 | Valldor — autonomous procurement software | 2026 | a16z conditional offer · YC interview |
+| 2 | Muse Sketch Studio — prompt → sketch → runway video | 2025 | Hackathon winner |
+| 3 | CarRaksha — Arduino collision prevention with impaired-driving detection | 2023 | 1st prize |
+| 4 | Custom Chatbot — Shopify-syncing AI search | 2025 | — |
+| 5 | iMoney — WCAG 2.1 AAA finance app for the visually impaired | 2024 | — |
+| 6 | Low-Stock Alert System — inventory alerts, 100% delivery | 2025 | Internal tool |
+
+The colonnade sizes itself from the array length, so adding or removing a project
+is a one-object edit in `content/projects.ts` and nothing else. **Content is
+expected to churn** — the roster above is a starting state, not a fixture. No
+geometry, camera path, or layout constant may be hard-coded against a count of
+six. This is a testable property, asserted in PR 6 with a 3-project and a
+12-project fixture.
+
+Pillar 1 is nearest the aperture and reads first. Accolades render as an etched
+band on the pillar, which is why they live in the content type rather than in prose.
 
 ### Entry sequence
 
@@ -314,17 +331,36 @@ rather than rendering blank.
 export interface Project {
   slug: string
   title: string
-  blurb: string          // one line, shown on the pillar
+  blurb: string          // one line, etched on the pillar
   body: string           // panel copy
   stack: string[]
+  accolade?: string      // "a16z conditional offer", "1st prize" — etched band
   repo?: string
   live?: string
   year: number
+}
+
+export interface Role {
+  org: string
+  title: string
+  location: string
+  start: string          // ISO "2026-01"
+  end: string | null     // null = present
+  blurb: string
 }
 ```
 
 Editing the site is editing a file and pushing. Should a CMS ever be wanted, every
 consumer reads through `content/index.ts`, so the swap is contained to that module.
+
+**Content churns; the world must not care.** Sarthak expects to revise experience
+and projects often. Two rules follow, both enforced by tests rather than
+discipline:
+
+1. No count, label, or dimension derived from content may be hard-coded in
+   `world/` or `overlay/`. Layouts compute from array length.
+2. `content/*.ts` is the only file anyone edits to update the site. Changing a job
+   title must never require touching a shader, a camera path, or a component.
 
 ---
 
