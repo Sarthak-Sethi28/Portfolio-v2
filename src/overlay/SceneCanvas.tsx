@@ -23,6 +23,10 @@ export function SceneCanvas() {
   const setQuality = useScene((s) => s.setQuality)
   const setReducedMotion = useScene((s) => s.setReducedMotion)
   const maxDpr = useScene((s) => s.quality.maxDpr)
+  const dpr = Math.max(
+    1,
+    Math.floor(Math.min(maxDpr, typeof window === 'undefined' ? 1 : window.devicePixelRatio)),
+  )
 
   const applyFlags = useScene((s) => s.applyFlags)
 
@@ -40,10 +44,11 @@ export function SceneCanvas() {
 
   return (
     <Canvas
-      // Fixed for the session, never recomputed from frame timings. The store
-      // starts at the high tier, so on capable hardware detection confirms the
-      // value and the buffer is never resized at all.
-      dpr={maxDpr}
+      // Fixed for the session, never recomputed from frame timings, and always
+      // an integer — floored against the device's own ratio so the framebuffer
+      // maps 1:1 or 1:2 onto physical pixels rather than being resampled by a
+      // fractional factor on its way to the panel.
+      dpr={dpr}
       gl={{ antialias: true, powerPreference: 'high-performance', alpha: false }}
       camera={{ fov: 56, near: 0.35, far: 6000, position: [0, 4.6, 58] }}
       style={{ position: 'absolute', inset: 0 }}

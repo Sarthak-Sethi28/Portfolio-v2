@@ -31,7 +31,15 @@ const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
     particleScale: 1,
     bloom: true,
     depthOfField: true,
-    maxDpr: 1.6,
+    // MUST be an integer.
+    //
+    // A fractional pixel ratio means the browser resamples every frame by a
+    // non-integer factor on the way to the panel. Standing still that is
+    // invisible; in motion each edge lands on a different sub-pixel phase
+    // every frame and shimmers. It survived every other fix because it is not
+    // in the scene at all — it is the scale between the framebuffer and the
+    // display.
+    maxDpr: 2,
     rainEnabled: true,
   },
   medium: {
@@ -39,7 +47,7 @@ const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
     particleScale: 0.5,
     bloom: true,
     depthOfField: false,
-    maxDpr: 1.5,
+    maxDpr: 1,
     rainEnabled: true,
   },
   low: {
