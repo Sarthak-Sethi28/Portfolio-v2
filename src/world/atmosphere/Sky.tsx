@@ -80,24 +80,20 @@ const fragment = /* glsl */ `
     float az = atan(dir.z, dir.x);
 
     /*
-     * Seam-free azimuth for TEXTURE sampling.
+     * Azimuth for TEXTURE sampling.
      *
-     * atan(z, x) jumps from +PI to -PI at the seam behind the camera. The GPU
-     * picks a mip level by differencing neighbouring pixels' UVs, and across
-     * that jump the difference is enormous — so it concludes the texture is
-     * infinitely minified and drops to the blurriest mip. The result is a band
-     * of mush that sweeps across the sky as the camera turns, present only
-     * when the view is moving.
+     * An earlier version used acos of the horizontal direction here, to avoid
+     * atan's +PI/-PI jump. That was a bad trade: acos has an INFINITE
+     * derivative at its endpoints, and those endpoints land directly ahead of
+     * and directly behind the camera. It replaced a seam nobody looks at with
+     * a hard line straight down the middle of the view — visible as a long
+     * thin streak through the sky.
      *
-     * acos of the normalised horizontal direction is continuous everywhere:
-     * it folds front-to-back instead of wrapping, so there is no discontinuity
-     * for the derivative to trip over. The fold mirrors the plate, which is
-     * invisible in cirrus and is exactly what MirroredRepeatWrapping already
-     * assumes. The raw az is still used for the procedural terms, which are
-     * analytic and have no mip level to get wrong.
+     * atan's discontinuity is at +/-PI, which is behind the viewer. That is
+     * where a seam belongs. The 0.5 offset rotates it further from the
+     * composition's forward axis.
      */
-    vec2 flat_dir = normalize(vec2(dir.x, dir.z) + vec2(1e-6));
-    float azSafe = acos(clamp(flat_dir.x, -1.0, 1.0)) / PI;
+    float azSafe = az / (2.0 * PI) + 0.5;
 
     // --- procedural base -------------------------------------------------
     float t = pow(clamp(h * 0.5 + 0.5, 0.0, 1.0), 0.55);
