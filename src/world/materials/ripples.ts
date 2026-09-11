@@ -1,54 +1,81 @@
-import { DataTexture, LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, RGBAFormat, UnsignedByteType } from 'three'
+import {
+  DataTexture,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  RepeatWrapping,
+  RGBAFormat,
+  UnsignedByteType,
+} from 'three'
 import { createRng } from '@/lib/rng'
 
 /**
- * A tiling distortion field for the water surface.
+ * A tiling water surface, as a true NORMAL map.
  *
- * A perfect mirror does not read as water — it reads as polished stone, which
- * is exactly the complaint. Real standing water has a slow-moving surface, and
- * what sells it is not big waves (this is a centimetre deep) but a very low
- * amplitude, long-wavelength disturbance that makes the reflection breathe
- * and wander instead of sitting frozen.
+ * The previous version encoded a flat 2D offset, which only smeared the
+ * reflection sideways. That is not what water looks like: a real surface has
+ * SLOPE, and slope is what catches a highlight on the near side of every wave
+ * and darkens the far side. Without normals the plain can only ever be a
+ * wobbling mirror — it can never glint.
  *
- * Encoded as a two-channel offset in R and G, sampled by MeshReflectorMaterial
- * as a distortion map. Deliberately smooth: any high-frequency content here
- * would alias into the shimmer we just spent so long removing.
+ * Built by summing directional waves and differentiating the height field, so
+ * the normals are actually consistent with a surface rather than invented.
+ * Kept low-frequency and low-amplitude: this is a centimetre of standing water
+ * on a salt flat, not open sea, and high-frequency content here would alias
+ * exactly as the earlier shimmer did.
  */
 
-const SIZE = 256
+const SIZE = 512
 
-function buildRipples(): DataTexture {
+function buildNormals(): DataTexture {
   const rng = createRng(0x1c7e93)
   const data = new Uint8Array(SIZE * SIZE * 4)
 
-  // Sum of a handful of directional sine waves at irrational frequency ratios,
-  // so the pattern never visibly repeats within a tile.
-  const waves = Array.from({ length: 6 }, () => ({
-    angle: rng() * Math.PI * 2,
-    freq: 1 + rng() * 3.2,
-    phase: rng() * Math.PI * 2,
-    amp: 0.35 + rng() * 0.65,
-  }))
+  // A few long crossing swells plus finer ripples riding on them.
+  const waves = Array.from({ length: 9 }, (_, i) => {
+    const long = i < 4
+    return {
+      angle: rng() * Math.PI * 2,
+      freq: long ? 1 + rng() * 2 : 4 + rng() * 7,
+      phase: rng() * Math.PI * 2,
+      amp: long ? 0.55 + rng() * 0.45 : 0.1 + rng() * 0.16,
+    }
+  })
+
+  const heightAt = (u: number, v: number) => {
+    let h = 0
+    for (const w of waves) {
+      const k =
+        Math.cos(w.angle) * u * Math.PI * 2 * w.freq +
+        Math.sin(w.angle) * v * Math.PI * 2 * w.freq
+      h += Math.sin(k + w.phase) * w.amp
+    }
+    return h
+  }
+
+  // Central differences give normals that match the height field exactly.
+  const e = 1 / SIZE
+  const strength = 0.055
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
-      const u = (x / SIZE) * Math.PI * 2
-      const v = (y / SIZE) * Math.PI * 2
+      const u = x / SIZE
+      const v = y / SIZE
 
-      let dx = 0
-      let dy = 0
-      for (const w of waves) {
-        const k = Math.cos(w.angle) * u * w.freq + Math.sin(w.angle) * v * w.freq
-        const s = Math.sin(k + w.phase) * w.amp
-        dx += Math.cos(w.angle) * s
-        dy += Math.sin(w.angle) * s
-      }
+      const dx = (heightAt(u + e, v) - heightAt(u - e, v)) / (2 * e)
+      const dy = (heightAt(u, v + e) - heightAt(u, v - e)) / (2 * e)
+
+      let nx = -dx * strength
+      let ny = -dy * strength
+      const nz = 1
+      const len = Math.hypot(nx, ny, nz)
+      nx /= len
+      ny /= len
+      const nzn = nz / len
 
       const i = (y * SIZE + x) * 4
-      // Remapped into 0-255 around a neutral 128, the no-offset value.
-      data[i] = Math.max(0, Math.min(255, Math.round(128 + dx * 42)))
-      data[i + 1] = Math.max(0, Math.min(255, Math.round(128 + dy * 42)))
-      data[i + 2] = 128
+      data[i] = Math.round((nx * 0.5 + 0.5) * 255)
+      data[i + 1] = Math.round((ny * 0.5 + 0.5) * 255)
+      data[i + 2] = Math.round((nzn * 0.5 + 0.5) * 255)
       data[i + 3] = 255
     }
   }
@@ -65,7 +92,22 @@ function buildRipples(): DataTexture {
 
 let cached: DataTexture | null = null
 
-export function rippleTexture(): DataTexture {
-  cached ??= buildRipples()
+function base(): DataTexture {
+  cached ??= buildNormals()
   return cached
+}
+
+/**
+ * Water is never one wave train.
+ *
+ * Two copies of the same field at different scales, drifting in different
+ * directions, are what stop a surface reading as a scrolling texture — the
+ * interference between them never repeats.
+ */
+export function waterNormals(repeat: number, anisotropy = 8): DataTexture {
+  const tex = base().clone()
+  tex.repeat.set(repeat, repeat)
+  tex.anisotropy = anisotropy
+  tex.needsUpdate = true
+  return tex
 }

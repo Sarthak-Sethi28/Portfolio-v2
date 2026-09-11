@@ -7,6 +7,7 @@ import { MathUtils, type MeshStandardMaterial } from 'three'
 import type { Placement } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
 import { concreteTiled } from '../materials/concrete'
+import { ArchedBay } from './ArchedBay'
 import { useScene } from '@/store/scene'
 
 /**
@@ -103,10 +104,21 @@ export function Monolith({
   const bevel = Math.min(0.22, width * 0.035)
 
   // String courses divide the shaft into storeys.
-  const courses = useMemo(() => {
-    const n = Math.max(1, detail.reveals)
-    return Array.from({ length: n }, (_, i) => height * ((i + 1) / (n + 1)) - height / 2)
-  }, [detail.reveals, height])
+  const n = Math.max(1, Math.min(3, detail.reveals))
+  const courses = useMemo(
+    () => Array.from({ length: n }, (_, i) => height * ((i + 1) / (n + 1)) - height / 2),
+    [n, height],
+  )
+
+  // The storeys BETWEEN those courses are where the bays go.
+  const storeys = useMemo(() => {
+    const count = n + 1
+    const storeyH = height / count
+    return Array.from({ length: count }, (_, i) => ({
+      centre: -height / 2 + storeyH * (i + 0.5),
+      height: storeyH,
+    }))
+  }, [n, height])
 
   const corners: [number, number][] = [
     [-1, -1],
@@ -137,6 +149,29 @@ export function Monolith({
           {mat}
         </RoundedBox>
       ))}
+
+      {/* Arched bays, one per storey, on the two faces the camera can see.
+          Real recessed voids with layered orders — this is where the sense of
+          a carved, built object actually comes from. */}
+      {storeys.map((st, i) =>
+        [0, Math.PI].map((rot, f) => (
+          <group
+            key={`bay-${i}-${f}`}
+            position={[0, st.centre, 0]}
+            rotation={[0, rot, 0]}
+          >
+            <group position={[0, -st.height / 2, coreD / 2]}>
+              <ArchedBay
+                width={coreW * 0.92}
+                height={st.height * 0.86}
+                depth={Math.min(coreD, coreW) * 0.26}
+              >
+                {mat}
+              </ArchedBay>
+            </group>
+          </group>
+        )),
+      )}
 
       {/* String courses banding between the pilasters. Proud of the core but
           shy of the pilasters, so they read as a moulding, not a collar. */}
