@@ -43,3 +43,6 @@ next-env.d.ts
 # local dev
 .vercel
 *.tsbuildinfo
+
+# generated bundle for external review
+signal-array-src.zip
