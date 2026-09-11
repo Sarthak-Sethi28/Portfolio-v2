@@ -32,13 +32,14 @@ export function IdleRig() {
   const pointer = useThree((s) => s.pointer)
   const reducedMotion = useScene((s) => s.reducedMotion)
   const freelook = useScene((s) => s.freelook)
+  const still = useScene((s) => s.flags.still)
 
   const lean = useRef(new Vector3())
 
   useFrame(({ clock }, delta) => {
     if (freelook) return
 
-    if (reducedMotion) {
+    if (reducedMotion || still) {
       camera.position.copy(REST)
       camera.lookAt(TARGET)
       return

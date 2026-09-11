@@ -18,6 +18,7 @@ import { useScene } from '@/store/scene'
 export function Stats() {
   const quality = useScene((s) => s.quality)
   const reducedMotion = useScene((s) => s.reducedMotion)
+  const flicker = useScene((s) => s.flicker)
   const ref = useRef<HTMLDivElement>(null)
   const [fps, setFps] = useState(0)
   const [low, setLow] = useState(0)
@@ -89,6 +90,11 @@ export function Stats() {
       <div>reflector :: {quality.reflectorResolution || 'off'}</div>
       <div>dpr cap :: {quality.maxDpr}</div>
       <div>reduced-motion :: {reducedMotion ? 'yes' : 'no'}</div>
+      {flicker.length > 0 && (
+        <div style={{ color: Math.max(...flicker) > 2 ? '#ff7b72' : '#7ee787' }}>
+          flicker :: {flicker.map((v) => v.toFixed(2)).join(' / ')}
+        </div>
+      )}
       <div ref={gpuRef} style={{ maxWidth: 260, opacity: 0.65 }}>
         gpu :: —
       </div>
