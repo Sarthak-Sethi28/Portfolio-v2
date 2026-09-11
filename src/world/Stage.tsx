@@ -109,7 +109,7 @@ export function Stage() {
           palette={palette}
           roughness={config.waterRoughness}
           reflectorResolution={flags.noReflect ? 0 : quality.reflectorResolution}
-          distort={rain ? 0.5 : 0.16}
+          distort={rain ? 0.75 : 0.32}
         />
         <ArrayWorld palette={palette} />
       </Suspense>
