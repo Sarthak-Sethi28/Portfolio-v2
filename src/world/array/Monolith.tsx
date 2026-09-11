@@ -47,16 +47,12 @@ export function Monolith({
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
   const noTex = useScene((s) => s.flags.noTex)
 
-  const map = useMemo(
-    () => concreteTiled(width / 9, height / 9, maxAniso),
-    [width, height, maxAniso],
-  )
+  // Horizontal tiling only; the vertical axis runs once so the waterline
+  // stain sits at the base instead of repeating up the shaft.
+  const map = useMemo(() => concreteTiled(width / 11, maxAniso), [width, maxAniso])
   const shoulderMap = useMemo(
-    () =>
-      shoulder
-        ? concreteTiled((width * shoulder.width) / 9, (height * shoulder.height) / 9, maxAniso)
-        : null,
-    [width, height, shoulder, maxAniso],
+    () => (shoulder ? concreteTiled((width * shoulder.width) / 11, maxAniso) : null),
+    [width, shoulder, maxAniso],
   )
 
   const mats = useRef<MeshStandardMaterial[]>([])
