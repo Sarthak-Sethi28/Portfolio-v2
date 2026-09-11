@@ -128,8 +128,11 @@ export function Stage() {
           the whole image flickering. There is 120fps of headroom here. */}
       {flags.probe && <FlickerProbe onSample={setFlicker} />}
 
+      {/* multisampling is 4x, not 8x: at DPR 2 it is billed per sub-sample
+          across the whole framebuffer, and 8x was a large part of what turned
+          a locked 120fps into a juddering 43-50. SMAA below covers the rest. */}
       {flags.noPost ? null : (
-      <EffectComposer enableNormalPass={false} multisampling={8}>
+      <EffectComposer enableNormalPass={false} multisampling={4}>
         {quality.bloom && !flags.noBloom ? (
           <Bloom
             intensity={0.22}
