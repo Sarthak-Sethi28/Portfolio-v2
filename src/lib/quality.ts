@@ -23,9 +23,11 @@ export interface QualitySettings {
 
 const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
   high: {
-    // 1024 with a wide blur was the dominant frame cost. 512 is visually
-    // indistinguishable here because the surface is blurred regardless.
-    reflectorResolution: 512,
+    // 512 was being stretched across a 2560px display — a 5x upscale, which
+    // stair-steps every reflected edge and makes them crawl as the camera
+    // drifts. Measured headroom on this scene is a locked 120fps, so the cost
+    // is affordable and the artefact is not.
+    reflectorResolution: 2048,
     particleScale: 1,
     bloom: true,
     depthOfField: true,
@@ -33,7 +35,7 @@ const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
     rainEnabled: true,
   },
   medium: {
-    reflectorResolution: 384,
+    reflectorResolution: 1024,
     particleScale: 0.5,
     bloom: true,
     depthOfField: false,
@@ -42,7 +44,7 @@ const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
   },
   low: {
     // Still reflective, just cheaply. Losing the mirror is losing the world.
-    reflectorResolution: 256,
+    reflectorResolution: 512,
     particleScale: 0.25,
     bloom: false,
     depthOfField: false,
