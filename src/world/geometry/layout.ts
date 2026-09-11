@@ -1,4 +1,4 @@
-import { createRng, range, sign, SEED } from '@/lib/rng'
+import { createRng, range, rangeInt, sign, SEED } from '@/lib/rng'
 
 /**
  * Placement maths for both worlds.
@@ -30,6 +30,24 @@ export interface Placement {
     width: number
     /** -1 attaches to the left face, 1 to the right. */
     side: -1 | 1
+  }
+  /**
+   * Architectural detail.
+   *
+   * A rectangular prism reads as a primitive no matter how it is textured.
+   * What makes cast concrete read as BUILT is the vocabulary of how it was
+   * poured: a cornice oversailing the top, a plinth spreading at the base, and
+   * horizontal reveals where one lift of formwork met the next. All three are
+   * silhouette-level cues, so they survive being seen almost entirely in
+   * shadow — which is how these are seen.
+   */
+  detail: {
+    /** Oversail of the cap, as a fraction of width. 0 means no cornice. */
+    cornice: number
+    /** Spread of the base plinth, as a fraction of width. 0 means none. */
+    plinth: number
+    /** Number of recessed horizontal reveal bands. */
+    reveals: number
   }
 }
 
@@ -97,6 +115,11 @@ export function sectionRing(count: number, radius: number): Placement[] {
             side: sign(rng) as -1 | 1,
           }
         : undefined,
+      detail: {
+        cornice: rng() < 0.7 ? range(rng, 0.03, 0.075) : 0,
+        plinth: rng() < 0.55 ? range(rng, 0.04, 0.09) : 0,
+        reveals: rangeInt(rng, 1, 4),
+      },
     }
   })
 }
@@ -133,6 +156,11 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
             side: sign(rng) as -1 | 1,
           }
         : undefined,
+      detail: {
+        cornice: rng() < 0.5 ? range(rng, 0.03, 0.06) : 0,
+        plinth: 0,
+        reveals: rangeInt(rng, 0, 2),
+      },
     })
   }
   return out
@@ -170,6 +198,7 @@ export function colonnade(
         height,
         width,
         depth: width,
+        detail: { cornice: 0.05, plinth: 0.04, reveals: 2 },
       })
       continue
     }
@@ -182,6 +211,7 @@ export function colonnade(
       height,
       width,
       depth: width,
+      detail: { cornice: 0.05, plinth: 0.04, reveals: 2 },
     })
   }
   return out
