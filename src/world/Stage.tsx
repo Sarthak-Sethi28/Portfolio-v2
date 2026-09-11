@@ -11,6 +11,7 @@ import { blendPalette, createPalette } from './atmosphere/palette'
 import { Sky } from './atmosphere/Sky'
 import { Motes } from './atmosphere/Motes'
 import { Birds } from './atmosphere/Birds'
+import { Debris } from './atmosphere/Debris'
 import { Water } from './array/Water'
 import { ArrayWorld } from './array/ArrayWorld'
 import { IdleRig } from './camera/IdleRig'
@@ -118,6 +119,9 @@ export function Stage() {
       {/* Something in the frame with its own intent. A drifting camera over a
           still world still reads as a photograph. */}
       {!flags.still && <Birds palette={palette} />}
+      {/* Motion the eye can actually track — water and cloud read as texture,
+          not as movement. */}
+      {!flags.still && <Debris palette={palette} />}
       <IdleRig />
 
       {/* multisampling is NOT optional.

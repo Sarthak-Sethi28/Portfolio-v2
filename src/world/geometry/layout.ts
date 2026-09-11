@@ -76,7 +76,7 @@ export function sectionRing(count: number, radius: number): Placement[] {
   const staging = [
     { a: -1.52, r: 1.02, h: 1.85, w: 2.6 }, // wide mass, crops the left edge
     { a: 1.55, r: 1.08, h: 1.7, w: 2.5 }, // wide mass, crops the right edge
-    { a: -0.34, r: 2.45, h: 2.5, w: 0.8 }, // the tall tower, set well back
+    { a: -0.52, r: 3.4, h: 2.6, w: 0.72 }, // the tall tower, well back and off-axis
     { a: 0.62, r: 2.3, h: 1.45, w: 1.5 }, // mid right, behind the gap
   ]
 
