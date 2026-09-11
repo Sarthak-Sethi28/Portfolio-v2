@@ -18,19 +18,19 @@ import type { Palette } from './palette'
  * geometry rather than points or sprites, so they antialias like everything
  * else and cannot produce the sub-pixel sparkle that additive particles did.
  */
-export function Debris({ count = 22, palette }: { count?: number; palette: Palette }) {
+export function Debris({ count = 9, palette }: { count?: number; palette: Palette }) {
   const group = useRef<Group>(null)
 
   const pieces = useMemo(() => {
     const rng = createRng(SEED.debris + 17)
     return Array.from({ length: count }, () => ({
-      radius: range(rng, 70, 300),
-      height: range(rng, 18, 95),
+      radius: range(rng, 180, 420),
+      height: range(rng, 55, 150),
       angle: range(rng, 0, Math.PI * 2),
       drift: range(rng, 0.004, 0.016) * (rng() < 0.5 ? -1 : 1),
       bob: range(rng, 1.5, 5),
       bobRate: range(rng, 0.08, 0.22),
-      size: [range(rng, 1.2, 4.5), range(rng, 0.8, 3.2), range(rng, 1.0, 3.8)] as [
+      size: [range(rng, 2.5, 7), range(rng, 1.6, 5), range(rng, 2, 6)] as [
         number,
         number,
         number,

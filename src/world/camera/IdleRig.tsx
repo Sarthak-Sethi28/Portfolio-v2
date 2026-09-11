@@ -19,8 +19,17 @@ import { useScene } from '@/store/scene'
  * becomes mathematically still again as soon as input settles.
  */
 
-const REST = new Vector3(0, 4.6, 58)
-const TARGET = new Vector3(0, 26, -76)
+/**
+ * Elevated and pulled back, looking slightly DOWN.
+ *
+ * The old rig sat about a metre above the water aiming up past the piers,
+ * which is dramatic but crops them — you never see a whole pier, and the array
+ * reads as fragments. From above you can follow each shaft from cornice to
+ * waterline, and the plain opens out behind them instead of being a sliver at
+ * the bottom of frame.
+ */
+const REST = new Vector3(0, 52, 168)
+const TARGET = new Vector3(0, 14, -96)
 
 const POINTER_DEADZONE = 0.045
 const AIM_X = 2.2
