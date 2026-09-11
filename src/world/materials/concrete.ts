@@ -1,4 +1,11 @@
-import { DataTexture, RGBAFormat, RepeatWrapping, UnsignedByteType, LinearFilter } from 'three'
+import {
+  DataTexture,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  RGBAFormat,
+  RepeatWrapping,
+  UnsignedByteType,
+} from 'three'
 import { createRng } from '@/lib/rng'
 
 /**
@@ -92,8 +99,13 @@ function buildConcrete(): DataTexture {
   tex.wrapS = RepeatWrapping
   tex.wrapT = RepeatWrapping
   tex.magFilter = LinearFilter
-  tex.minFilter = LinearFilter
-  tex.generateMipmaps = false
+  // Mipmaps are NOT optional here. Without them a tiled map seen at a glancing
+  // angle — which is every tall slab — aliases into a moire that crawls across
+  // the face on every camera movement. Anisotropy keeps it sharp at the angles
+  // where trilinear alone would go mushy.
+  tex.minFilter = LinearMipmapLinearFilter
+  tex.generateMipmaps = true
+  tex.anisotropy = 8
   tex.needsUpdate = true
   return tex
 }

@@ -43,23 +43,23 @@ export function sectionRing(count: number, radius: number): Placement[] {
   if (count <= 0) return []
 
   /**
-   * Not an even ring.
+   * Staged to a specific frame, not scattered.
    *
-   * An evenly spaced ring renders as a turntable of equal boxes in the middle
-   * distance — correct, and completely unmonumental. Scale is a compositional
-   * effect: it comes from objects near enough to be CROPPED by the frame,
-   * towering over a camera that sits low and looks up past them.
+   * The reference composition is: a wide mass cropped by the left edge, a
+   * clear gap, a tall narrow tower near the centre, another gap showing the
+   * dish and the horizon, then wide masses cropped by the right edge. The
+   * GAPS are the composition — they are what the eye travels through, and
+   * what lets the aperture and the mirrored plain be seen at all.
    *
-   * So the first two sections are staged close and huge, flanking the lens,
-   * and the remainder step back and inward. The ring radius still scales the
-   * whole arrangement, so the SYS.CONFIG slider keeps working.
+   * `a` is the bearing from the camera axis, `r` scales the ring radius, `h`
+   * and `w` scale height and width. Width is explicit per slot because a
+   * random width on a near mass either blocks the centre or looks like a post.
    */
   const staging = [
-    // angle around the camera axis, radial scale, height scale
-    { a: -1.34, r: 0.72, h: 2.2 }, // near left, cropped by the frame edge
-    { a: 1.38, r: 0.78, h: 2.0 }, // near right
-    { a: -0.44, r: 1.45, h: 1.5 }, // mid, left of the aperture
-    { a: 0.40, r: 1.85, h: 1.3 }, // mid, right of the aperture
+    { a: -1.52, r: 1.02, h: 1.85, w: 2.6 }, // wide mass, crops the left edge
+    { a: 1.55, r: 1.08, h: 1.7, w: 2.5 }, // wide mass, crops the right edge
+    { a: -0.30, r: 1.55, h: 2.35, w: 0.75 }, // the tall narrow tower
+    { a: 0.62, r: 2.3, h: 1.45, w: 1.5 }, // mid right, behind the gap
   ]
 
   return Array.from({ length: count }, (_, i) => {
@@ -69,8 +69,14 @@ export function sectionRing(count: number, radius: number): Placement[] {
     const r = radius * s.r * (1 + tier * 0.8)
 
     const rng = createRng(SEED.fieldMonoliths + i * 7919)
-    const height = range(rng, 30, 40) * s.h
-    const width = range(rng, 9, 13) * (s.h > 1.8 ? 1.25 : 1)
+    // Proportion is the whole argument.
+    //
+    // These were 9-13 wide against 60-90 tall, which is a column. The
+    // reference frame's slabs are MASSES — wide, blocky, closer to a wall than
+    // a tower, so that a single one can fill a quarter of the frame and read
+    // as architecture rather than as a post.
+    const height = range(rng, 26, 34) * s.h
+    const width = range(rng, 11, 14) * s.w
     // Roughly two in three carry a step. Uniformly notched reads as a pattern;
     // never notched reads as a box.
     const stepped = rng() < 0.66
@@ -83,7 +89,7 @@ export function sectionRing(count: number, radius: number): Placement[] {
       rotationY: -s.a + range(rng, -0.14, 0.14),
       height,
       width,
-      depth: range(rng, 8, 11),
+      depth: range(rng, 13, 19),
       shoulder: stepped
         ? {
             height: range(rng, 0.42, 0.68),
@@ -111,15 +117,15 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
     // sqrt keeps the scatter area-uniform instead of clustering at the centre.
     const r = innerRadius * 1.5 + Math.sqrt(rng()) * innerRadius * 5.5
     // Distant slabs read as taller because fog eats their base.
-    const height = range(rng, 14, 52) * (1 + r / 420)
-    const width = range(rng, 4, 13)
+    const height = range(rng, 14, 46) * (1 + r / 420)
+    const width = range(rng, 10, 26)
     const stepped = rng() < 0.5
     out.push({
       position: [Math.cos(angle) * r, height / 2, Math.sin(angle) * r],
       rotationY: range(rng, 0, Math.PI * 2),
       height,
       width,
-      depth: range(rng, 4, 11),
+      depth: range(rng, 9, 20),
       shoulder: stepped
         ? {
             height: range(rng, 0.35, 0.7),

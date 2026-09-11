@@ -2,16 +2,8 @@
 
 import { Suspense, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import {
-  Bloom,
-  ChromaticAberration,
-  EffectComposer,
-  Noise,
-  ToneMapping,
-  Vignette,
-} from '@react-three/postprocessing'
+import { Bloom, EffectComposer, Noise, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { BlendFunction, ToneMappingMode } from 'postprocessing'
-import { Vector2 } from 'three'
 import { MathUtils, type DirectionalLight, type FogExp2 } from 'three'
 import { CONFIG_DEFAULTS, useScene, effectiveMoteCount } from '@/store/scene'
 import { blendPalette, createPalette } from './atmosphere/palette'
@@ -37,9 +29,11 @@ export function Stage() {
   const moteCount = useScene((s) => effectiveMoteCount({ config: s.config, quality: s.quality }))
 
   const palette = useMemo(() => createPalette(), [])
-  // Sub-pixel at 1080p. Enough to break the CG-clean edges, not enough to
-  // read as an effect.
-  const aberration = useMemo(() => new Vector2(0.0007, 0.0009), [])
+  // NOTE: no chromatic aberration.
+  //
+  // Even at sub-pixel offsets it split every drifting mote into separate red
+  // and blue dots, which reads as coloured speckle crawling over the frame
+  // rather than as a lens characteristic. Grain alone carries the film feel.
   const animRef = useRef<Anim>(createAnim())
   const sunRef = useRef<DirectionalLight>(null)
 
@@ -108,7 +102,6 @@ export function Stage() {
         ) : (
           <></>
         )}
-        <ChromaticAberration offset={aberration} />
         <Vignette offset={0.2} darkness={0.78} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
         {/* Grain last, over the graded image. A perfectly clean frame is the
