@@ -26,26 +26,45 @@ export interface Placement {
  */
 export function sectionRing(count: number, radius: number): Placement[] {
   if (count <= 0) return []
-  // Start a little off-axis so no monolith sits dead-centre of the opening
-  // shot and blocks the name.
-  const offset = Math.PI / count + 0.90
+
+  /**
+   * Not an even ring.
+   *
+   * An evenly spaced ring renders as a turntable of equal boxes in the middle
+   * distance — correct, and completely unmonumental. Scale is a compositional
+   * effect: it comes from objects near enough to be CROPPED by the frame,
+   * towering over a camera that sits low and looks up past them.
+   *
+   * So the first two sections are staged close and huge, flanking the lens,
+   * and the remainder step back and inward. The ring radius still scales the
+   * whole arrangement, so the SYS.CONFIG slider keeps working.
+   */
+  const staging = [
+    // angle around the camera axis, radial scale, height scale
+    { a: -1.34, r: 0.72, h: 2.2 }, // near left, cropped by the frame edge
+    { a: 1.38, r: 0.78, h: 2.0 }, // near right
+    { a: -0.44, r: 1.45, h: 1.5 }, // mid, left of the aperture
+    { a: 0.40, r: 1.85, h: 1.3 }, // mid, right of the aperture
+  ]
 
   return Array.from({ length: count }, (_, i) => {
-    const angle = offset + (i / count) * Math.PI * 2
-    // Deterministic per-index variation keeps the ring from reading as a
-    // turntable of identical objects.
+    const s = staging[i % staging.length]
+    // Sections beyond the staged four step progressively further out.
+    const tier = Math.floor(i / staging.length)
+    const r = radius * s.r * (1 + tier * 0.8)
+
     const rng = createRng(SEED.fieldMonoliths + i * 7919)
-    const height = range(rng, 26, 38)
+    const height = range(rng, 30, 40) * s.h
     return {
-      position: [Math.cos(angle) * radius, height / 2, Math.sin(angle) * radius] as [
+      position: [Math.sin(s.a) * r, height / 2, Math.cos(s.a) * r * -1] as [
         number,
         number,
         number,
       ],
-      rotationY: -angle + range(rng, -0.12, 0.12),
+      rotationY: -s.a + range(rng, -0.14, 0.14),
       height,
-      width: range(rng, 7, 10.5),
-      depth: range(rng, 6, 9),
+      width: range(rng, 9, 13) * (s.h > 1.8 ? 1.25 : 1),
+      depth: range(rng, 8, 11),
     }
   })
 }

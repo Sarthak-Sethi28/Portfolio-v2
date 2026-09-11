@@ -34,8 +34,8 @@ export function Water({
           // loses coherence toward the horizon.
           blur={[160, 38]}
           resolution={reflectorResolution}
-          mixBlur={0.55}
-          mixStrength={14}
+          mixBlur={0.35}
+          mixStrength={22}
           roughness={roughness}
           depthScale={1.15}
           minDepthThreshold={0.35}

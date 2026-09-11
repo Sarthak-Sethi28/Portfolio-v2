@@ -8,18 +8,22 @@ import type { Palette } from '../atmosphere/palette'
 /**
  * The radio telescope.
  *
- * The one object in the array that is not a box, and the only one that is pale
- * rather than black — which is what makes it the eye's destination on the
- * horizon. It is also the contact form (spec §5a), so it is built as an
- * articulated rig: `tilt` and `heading` are driven from outside rather than
- * baked into the geometry.
+ * The only pale object in a black array, which makes it the eye's destination
+ * on the horizon, and the only one that is not a box. It is also the contact
+ * form (spec §5a), so it is built as an articulated rig: `tilt` and `heading`
+ * are driven from outside rather than baked into the geometry.
+ *
+ * A real dish reads as a dish because of three cues, all of which the first
+ * version lacked: an OPEN truss tower rather than a solid pedestal, a defined
+ * rim around the reflector, and visible radial structure on its back. Without
+ * them it is a mushroom.
  */
 export function Dish({
   palette,
-  position = [150, 0, -230],
-  radius = 26,
-  tilt = -0.62,
-  heading = 2.3,
+  position = [128, 0, -196],
+  radius = 30,
+  tilt = -0.5,
+  heading = 2.55,
   /** 0 to 1. Lights the struts and rim during a transmission. */
   transmit = 0,
 }: {
@@ -32,91 +36,132 @@ export function Dish({
   transmit?: number
 }) {
   const profile = useMemo(() => dishProfile(radius), [radius])
-  const struts = useMemo(() => strutRing(14, radius * 0.66), [radius])
-  const lights = useMemo(() => rimLights(12, radius * 0.99, 0), [radius])
+  const backStruts = useMemo(() => strutRing(18, radius * 0.62), [radius])
+  const lights = useMemo(() => rimLights(14, radius * 0.985, 0.2), [radius])
 
-  const pedestalHeight = radius * 0.86
-  const mountHeight = radius * 0.52
+  const towerHeight = radius * 1.45
+  const towerHalf = radius * 0.24
+  // Four legs, splayed, braced — an open frame you can see the sky through.
+  const legs: [number, number][] = [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ]
+  const braceLevels = [0.24, 0.52, 0.8]
+
+  const steel = '#8e948f'
+  const darkSteel = '#4a4f4e'
 
   return (
     <group position={position} rotation={[0, heading, 0]}>
-      {/* Pedestal rising out of the water. */}
-      <mesh position={[0, pedestalHeight / 2, 0]} castShadow>
-        <cylinderGeometry args={[radius * 0.2, radius * 0.3, pedestalHeight, 16]} />
-        <meshStandardMaterial color={palette.ambient} roughness={0.85} metalness={0.12} />
+      {/* --- open truss tower ------------------------------------------- */}
+      {legs.map(([sx, sz], i) => (
+        <mesh
+          key={`leg-${i}`}
+          position={[sx * towerHalf * 0.72, towerHeight / 2, sz * towerHalf * 0.72]}
+          rotation={[sz * 0.075, 0, -sx * 0.075]}
+        >
+          <cylinderGeometry args={[radius * 0.017, radius * 0.026, towerHeight, 6]} />
+          <meshStandardMaterial color={darkSteel} roughness={0.72} metalness={0.4} />
+        </mesh>
+      ))}
+
+      {braceLevels.map((f, li) => (
+        <group key={`brace-${li}`} position={[0, towerHeight * f, 0]}>
+          {[0, 1].map((r) => (
+            <mesh key={r} rotation={[0, (r * Math.PI) / 2, 0]}>
+              <boxGeometry args={[towerHalf * 1.5, radius * 0.02, radius * 0.02]} />
+              <meshStandardMaterial color={darkSteel} roughness={0.72} metalness={0.4} />
+            </mesh>
+          ))}
+          {/* Diagonals — what makes a truss read as a truss at silhouette size. */}
+          {[-1, 1].map((d) => (
+            <mesh key={`d${d}`} rotation={[0, 0, d * 0.62]}>
+              <boxGeometry args={[towerHalf * 1.9, radius * 0.014, radius * 0.014]} />
+              <meshStandardMaterial color={darkSteel} roughness={0.75} metalness={0.35} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+
+      {/* Azimuth turret at the top of the tower. */}
+      <mesh position={[0, towerHeight + radius * 0.1, 0]}>
+        <cylinderGeometry args={[towerHalf * 0.7, towerHalf * 0.85, radius * 0.2, 12]} />
+        <meshStandardMaterial color={steel} roughness={0.62} metalness={0.45} />
       </mesh>
 
-      {/* Yoke that carries the elevation axis. */}
-      <mesh position={[0, pedestalHeight + mountHeight / 2, 0]} castShadow>
-        <boxGeometry args={[radius * 0.5, mountHeight, radius * 0.34]} />
-        <meshStandardMaterial color={palette.ambient} roughness={0.8} metalness={0.18} />
-      </mesh>
-
-      {/* Everything above the elevation axis tilts together. */}
-      <group position={[0, pedestalHeight + mountHeight, 0]} rotation={[tilt, 0, 0]}>
-        {/* The reflector. Rotated so the lathe's +Y becomes the face normal. */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
-          <latheGeometry args={[profile, 64]} />
+      {/* --- everything above the elevation axis tilts together ---------- */}
+      <group position={[0, towerHeight + radius * 0.2, 0]} rotation={[tilt, 0, 0]}>
+        {/* The reflector. */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <latheGeometry args={[profile, 72]} />
           <meshStandardMaterial
-            color="#c8ccc9"
-            roughness={0.52}
-            metalness={0.3}
+            color="#cdd1cd"
+            roughness={0.46}
+            metalness={0.34}
             side={DoubleSide}
           />
         </mesh>
 
-        {/* Back lattice. Thin bars from the rim down to the hub — in the
-            reference frame these catch the transmission pulse. */}
-        {struts.map((s, i) => (
+        {/* Rim. A defined edge is the strongest single "this is a dish" cue. */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+          <torusGeometry args={[radius * 0.995, radius * 0.016, 8, 80]} />
+          <meshStandardMaterial color={steel} roughness={0.5} metalness={0.5} />
+        </mesh>
+
+        {/* Radial backing structure. */}
+        {backStruts.map((s, i) => (
           <mesh
-            key={i}
-            position={[s.x * 0.5, -radius * 0.26, s.z * 0.5]}
-            rotation={[0, -s.angle, Math.PI / 2 - 0.42]}
-            castShadow
+            key={`back-${i}`}
+            position={[s.x * 0.52, -radius * 0.2, s.z * 0.52]}
+            rotation={[0, -s.angle, Math.PI / 2 - 0.5]}
           >
-            <cylinderGeometry args={[0.22, 0.22, radius * 0.92, 6]} />
+            <cylinderGeometry args={[radius * 0.008, radius * 0.008, radius * 0.86, 5]} />
             <meshStandardMaterial
-              color="#3f4446"
+              color={darkSteel}
               roughness={0.7}
-              metalness={0.35}
-              emissive="#8fc8ff"
-              emissiveIntensity={transmit * 2.2}
+              metalness={0.38}
+              emissive="#9fd4ff"
+              emissiveIntensity={transmit * 2.4}
             />
           </mesh>
         ))}
 
         {/* Feed tripod and the receiver at the focus. */}
         {[0, 1, 2].map((i) => {
-          const a = (i / 3) * Math.PI * 2
+          const a = (i / 3) * Math.PI * 2 + 0.4
           return (
             <mesh
-              key={i}
-              position={[
-                (Math.cos(a) * radius * 0.62) / 2,
-                radius * 0.42,
-                (Math.sin(a) * radius * 0.62) / 2,
-              ]}
-              rotation={[Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5]}
+              key={`feed-${i}`}
+              position={[Math.cos(a) * radius * 0.3, radius * 0.4, Math.sin(a) * radius * 0.3]}
+              rotation={[Math.sin(a) * 0.62, 0, -Math.cos(a) * 0.62]}
             >
-              <cylinderGeometry args={[0.16, 0.16, radius * 0.95, 6]} />
-              <meshStandardMaterial color="#babfbd" roughness={0.6} metalness={0.3} />
+              <cylinderGeometry args={[radius * 0.008, radius * 0.008, radius * 0.95, 5]} />
+              <meshStandardMaterial color={steel} roughness={0.58} metalness={0.42} />
             </mesh>
           )
         })}
-        <mesh position={[0, radius * 0.86, 0]}>
-          <cylinderGeometry args={[radius * 0.07, radius * 0.05, radius * 0.2, 12]} />
-          <meshStandardMaterial color="#d5d9d6" roughness={0.5} metalness={0.4} />
+        <mesh position={[0, radius * 0.83, 0]}>
+          <cylinderGeometry args={[radius * 0.05, radius * 0.035, radius * 0.17, 10]} />
+          <meshStandardMaterial color="#e0e4e0" roughness={0.44} metalness={0.5} />
         </mesh>
 
-        {/* Red aircraft warning lights around the rim. Always faintly on;
-            §5a blinks them as the morse channel. */}
+        {/* Red aircraft warning lights around the rim. §5a blinks these as the
+            morse channel for an outgoing transmission. */}
         {lights.map((l) => (
           <mesh key={l.index} position={l.position}>
-            <sphereGeometry args={[0.42, 8, 8]} />
+            <sphereGeometry args={[radius * 0.013, 8, 8]} />
             <meshBasicMaterial color="#ff2d20" toneMapped={false} />
           </mesh>
         ))}
       </group>
+
+      {/* Keeps the dish tied to the palette across the day/night blend. */}
+      <mesh position={[0, 0.12, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[towerHalf * 1.6, 24]} />
+        <meshStandardMaterial color={palette.monolith} roughness={0.9} metalness={0.1} />
+      </mesh>
     </group>
   )
 }

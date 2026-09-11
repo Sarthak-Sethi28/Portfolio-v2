@@ -15,8 +15,18 @@ export interface Palette {
   sunColor: Color
   /** Direction TO the sun, normalized. */
   sunDirection: Vector3
+  /** Brightness of the sun DISC in the sky shader. Wants to be large. */
   sunIntensity: number
-  /** Equals skyHorizon. Kept explicit so the invariant is visible. */
+  /** Brightness of the directional key light on geometry. Deliberately
+   *  separate: the sky needs a blown-out sun, the monoliths need to stay in
+   *  silhouette, and one number cannot serve both. */
+  keyIntensity: number
+  /**
+   * Derived from the sky, but pulled toward the zenith rather than set equal
+   * to the horizon. Real aerial perspective cools with distance — matching the
+   * warm horizon exactly turned every distant monolith cream instead of
+   * letting it recede into haze.
+   */
   fog: Color
   fogDensityScale: number
   monolith: Color
@@ -31,14 +41,15 @@ export const DAY: Palette = {
   skyZenith: new Color('#4b6d76'),
   skyHorizon: new Color('#ecdcb9'),
   sunColor: new Color('#ffd8a0'),
-  sunDirection: new Vector3(0.62, 0.075, -0.78).normalize(),
+  sunDirection: new Vector3(0.94, 0.045, -0.34).normalize(),
   sunIntensity: 3.4,
-  fog: new Color('#ecdcb9'),
+  keyIntensity: 0.85,
+  fog: new Color('#b6bda6'),
   fogDensityScale: 1,
-  monolith: new Color('#070a0c'),
-  waterTint: new Color('#9aa79f'),
+  monolith: new Color('#020304'),
+  waterTint: new Color('#7d8881'),
   ambient: new Color('#5d7a80'),
-  ambientIntensity: 0.26,
+  ambientIntensity: 0.17,
 }
 
 export const NIGHT: Palette = {
@@ -48,9 +59,10 @@ export const NIGHT: Palette = {
   // The "sun" at night is the moon, low and opposite the day sun.
   sunDirection: new Vector3(-0.45, 0.22, 0.86).normalize(),
   sunIntensity: 0.35,
-  fog: new Color('#16273f'),
+  keyIntensity: 0.14,
+  fog: new Color('#0e1c2e'),
   fogDensityScale: 1.35,
-  monolith: new Color('#04060a'),
+  monolith: new Color('#010203'),
   waterTint: new Color('#16243a'),
   ambient: new Color('#16304f'),
   ambientIntensity: 0.14,
@@ -63,7 +75,8 @@ export function blendPalette(t: number, out: Palette): Palette {
   out.sunColor.copy(DAY.sunColor).lerp(NIGHT.sunColor, t)
   out.sunDirection.copy(DAY.sunDirection).lerp(NIGHT.sunDirection, t).normalize()
   out.sunIntensity = DAY.sunIntensity + (NIGHT.sunIntensity - DAY.sunIntensity) * t
-  out.fog.copy(out.skyHorizon)
+  out.keyIntensity = DAY.keyIntensity + (NIGHT.keyIntensity - DAY.keyIntensity) * t
+  out.fog.copy(out.skyHorizon).lerp(out.skyZenith, 0.42)
   out.fogDensityScale = DAY.fogDensityScale + (NIGHT.fogDensityScale - DAY.fogDensityScale) * t
   out.monolith.copy(DAY.monolith).lerp(NIGHT.monolith, t)
   out.waterTint.copy(DAY.waterTint).lerp(NIGHT.waterTint, t)
@@ -81,6 +94,7 @@ export function createPalette(): Palette {
     sunColor: DAY.sunColor.clone(),
     sunDirection: DAY.sunDirection.clone(),
     sunIntensity: DAY.sunIntensity,
+    keyIntensity: DAY.keyIntensity,
     fog: DAY.fog.clone(),
     fogDensityScale: DAY.fogDensityScale,
     monolith: DAY.monolith.clone(),
