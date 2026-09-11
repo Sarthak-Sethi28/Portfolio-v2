@@ -68,8 +68,8 @@ export function archedPlate(
     // arris does; without it the opening reads as cut from paper.
     bevelThickness: thickness * 0.16,
     bevelSize: thickness * 0.16,
-    bevelSegments: 2,
-    curveSegments: 20,
+    bevelSegments: 1,
+    curveSegments: 10,
   })
   geo.translate(0, 0, -thickness / 2)
   return geo
