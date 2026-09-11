@@ -79,13 +79,22 @@ function buildConcrete(): DataTexture {
       const band = Math.abs(((v * 8) % 1) - 0.5)
       if (band > 0.47) n -= 0.10
 
-      // Remap into a narrow band near the top of the range.
+      // A VERY narrow band near the top of the range.
       //
-      // roughnessMap MULTIPLIES the material's roughness, so a texel near 0
-      // drives roughness to 0 — a perfect mirror — and the key light blows a
-      // specular hotspot across that patch. Concrete is never glossy, so the
-      // map has no business below about 0.6 anyway.
-      const banded = 0.62 + Math.max(0, Math.min(1, n)) * 0.38
+      // Two separate reasons, both learned the hard way:
+      //
+      // 1. roughnessMap MULTIPLIES the material's roughness, so a texel near 0
+      //    drives roughness to 0 — a perfect mirror — and the key light blows
+      //    a specular hotspot across that patch.
+      // 2. Roughness selects which blurred mip of the ENVIRONMENT map a pixel
+      //    samples. Wide variation means neighbouring pixels pick different
+      //    mips, and as the camera moves those choices flip back and forth —
+      //    specular aliasing that appears only when the view changes, which is
+      //    exactly the "it flickers when moving, not when still" symptom.
+      //
+      // Concrete is never glossy, and the surface interest here has to come
+      // from a whisper of variation rather than a wide range.
+      const banded = 0.84 + Math.max(0, Math.min(1, n)) * 0.14
       const v8 = Math.max(0, Math.min(255, Math.round(banded * 255)))
       const i = (y * SIZE + x) * 4
       data[i] = v8

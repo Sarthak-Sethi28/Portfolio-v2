@@ -95,7 +95,10 @@ const fragment = /* glsl */ `
     // camera can actually see and buried the teal. Compress it to its true
     // arc and let the procedural zenith take over above.
     float plateElev = clamp(elev / 0.52, 0.0, 1.0);
-    vec3 duskPlate = texture2D(uDusk, vec2(az / (2.0 * PI), plateElev)).rgb;
+    // The plate drifts. A static sky is half of why the world felt frozen;
+    // real cirrus is always moving, just slowly enough that you notice it
+    // only after a few seconds of looking.
+    vec3 duskPlate = texture2D(uDusk, vec2(az / (2.0 * PI) + uTime * 0.0016, plateElev)).rgb;
 
     // The plate was shot with a sun in it. Mirrored across the seam that sun
     // appears twice, and neither copy sits where our key light is — so roll
