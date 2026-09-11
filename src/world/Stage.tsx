@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Environment } from '@react-three/drei'
-import { Bloom, EffectComposer, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { EffectComposer, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { MathUtils, type DirectionalLight, type FogExp2 } from 'three'
 import { CONFIG_DEFAULTS, useScene, effectiveMoteCount } from '@/store/scene'
@@ -132,26 +132,19 @@ export function Stage() {
           across the whole framebuffer, and 8x was a large part of what turned
           a locked 120fps into a juddering 43-50. SMAA below covers the rest. */}
       {flags.noPost ? null : (
-      <EffectComposer enableNormalPass={false} multisampling={4}>
-        {quality.bloom && !flags.noBloom ? (
-          <Bloom
-            intensity={0.22}
-            luminanceThreshold={0.72}
-            luminanceSmoothing={0.5}
-            mipmapBlur
-          />
-        ) : (
-          <></>
-        )}
-        {/* SMAA in ADDITION to the composer's multisampling.
-            multisampling={8} should already cover geometry edges, but it is
-            applied to the composer's own buffer and there is no guarantee it
-            survives every driver and effect chain — and the flicker has
-            outlived three separate theories. SMAA works on the resolved image
-            regardless of how it was produced, so it catches edge crawl that
-            MSAA missed. Cheap, and the one AA that cannot be silently
-            discarded. */}
-        <SMAA />
+      <EffectComposer enableNormalPass={false} multisampling={flags.noMs ? 0 : 4}>
+        {/* NO BLOOM.
+            Bisected with Playwright: bloom alone takes frame-to-frame size
+            variance from 1.05x to 61x, and the broken frames are the scene
+            drawn into a fraction of the viewport with the rest black —
+            intermittent, and a violent flicker. Its internal render targets do
+            not stay in step with the canvas, and a fixed resolution does not
+            help, so the effect is simply unusable here.
+
+            Little is lost: the sun's disc, halo and wide glow are all drawn
+            analytically in the sky shader, so the light still blooms. This
+            only removed a pass that added a touch more on top. */}
+        {flags.noSmaa ? <></> : <SMAA />}
         <Vignette offset={0.2} darkness={0.78} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
         {/* NO GRAIN.

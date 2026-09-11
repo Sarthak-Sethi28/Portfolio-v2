@@ -28,6 +28,10 @@ export interface Flags {
   noPlate: boolean
   /** Hide every DOM overlay above the canvas. */
   noUi: boolean
+  /** Drop SMAA from the effect chain. */
+  noSmaa: boolean
+  /** Drop the composer's multisampling. */
+  noMs: boolean
 }
 
 const EMPTY: Flags = {
@@ -40,6 +44,8 @@ const EMPTY: Flags = {
   noTex: false,
   noPlate: false,
   noUi: false,
+  noSmaa: false,
+  noMs: false,
 }
 
 export function readFlags(): Flags {
@@ -56,5 +62,7 @@ export function readFlags(): Flags {
     noTex: plain || q.has('notex'),
     noPlate: plain || q.has('noplate'),
     noUi: q.has('noui'),
+    noSmaa: q.has('nosmaa'),
+    noMs: q.has('noms'),
   }
 }
