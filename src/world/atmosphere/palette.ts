@@ -1,0 +1,91 @@
+import { Color, Vector3 } from 'three'
+
+/**
+ * The palette, sampled from the approved concept frames.
+ *
+ * Every colour in the scene resolves from here. Fog in particular MUST equal
+ * the sky's horizon colour — if the two drift apart, distant geometry reads as
+ * pasted onto the sky instead of receding into it, and the entire sense of
+ * scale collapses.
+ */
+
+export interface Palette {
+  skyZenith: Color
+  skyHorizon: Color
+  sunColor: Color
+  /** Direction TO the sun, normalized. */
+  sunDirection: Vector3
+  sunIntensity: number
+  /** Equals skyHorizon. Kept explicit so the invariant is visible. */
+  fog: Color
+  fogDensityScale: number
+  monolith: Color
+  /** Tint multiplied into the water's reflection. Slightly darker than 1 reads
+   *  as water rather than as a mirror. */
+  waterTint: Color
+  ambient: Color
+  ambientIntensity: number
+}
+
+export const DAY: Palette = {
+  skyZenith: new Color('#4b6d76'),
+  skyHorizon: new Color('#ecdcb9'),
+  sunColor: new Color('#ffd8a0'),
+  sunDirection: new Vector3(0.62, 0.075, -0.78).normalize(),
+  sunIntensity: 3.4,
+  fog: new Color('#ecdcb9'),
+  fogDensityScale: 1,
+  monolith: new Color('#070a0c'),
+  waterTint: new Color('#9aa79f'),
+  ambient: new Color('#5d7a80'),
+  ambientIntensity: 0.26,
+}
+
+export const NIGHT: Palette = {
+  skyZenith: new Color('#03060f'),
+  skyHorizon: new Color('#16273f'),
+  sunColor: new Color('#9fb6d8'),
+  // The "sun" at night is the moon, low and opposite the day sun.
+  sunDirection: new Vector3(-0.45, 0.22, 0.86).normalize(),
+  sunIntensity: 0.35,
+  fog: new Color('#16273f'),
+  fogDensityScale: 1.35,
+  monolith: new Color('#04060a'),
+  waterTint: new Color('#16243a'),
+  ambient: new Color('#16304f'),
+  ambientIntensity: 0.14,
+}
+
+/** Linear blend between the two palettes. `t` of 0 is day, 1 is night. */
+export function blendPalette(t: number, out: Palette): Palette {
+  out.skyZenith.copy(DAY.skyZenith).lerp(NIGHT.skyZenith, t)
+  out.skyHorizon.copy(DAY.skyHorizon).lerp(NIGHT.skyHorizon, t)
+  out.sunColor.copy(DAY.sunColor).lerp(NIGHT.sunColor, t)
+  out.sunDirection.copy(DAY.sunDirection).lerp(NIGHT.sunDirection, t).normalize()
+  out.sunIntensity = DAY.sunIntensity + (NIGHT.sunIntensity - DAY.sunIntensity) * t
+  out.fog.copy(out.skyHorizon)
+  out.fogDensityScale = DAY.fogDensityScale + (NIGHT.fogDensityScale - DAY.fogDensityScale) * t
+  out.monolith.copy(DAY.monolith).lerp(NIGHT.monolith, t)
+  out.waterTint.copy(DAY.waterTint).lerp(NIGHT.waterTint, t)
+  out.ambient.copy(DAY.ambient).lerp(NIGHT.ambient, t)
+  out.ambientIntensity =
+    DAY.ambientIntensity + (NIGHT.ambientIntensity - DAY.ambientIntensity) * t
+  return out
+}
+
+/** A mutable palette instance for the render loop to write into each frame. */
+export function createPalette(): Palette {
+  return {
+    skyZenith: DAY.skyZenith.clone(),
+    skyHorizon: DAY.skyHorizon.clone(),
+    sunColor: DAY.sunColor.clone(),
+    sunDirection: DAY.sunDirection.clone(),
+    sunIntensity: DAY.sunIntensity,
+    fog: DAY.fog.clone(),
+    fogDensityScale: DAY.fogDensityScale,
+    monolith: DAY.monolith.clone(),
+    waterTint: DAY.waterTint.clone(),
+    ambient: DAY.ambient.clone(),
+    ambientIntensity: DAY.ambientIntensity,
+  }
+}

@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: #0b0e11;
+  overscroll-behavior: none;
+}
+
+/* The world is the page. Nothing scrolls. */
+body {
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}

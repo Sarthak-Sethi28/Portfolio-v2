@@ -1,0 +1,127 @@
+/**
+ * Device capability detection -> quality tier.
+ *
+ * Decided once at boot, before the first frame, so the scene never has to
+ * rebuild itself mid-session. Tiers are defined in the spec, section 6.
+ */
+
+export type Tier = 'high' | 'medium' | 'low'
+
+export interface QualitySettings {
+  tier: Tier
+  /** Reflector render-target resolution. 0 disables reflection entirely. */
+  reflectorResolution: number
+  /** Multiplier applied to every scattered-particle count. */
+  particleScale: number
+  bloom: boolean
+  depthOfField: boolean
+  /** Upper bound for device pixel ratio. */
+  maxDpr: number
+  /** Rain is the most expensive optional system. */
+  rainEnabled: boolean
+}
+
+const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
+  high: {
+    reflectorResolution: 1024,
+    particleScale: 1,
+    bloom: true,
+    depthOfField: true,
+    maxDpr: 2,
+    rainEnabled: true,
+  },
+  medium: {
+    reflectorResolution: 512,
+    particleScale: 0.5,
+    bloom: true,
+    depthOfField: false,
+    maxDpr: 1.5,
+    rainEnabled: true,
+  },
+  low: {
+    reflectorResolution: 0,
+    particleScale: 0.2,
+    bloom: false,
+    depthOfField: false,
+    maxDpr: 1,
+    rainEnabled: false,
+  },
+}
+
+export function settingsFor(tier: Tier): QualitySettings {
+  return { tier, ...SETTINGS[tier] }
+}
+
+/** Inputs to tier selection, extracted so the decision itself stays testable. */
+export interface DeviceProfile {
+  /** navigator.deviceMemory in GB, undefined when unreported. */
+  deviceMemory?: number
+  hardwareConcurrency: number
+  /** WEBGL_debug_renderer_info UNMASKED_RENDERER_WEBGL, lowercased. */
+  renderer: string
+  /** Coarse pointer implies touch, which implies a mobile GPU. */
+  coarsePointer: boolean
+  prefersReducedMotion: boolean
+}
+
+/**
+ * Pure, so it can be unit-tested against known device profiles rather than
+ * only discovered on real hardware.
+ */
+export function selectTier(p: DeviceProfile): Tier {
+  // Reduced motion is a request for calm, not necessarily a weak device, but
+  // the animated systems it disables are the same ones the low tier drops.
+  if (p.prefersReducedMotion) return 'low'
+
+  // Software renderers appear in CI and in browsers with GPU blocklists. They
+  // cannot sustain a reflector at any resolution.
+  if (/swiftshader|llvmpipe|softwarerasterizer|angle \(software/.test(p.renderer)) {
+    return 'low'
+  }
+
+  const weakMemory = p.deviceMemory !== undefined && p.deviceMemory <= 4
+  const weakCpu = p.hardwareConcurrency <= 4
+
+  if (p.coarsePointer) {
+    // Mobile. Apple's mobile GPUs carry a reflector at half res; most others do not.
+    return /apple/.test(p.renderer) && !weakMemory ? 'medium' : 'low'
+  }
+
+  if (weakMemory || weakCpu) return 'medium'
+  return 'high'
+}
+
+/** Reads the live browser environment. Returns 'medium' during SSR. */
+export function detectTier(): Tier {
+  if (typeof window === 'undefined') return 'medium'
+
+  let renderer = ''
+  try {
+    const canvas = document.createElement('canvas')
+    const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl')
+    if (!gl) return 'low'
+    const ext = gl.getExtension('WEBGL_debug_renderer_info')
+    if (ext) renderer = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)).toLowerCase()
+  } catch {
+    return 'low'
+  }
+
+  return selectTier({
+    deviceMemory: (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
+    hardwareConcurrency: navigator.hardwareConcurrency ?? 4,
+    renderer,
+    coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+    prefersReducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  })
+}
+
+/** True when WebGL is unavailable and the text fallback must be served instead. */
+export function hasWebGL(): boolean {
+  if (typeof window === 'undefined') return true
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(canvas.getContext('webgl2') ?? canvas.getContext('webgl'))
+  } catch {
+    return false
+  }
+}
