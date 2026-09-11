@@ -8,6 +8,7 @@ import type { Palette } from '../atmosphere/palette'
 import { Monolith } from './Monolith'
 import { Dish } from './Dish'
 import { Aperture } from './Aperture'
+import { Figure } from './Figure'
 
 /**
  * World 1 — the array.
@@ -56,6 +57,10 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
 
       <Aperture palette={palette} />
       <Dish palette={palette} />
+
+      {/* Scale reference. See Figure — nothing else in the world has a size
+          the viewer already knows. */}
+      <Figure palette={palette} position={[21, 0, -205]} />
     </group>
   )
 }
