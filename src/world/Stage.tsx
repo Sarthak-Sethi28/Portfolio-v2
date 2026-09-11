@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Environment } from '@react-three/drei'
-import { Bloom, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { Bloom, EffectComposer, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { MathUtils, type DirectionalLight, type FogExp2 } from 'three'
 import { CONFIG_DEFAULTS, useScene, effectiveMoteCount } from '@/store/scene'
@@ -140,6 +140,15 @@ export function Stage() {
         ) : (
           <></>
         )}
+        {/* SMAA in ADDITION to the composer's multisampling.
+            multisampling={8} should already cover geometry edges, but it is
+            applied to the composer's own buffer and there is no guarantee it
+            survives every driver and effect chain — and the flicker has
+            outlived three separate theories. SMAA works on the resolved image
+            regardless of how it was produced, so it catches edge crawl that
+            MSAA missed. Cheap, and the one AA that cannot be silently
+            discarded. */}
+        <SMAA />
         <Vignette offset={0.2} darkness={0.78} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
         {/* NO GRAIN.

@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { RoundedBox } from '@react-three/drei'
-import { useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
+import { MathUtils, type MeshStandardMaterial } from 'three'
 import type { Placement } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
 import { concreteTiled } from '../materials/concrete'
@@ -13,12 +14,18 @@ import { useScene } from '@/store/scene'
  *
  * Near-black and barely reflective — in the reference frames these read almost
  * entirely as silhouette, and the thin specular along the lit edge is the only
- * thing telling you they are solid rather than holes cut out of the sky. The
- * bevel exists to catch exactly that highlight, and the concrete map gives it
- * something to catch ON, so the edge breaks up instead of running dead straight.
+ * thing telling you they are solid rather than holes cut out of the sky.
  *
- * The optional shoulder is rendered as a second mass butted against one face,
- * which is what turns a rectangle into a silhouette worth looking at.
+ * Two things give them architecture rather than primitive-ness: the stepped
+ * shoulder, and the cornice / plinth / reveal vocabulary of cast concrete.
+ * All of it is silhouette-level, because that is how these are seen.
+ *
+ * The hover highlight is EASED, never snapped. Raycasting resolves against the
+ * camera, so while the camera drifts the object under a stationary cursor
+ * changes repeatedly and the hover state flips on and off. Applied instantly
+ * that flip is a visible jump in the material — which is very probably the
+ * flicker that only ever appeared with camera motion. Damping makes the state
+ * change unobservable even when it oscillates.
  */
 export function Monolith({
   placement,
@@ -30,18 +37,20 @@ export function Monolith({
 }: {
   placement: Placement
   palette: Palette
-  /** 0 to 1. Hover/focus rim lift for the interactive section monoliths. */
+  /** 0 or 1. Target, not the applied value — see the easing note above. */
   emphasis?: number
   onPointerOver?: () => void
   onPointerOut?: () => void
   onClick?: () => void
 }) {
-  const { position, rotationY, width, height, depth, shoulder } = placement
+  const { position, rotationY, width, height, depth, shoulder, detail } = placement
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
   const noTex = useScene((s) => s.flags.noTex)
-  // Tiling scaled to world size, so a short slab and a tall one share the same
-  // aggregate grain instead of one looking like a scaled photo of the other.
-  const map = useMemo(() => concreteTiled(width / 9, height / 9, maxAniso), [width, height, maxAniso])
+
+  const map = useMemo(
+    () => concreteTiled(width / 9, height / 9, maxAniso),
+    [width, height, maxAniso],
+  )
   const shoulderMap = useMemo(
     () =>
       shoulder
@@ -50,18 +59,33 @@ export function Monolith({
     [width, height, shoulder, maxAniso],
   )
 
+  const mats = useRef<MeshStandardMaterial[]>([])
+  const eased = useRef(0)
+
+  useFrame((_, delta) => {
+    eased.current = MathUtils.damp(eased.current, emphasis, 7, delta)
+    const e = eased.current
+    for (const m of mats.current) {
+      if (!m) continue
+      m.emissiveIntensity = e * 0.14
+      m.roughness = 0.86 - e * 0.16
+      m.metalness = 0.04 + e * 0.1
+    }
+  })
+
+  const collect = (m: MeshStandardMaterial | null) => {
+    if (m && !mats.current.includes(m)) mats.current.push(m)
+  }
+
   const material = (tex: typeof map) => (
     <meshStandardMaterial
+      ref={collect}
       color={palette.monolith}
-      roughness={0.86 - emphasis * 0.16}
-      metalness={0.04 + emphasis * 0.1}
+      roughness={0.86}
+      metalness={0.04}
       roughnessMap={noTex ? null : tex}
-      // No bumpMap. A perturbed normal under a near-horizontal key light
-      // aliases into specular glitter across the whole face — the surface
-      // variation has to come from roughness alone, which does not move the
-      // normal and therefore cannot sparkle.
       emissive={palette.sunColor}
-      emissiveIntensity={emphasis * 0.14}
+      emissiveIntensity={0}
     />
   )
 
@@ -81,24 +105,62 @@ export function Monolith({
       }),
   }
 
+  const bevel = Math.min(0.3, width * 0.05)
+
+  // Reveals: recessed horizontal bands where one lift of formwork met the next.
+  const reveals = useMemo(() => {
+    if (detail.reveals <= 0) return []
+    return Array.from({ length: detail.reveals }, (_, i) => {
+      const f = (i + 1) / (detail.reveals + 1)
+      return { y: height * f - height / 2, thickness: height * 0.012 }
+    })
+  }, [detail.reveals, height])
+
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
-      <RoundedBox
-        args={[width, height, depth]}
-        radius={Math.min(0.3, width * 0.05)}
-        smoothness={3}
-        {...handlers}
-      >
+      <RoundedBox args={[width, height, depth]} radius={bevel} smoothness={3} {...handlers}>
         {material(map)}
       </RoundedBox>
+
+      {/* Cornice: a cap oversailing the shaft. Reads instantly as built. */}
+      {detail.cornice > 0 && (
+        <RoundedBox
+          args={[width * (1 + detail.cornice), height * 0.035, depth * (1 + detail.cornice)]}
+          radius={bevel * 0.5}
+          smoothness={3}
+          position={[0, height / 2 - height * 0.0175, 0]}
+          {...handlers}
+        >
+          {material(map)}
+        </RoundedBox>
+      )}
+
+      {/* Plinth: the base spreading where it meets the water. */}
+      {detail.plinth > 0 && (
+        <RoundedBox
+          args={[width * (1 + detail.plinth), height * 0.05, depth * (1 + detail.plinth)]}
+          radius={bevel * 0.5}
+          smoothness={3}
+          position={[0, -height / 2 + height * 0.025, 0]}
+          {...handlers}
+        >
+          {material(map)}
+        </RoundedBox>
+      )}
+
+      {/* Reveals, inset slightly so they catch a shadow line. */}
+      {reveals.map((r, i) => (
+        <mesh key={`reveal-${i}`} position={[0, r.y, 0]}>
+          <boxGeometry args={[width * 0.985, r.thickness, depth * 0.985]} />
+          {material(map)}
+        </mesh>
+      ))}
 
       {shoulder && (
         <RoundedBox
           args={[width * shoulder.width, height * shoulder.height, depth * 0.94]}
           radius={Math.min(0.26, width * 0.045)}
           smoothness={3}
-          // Butted against one face and sitting on the same ground plane, so
-          // the step reads as one poured mass rather than two stacked objects.
           position={[
             (shoulder.side * (width + width * shoulder.width)) / 2 - shoulder.side * 0.35,
             (height * shoulder.height - height) / 2,
