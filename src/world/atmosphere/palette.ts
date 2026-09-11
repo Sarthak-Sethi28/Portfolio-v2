@@ -41,7 +41,7 @@ export const DAY: Palette = {
   skyZenith: new Color('#4b6d76'),
   skyHorizon: new Color('#ecdcb9'),
   sunColor: new Color('#ffd8a0'),
-  sunDirection: new Vector3(0.94, 0.045, -0.34).normalize(),
+  sunDirection: new Vector3(0.44, 0.04, -0.90).normalize(),
   sunIntensity: 3.4,
   keyIntensity: 0.85,
   fog: new Color('#b6bda6'),
