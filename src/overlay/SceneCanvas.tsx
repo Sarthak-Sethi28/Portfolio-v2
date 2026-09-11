@@ -9,15 +9,10 @@ import { detectTier } from '@/lib/quality'
 /**
  * The canvas host.
  *
- * Detects the device's capability once, before the first frame, and then
- * leaves the resolution alone.
- *
- * It used to run AdaptiveDpr and a PerformanceMonitor that stepped the pixel
- * ratio down whenever the frame rate dipped. That is a reasonable idea and a
- * terrible experience: every step resizes the drawing buffer, and on a scene
- * this dark each resize lands as a visible flash. A monitor that reacts to
- * dips caused by its own resizes then oscillates, and the whole page appears
- * to flicker. Pick a resolution from the device and hold it.
+ * Resolution is picked once from the device and held for the session. Dynamic
+ * DPR changes were one of the original sources of visible flashes, so visual
+ * quality is improved through materials/lighting rather than resizing the
+ * framebuffer while the user is looking at it.
  */
 export function SceneCanvas() {
   const setQuality = useScene((s) => s.setQuality)
@@ -44,11 +39,8 @@ export function SceneCanvas() {
 
   return (
     <Canvas
-      // Fixed for the session, never recomputed from frame timings, and always
-      // an integer — floored against the device's own ratio so the framebuffer
-      // maps 1:1 or 1:2 onto physical pixels rather than being resampled by a
-      // fractional factor on its way to the panel.
       dpr={dpr}
+      shadows="soft"
       gl={{ antialias: true, powerPreference: 'high-performance', alpha: false }}
       camera={{ fov: 56, near: 0.35, far: 6000, position: [0, 4.6, 58] }}
       style={{ position: 'absolute', inset: 0 }}
