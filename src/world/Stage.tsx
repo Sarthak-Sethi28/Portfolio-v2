@@ -10,6 +10,7 @@ import { CONFIG_DEFAULTS, useScene, effectiveMoteCount } from '@/store/scene'
 import { blendPalette, createPalette } from './atmosphere/palette'
 import { Sky } from './atmosphere/Sky'
 import { Motes } from './atmosphere/Motes'
+import { Birds } from './atmosphere/Birds'
 import { Water } from './array/Water'
 import { ArrayWorld } from './array/ArrayWorld'
 import { IdleRig } from './camera/IdleRig'
@@ -114,6 +115,9 @@ export function Stage() {
       </Suspense>
 
       <Motes count={flags.noMotes ? 0 : moteCount} palette={palette} />
+      {/* Something in the frame with its own intent. A drifting camera over a
+          still world still reads as a photograph. */}
+      {!flags.still && <Birds palette={palette} />}
       <IdleRig />
 
       {/* multisampling is NOT optional.

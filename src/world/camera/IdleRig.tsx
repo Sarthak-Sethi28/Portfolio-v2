@@ -49,13 +49,13 @@ export function IdleRig() {
 
     // Orbital breath. Long periods, small amplitudes, deliberately irrational
     // ratios so the loop never visibly repeats.
-    const breathX = Math.sin(t * 0.047) * 3.1 + Math.sin(t * 0.0163) * 1.3
-    const breathY = Math.sin(t * 0.0331) * 0.5
-    const breathZ = Math.cos(t * 0.0391) * 2.2
+    const breathX = Math.sin(t * 0.062) * 7.4 + Math.sin(t * 0.0211) * 3.0
+    const breathY = Math.sin(t * 0.0431) * 1.4
+    const breathZ = Math.cos(t * 0.0509) * 5.6
 
     // Pointer parallax, heavily damped.
-    lean.current.x = MathUtils.damp(lean.current.x, pointer.x * 5.5, 1.6, delta)
-    lean.current.y = MathUtils.damp(lean.current.y, pointer.y * 1.4, 1.6, delta)
+    lean.current.x = MathUtils.damp(lean.current.x, pointer.x * 9.5, 1.9, delta)
+    lean.current.y = MathUtils.damp(lean.current.y, pointer.y * 2.6, 1.9, delta)
 
     camera.position.set(
       REST.x + breathX + lean.current.x,
