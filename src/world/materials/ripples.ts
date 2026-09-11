@@ -1,59 +1,53 @@
-import { DataTexture, LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, RGBAFormat, UnsignedByteType } from 'three'
+import {
+  DataTexture,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  RepeatWrapping,
+  RGBAFormat,
+  UnsignedByteType,
+} from 'three'
 import { createRng } from '@/lib/rng'
 
 /**
- * A tiling distortion field for the water surface.
- *
- * A perfect mirror does not read as water — it reads as polished stone, which
- * is exactly the complaint. Real standing water has a slow-moving surface, and
- * what sells it is not big waves (this is a centimetre deep) but a very low
- * amplitude, long-wavelength disturbance that makes the reflection breathe
- * and wander instead of sitting frozen.
- *
- * Encoded as a two-channel offset in R and G, sampled by MeshReflectorMaterial
- * as a distortion map. Deliberately smooth: any high-frequency content here
- * would alias into the shimmer we just spent so long removing.
+ * Low-frequency water surface data shared by both reflection distortion and
+ * the physical highlight layer. Keeping both maps analytic and mipmapped gives
+ * the water shape without introducing the high-frequency sparkle that caused
+ * motion shimmer in earlier passes.
  */
 
-const SIZE = 256
+const SIZE = 384
 
-function buildRipples(): DataTexture {
+interface Wave {
+  angle: number
+  freq: number
+  phase: number
+  amp: number
+}
+
+function makeWaves(): Wave[] {
   const rng = createRng(0x1c7e93)
-  const data = new Uint8Array(SIZE * SIZE * 4)
-
-  // Sum of a handful of directional sine waves at irrational frequency ratios,
-  // so the pattern never visibly repeats within a tile.
-  const waves = Array.from({ length: 6 }, () => ({
+  return Array.from({ length: 7 }, () => ({
     angle: rng() * Math.PI * 2,
-    freq: 1 + rng() * 3.2,
+    freq: 0.7 + rng() * 2.4,
     phase: rng() * Math.PI * 2,
-    amp: 0.35 + rng() * 0.65,
+    amp: 0.22 + rng() * 0.52,
   }))
+}
 
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      const u = (x / SIZE) * Math.PI * 2
-      const v = (y / SIZE) * Math.PI * 2
+const waves = makeWaves()
 
-      let dx = 0
-      let dy = 0
-      for (const w of waves) {
-        const k = Math.cos(w.angle) * u * w.freq + Math.sin(w.angle) * v * w.freq
-        const s = Math.sin(k + w.phase) * w.amp
-        dx += Math.cos(w.angle) * s
-        dy += Math.sin(w.angle) * s
-      }
-
-      const i = (y * SIZE + x) * 4
-      // Remapped into 0-255 around a neutral 128, the no-offset value.
-      data[i] = Math.max(0, Math.min(255, Math.round(128 + dx * 42)))
-      data[i + 1] = Math.max(0, Math.min(255, Math.round(128 + dy * 42)))
-      data[i + 2] = 128
-      data[i + 3] = 255
-    }
+function heightAt(u: number, v: number): number {
+  let h = 0
+  for (const w of waves) {
+    const ca = Math.cos(w.angle)
+    const sa = Math.sin(w.angle)
+    const k = ca * u * w.freq + sa * v * w.freq
+    h += Math.sin(k + w.phase) * w.amp
   }
+  return h
+}
 
-  const tex = new DataTexture(data, SIZE, SIZE, RGBAFormat, UnsignedByteType)
+function configure(tex: DataTexture): DataTexture {
   tex.wrapS = RepeatWrapping
   tex.wrapT = RepeatWrapping
   tex.magFilter = LinearFilter
@@ -63,9 +57,82 @@ function buildRipples(): DataTexture {
   return tex
 }
 
-let cached: DataTexture | null = null
+function buildDistortion(): DataTexture {
+  const data = new Uint8Array(SIZE * SIZE * 4)
+
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const u = (x / SIZE) * Math.PI * 2
+      const v = (y / SIZE) * Math.PI * 2
+      let dx = 0
+      let dy = 0
+
+      for (const w of waves) {
+        const ca = Math.cos(w.angle)
+        const sa = Math.sin(w.angle)
+        const k = ca * u * w.freq + sa * v * w.freq
+        const s = Math.sin(k + w.phase) * w.amp
+        dx += ca * s
+        dy += sa * s
+      }
+
+      const i = (y * SIZE + x) * 4
+      data[i] = Math.max(0, Math.min(255, Math.round(128 + dx * 34)))
+      data[i + 1] = Math.max(0, Math.min(255, Math.round(128 + dy * 34)))
+      data[i + 2] = 128
+      data[i + 3] = 255
+    }
+  }
+
+  return configure(new DataTexture(data, SIZE, SIZE, RGBAFormat, UnsignedByteType))
+}
+
+/**
+ * Tangent-space normal map generated from the same long waves as the
+ * distortion field. It produces broad moving highlights like real shallow
+ * water instead of a perfectly flat mirror.
+ */
+function buildNormal(): DataTexture {
+  const data = new Uint8Array(SIZE * SIZE * 4)
+  const eps = (Math.PI * 2) / SIZE
+  const strength = 0.72
+
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const u = (x / SIZE) * Math.PI * 2
+      const v = (y / SIZE) * Math.PI * 2
+
+      const dx = (heightAt(u + eps, v) - heightAt(u - eps, v)) * strength
+      const dy = (heightAt(u, v + eps) - heightAt(u, v - eps)) * strength
+
+      let nx = -dx
+      let ny = -dy
+      let nz = 1
+      const inv = 1 / Math.hypot(nx, ny, nz)
+      nx *= inv
+      ny *= inv
+      nz *= inv
+
+      const i = (y * SIZE + x) * 4
+      data[i] = Math.round((nx * 0.5 + 0.5) * 255)
+      data[i + 1] = Math.round((ny * 0.5 + 0.5) * 255)
+      data[i + 2] = Math.round((nz * 0.5 + 0.5) * 255)
+      data[i + 3] = 255
+    }
+  }
+
+  return configure(new DataTexture(data, SIZE, SIZE, RGBAFormat, UnsignedByteType))
+}
+
+let distortionCache: DataTexture | null = null
+let normalCache: DataTexture | null = null
 
 export function rippleTexture(): DataTexture {
-  cached ??= buildRipples()
-  return cached
+  distortionCache ??= buildDistortion()
+  return distortionCache
+}
+
+export function waterNormalTexture(): DataTexture {
+  normalCache ??= buildNormal()
+  return normalCache
 }
