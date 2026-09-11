@@ -108,6 +108,7 @@ export const useScene = create<SceneState>((set) => ({
     noPost: false,
     probe: false,
     noTex: false,
+    noPlate: false,
   },
   flicker: [],
 
