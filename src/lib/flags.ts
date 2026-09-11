@@ -24,6 +24,8 @@ export interface Flags {
   probe: boolean
   /** Drop the concrete surface map — isolates texture shimmer from edge crawl. */
   noTex: boolean
+  /** Drop the photographic sky plate, leaving the procedural gradient. */
+  noPlate: boolean
 }
 
 const EMPTY: Flags = {
@@ -34,6 +36,7 @@ const EMPTY: Flags = {
   noPost: false,
   probe: false,
   noTex: false,
+  noPlate: false,
 }
 
 export function readFlags(): Flags {
@@ -48,5 +51,6 @@ export function readFlags(): Flags {
     noPost: plain || q.has('nopost'),
     probe: q.has('flicker'),
     noTex: plain || q.has('notex'),
+    noPlate: plain || q.has('noplate'),
   }
 }

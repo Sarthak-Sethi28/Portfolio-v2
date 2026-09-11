@@ -16,6 +16,7 @@ import {
 } from 'three'
 import type { Palette } from './palette'
 import type { AnimRef } from '../anim'
+import { useScene } from '@/store/scene'
 
 /**
  * The sky: a photographic panorama blended over a procedural base.
@@ -49,6 +50,7 @@ const fragment = /* glsl */ `
   uniform vec3      uSunDir;
   uniform float     uSunIntensity;
   uniform float     uNight;
+  uniform float     uPlate;
   uniform float     uTime;
   uniform sampler2D uDusk;
   uniform sampler2D uNightMap;
@@ -77,6 +79,26 @@ const fragment = /* glsl */ `
     float h = clamp(dir.y, -1.0, 1.0);
     float az = atan(dir.z, dir.x);
 
+    /*
+     * Seam-free azimuth for TEXTURE sampling.
+     *
+     * atan(z, x) jumps from +PI to -PI at the seam behind the camera. The GPU
+     * picks a mip level by differencing neighbouring pixels' UVs, and across
+     * that jump the difference is enormous — so it concludes the texture is
+     * infinitely minified and drops to the blurriest mip. The result is a band
+     * of mush that sweeps across the sky as the camera turns, present only
+     * when the view is moving.
+     *
+     * acos of the normalised horizontal direction is continuous everywhere:
+     * it folds front-to-back instead of wrapping, so there is no discontinuity
+     * for the derivative to trip over. The fold mirrors the plate, which is
+     * invisible in cirrus and is exactly what MirroredRepeatWrapping already
+     * assumes. The raw az is still used for the procedural terms, which are
+     * analytic and have no mip level to get wrong.
+     */
+    vec2 flat_dir = normalize(vec2(dir.x, dir.z) + vec2(1e-6));
+    float azSafe = acos(clamp(flat_dir.x, -1.0, 1.0)) / PI;
+
     // --- procedural base -------------------------------------------------
     float t = pow(clamp(h * 0.5 + 0.5, 0.0, 1.0), 0.55);
     vec3 col = mix(uHorizon, uZenith, smoothstep(0.30, 0.88, t));
@@ -98,7 +120,7 @@ const fragment = /* glsl */ `
     // The plate drifts. A static sky is half of why the world felt frozen;
     // real cirrus is always moving, just slowly enough that you notice it
     // only after a few seconds of looking.
-    vec3 duskPlate = texture2D(uDusk, vec2(az / (2.0 * PI) + uTime * 0.0016, plateElev)).rgb;
+    vec3 duskPlate = texture2D(uDusk, vec2(azSafe + uTime * 0.0016, plateElev)).rgb;
 
     // The plate was shot with a sun in it. Mirrored across the seam that sun
     // appears twice, and neither copy sits where our key light is — so roll
@@ -115,14 +137,14 @@ const fragment = /* glsl */ `
     // Strongest through the striation band; released toward the zenith so the
     // procedural teal closes the dome, and at the horizon where fog takes over.
     float plateMix = smoothstep(0.0, 0.10, h) * (1.0 - smoothstep(0.45, 0.92, elev)) * 0.88;
-    col = mix(col, duskPlate, plateMix * (1.0 - uNight));
+    col = mix(col, duskPlate, plateMix * (1.0 - uNight) * uPlate);
 
     // --- night ------------------------------------------------------------
-    vec2 nightUv = vec2(az / (2.0 * PI) + 0.5, clamp(elev / 0.85, 0.0, 1.0));
+    vec2 nightUv = vec2(azSafe + 0.5, clamp(elev / 0.85, 0.0, 1.0));
     vec3 stars = texture2D(uNightMap, nightUv).rgb;
     // Lift the plate's faint stars without lifting its black.
     stars = pow(stars, vec3(0.72)) * 1.45;
-    col = mix(col, col * 0.25 + stars, uNight * smoothstep(-0.03, 0.14, h));
+    col = mix(col, col * 0.25 + stars * uPlate, uNight * smoothstep(-0.03, 0.14, h));
 
     // Milky Way, kept procedural so it can be placed for composition rather
     // than wherever the plate put it.
@@ -142,6 +164,7 @@ const fragment = /* glsl */ `
 `
 
 export function Sky({ palette, anim }: { palette: Palette; anim: AnimRef }) {
+  const noPlate = useScene((s) => s.flags.noPlate)
   const matRef = useRef<ShaderMaterial>(null)
   // Wrapping and colour space are configured in the loader callback rather
   // than after the fact: mutating a value returned from a hook is a React
@@ -174,6 +197,7 @@ export function Sky({ palette, anim }: { palette: Palette; anim: AnimRef }) {
       uSunDir: { value: new Vector3() },
       uSunIntensity: { value: 1 },
       uNight: { value: 0 },
+      uPlate: { value: 1 },
       uTime: { value: 0 },
       uDusk: { value: dusk },
       uNightMap: { value: night },
@@ -189,6 +213,7 @@ export function Sky({ palette, anim }: { palette: Palette; anim: AnimRef }) {
     u.uSunDir.value.copy(palette.sunDirection)
     u.uSunIntensity.value = palette.sunIntensity
     u.uNight.value = anim.current.night
+    u.uPlate.value = noPlate ? 0 : 1
     u.uTime.value = clock.elapsedTime
   })
 
