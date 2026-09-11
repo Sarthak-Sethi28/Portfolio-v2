@@ -80,7 +80,8 @@ export function Stats() {
         background: 'rgba(0,0,0,0.62)',
         borderColor: 'rgba(255,255,255,0.14)',
         color: 'rgba(235,235,230,0.82)',
-        backdropFilter: 'blur(6px)',
+        // No backdrop-filter: blurring what is behind an element forces the
+        // compositor to re-read the canvas every frame.
       }}
     >
       <div style={{ color: colour }}>
