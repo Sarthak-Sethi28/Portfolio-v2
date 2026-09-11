@@ -45,7 +45,7 @@ export function SceneCanvas() {
       // value and the buffer is never resized at all.
       dpr={maxDpr}
       gl={{ antialias: true, powerPreference: 'high-performance', alpha: false }}
-      camera={{ fov: 56, near: 0.35, far: 2600, position: [0, 4.6, 58] }}
+      camera={{ fov: 56, near: 0.35, far: 6000, position: [0, 4.6, 58] }}
       style={{ position: 'absolute', inset: 0 }}
     >
       <Stage />
