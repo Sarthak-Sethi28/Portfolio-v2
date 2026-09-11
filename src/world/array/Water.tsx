@@ -8,16 +8,13 @@ import type { Palette } from '../atmosphere/palette'
 import { rippleTexture } from '../materials/ripples'
 
 /**
- * The salt plain: a centimetre of standing water over a flat bed.
+ * Shallow standing water over the salt plain.
  *
- * This single plane does most of the work in the reference frames. Every
- * vertical in the scene is doubled by it, which is what makes the monoliths
- * read as enormous.
- *
- * It was a PERFECT mirror, and a perfect mirror reads as polished stone, not
- * as water. What makes water look like water at this depth is not waves — it
- * is a slow, low-amplitude wander in the reflection. The distortion map drifts
- * continuously so the mirrored world breathes rather than sitting frozen.
+ * The important physical correction here is that water is a DIELECTRIC, not a
+ * metal. The previous material used metalness=1 and an extremely strong planar
+ * reflection, which made the surface read as chrome/polished stone. We keep the
+ * planar reflector for the cinematic doubled skyline, but let roughness, blur,
+ * tint and low-amplitude distortion sell shallow water instead of a mirror.
  */
 export function Water({
   palette,
@@ -28,7 +25,6 @@ export function Water({
   palette: Palette
   roughness: number
   reflectorResolution: number
-  /** Rain ripple amount. Low but never zero — still water still moves. */
   distort: number
 }) {
   const reflective = reflectorResolution > 0
@@ -36,40 +32,45 @@ export function Water({
   const texRef = useRef<Texture>(ripples)
 
   useFrame(({ clock }) => {
-    // Two axes at different rates, so the surface never repeats a state.
     const t = clock.elapsedTime
-    texRef.current.offset.set(t * 0.0075, t * 0.0043)
+    // Long wavelength drift. Faster texture travel makes the whole landscape
+    // look as if it is sliding under glass.
+    texRef.current.offset.set(t * 0.0038, t * 0.0021)
   })
+
+  const waterRoughness = Math.max(0.16, Math.min(0.28, roughness + 0.07))
+  const waterDistortion = Math.min(0.12, Math.max(0.025, distort * 0.42))
 
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-      {/* Sized to sit inside the sky dome; beyond that the plain would render
-          against nothing at all. */}
       <planeGeometry args={[1600, 1600, 1, 1]} />
       {reflective ? (
         <MeshReflectorMaterial
-          // Just enough to read as a centimetre of water rather than glass.
-          //
-          // This was [160,38] and then [90,22]; at those values the reflection
-          // smeared into flat darkness and the mirrored plain — half the
-          // composition — was simply absent.
-          blur={[26, 7]}
+          blur={[18, 5]}
           resolution={reflectorResolution}
-          mixBlur={0.22}
-          mixStrength={6}
-          roughness={roughness}
-          // depthScale fades the reflection by distance from the surface, and
-          // enabled it erased almost everything the plain should mirror.
+          mixBlur={0.32}
+          // Reflection should be present, not dominate the base surface.
+          mixStrength={2.15}
+          roughness={waterRoughness}
           depthScale={0}
           color={palette.waterTint}
-          metalness={1}
-          mirror={1}
-          distortion={distort}
+          // Water is a dielectric. Planar reflection comes from the reflector,
+          // not from pretending the surface is a metal.
+          metalness={0}
+          mirror={0.82}
+          distortion={waterDistortion}
           distortionMap={ripples}
-          reflectorOffset={0}
+          reflectorOffset={0.012}
         />
       ) : (
-        <meshStandardMaterial color={palette.waterTint} roughness={Math.max(roughness, 0.35)} metalness={0.6} />
+        <meshPhysicalMaterial
+          color={palette.waterTint}
+          roughness={Math.max(waterRoughness, 0.22)}
+          metalness={0}
+          ior={1.333}
+          clearcoat={0.18}
+          clearcoatRoughness={0.22}
+        />
       )}
     </mesh>
   )
