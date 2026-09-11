@@ -10,22 +10,21 @@ import { concreteTiled } from '../materials/concrete'
 import { useScene } from '@/store/scene'
 
 /**
- * One slab.
+ * One pier.
  *
- * Near-black and barely reflective — in the reference frames these read almost
- * entirely as silhouette, and the thin specular along the lit edge is the only
- * thing telling you they are solid rather than holes cut out of the sky.
+ * These were extruded boxes with a texture on them, and no amount of surface
+ * detail fixes that — what gives real architecture its definition is GEOMETRIC
+ * DEPTH. A pier of this kind is not a solid block; it is a frame:
  *
- * Two things give them architecture rather than primitive-ness: the stepped
- * shoulder, and the cornice / plinth / reveal vocabulary of cast concrete.
- * All of it is silhouette-level, because that is how these are seen.
+ *   - four CORNER PILASTERS standing proud of the faces
+ *   - the field between them RECESSED, so every face carries a deep panel
+ *   - STRING COURSES banding horizontally between the pilasters, dividing the
+ *     shaft into storeys
+ *   - a stepped CORNICE oversailing the top, and a spreading PLINTH at the base
  *
- * The hover highlight is EASED, never snapped. Raycasting resolves against the
- * camera, so while the camera drifts the object under a stationary cursor
- * changes repeatedly and the hover state flips on and off. Applied instantly
- * that flip is a visible jump in the material — which is very probably the
- * flicker that only ever appeared with camera motion. Damping makes the state
- * change unobservable even when it oscillates.
+ * Every one of those throws a real shadow that moves as the light and camera
+ * move. That is the difference between something modelled and something
+ * printed on a slab, and it is why the reference reads as built.
  */
 export function Monolith({
   placement,
@@ -37,7 +36,6 @@ export function Monolith({
 }: {
   placement: Placement
   palette: Palette
-  /** 0 or 1. Target, not the applied value — see the easing note above. */
   emphasis?: number
   onPointerOver?: () => void
   onPointerOut?: () => void
@@ -47,13 +45,7 @@ export function Monolith({
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
   const noTex = useScene((s) => s.flags.noTex)
 
-  // Horizontal tiling only; the vertical axis runs once so the waterline
-  // stain sits at the base instead of repeating up the shaft.
   const map = useMemo(() => concreteTiled(width / 11, maxAniso), [width, maxAniso])
-  const shoulderMap = useMemo(
-    () => (shoulder ? concreteTiled((width * shoulder.width) / 11, maxAniso) : null),
-    [width, shoulder, maxAniso],
-  )
 
   const mats = useRef<MeshStandardMaterial[]>([])
   const eased = useRef(0)
@@ -73,19 +65,14 @@ export function Monolith({
     if (m && !mats.current.includes(m)) mats.current.push(m)
   }
 
-  const material = (tex: typeof map) => (
+  const mat = (
     <meshStandardMaterial
       ref={collect}
       color={palette.monolith}
       roughness={0.86}
-      // Concrete is a dielectric: its metalness is zero, not nearly zero.
-      // Any metalness at all makes the face mirror the environment map, and
-      // that reflection changes with every camera move — correct physics, but
-      // another thing that can only ever shimmer while the view is moving.
       metalness={0}
-      // The environment still lights these; it just does not mirror in them.
       envMapIntensity={0.35}
-      roughnessMap={noTex ? null : tex}
+      roughnessMap={noTex ? null : map}
       emissive={palette.sunColor}
       emissiveIntensity={0}
     />
@@ -107,62 +94,101 @@ export function Monolith({
       }),
   }
 
-  const bevel = Math.min(0.3, width * 0.05)
+  // Proportions of the order. The pilaster is a fraction of the face, and the
+  // recessed core sits back behind it — that setback is the whole effect.
+  const pil = Math.min(width, depth) * 0.17
+  const setback = pil * 0.55
+  const coreW = width - setback * 2
+  const coreD = depth - setback * 2
+  const bevel = Math.min(0.22, width * 0.035)
 
-  // Reveals: recessed horizontal bands where one lift of formwork met the next.
-  const reveals = useMemo(() => {
-    if (detail.reveals <= 0) return []
-    return Array.from({ length: detail.reveals }, (_, i) => {
-      const f = (i + 1) / (detail.reveals + 1)
-      return { y: height * f - height / 2, thickness: height * 0.012 }
-    })
+  // String courses divide the shaft into storeys.
+  const courses = useMemo(() => {
+    const n = Math.max(1, detail.reveals)
+    return Array.from({ length: n }, (_, i) => height * ((i + 1) / (n + 1)) - height / 2)
   }, [detail.reveals, height])
+
+  const corners: [number, number][] = [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ]
 
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
-      <RoundedBox args={[width, height, depth]} radius={bevel} smoothness={3} {...handlers}>
-        {material(map)}
-      </RoundedBox>
+      {/* Recessed core. Set back on all four sides so each face reads as a
+          deep panel rather than a flat side. */}
+      <mesh {...handlers}>
+        <boxGeometry args={[coreW, height, coreD]} />
+        {mat}
+      </mesh>
 
-      {/* Cornice: a cap oversailing the shaft. Reads instantly as built. */}
-      {detail.cornice > 0 && (
+      {/* Corner pilasters, standing proud the full height. */}
+      {corners.map(([sx, sz], i) => (
         <RoundedBox
-          args={[width * (1 + detail.cornice), height * 0.035, depth * (1 + detail.cornice)]}
-          radius={bevel * 0.5}
-          smoothness={3}
-          position={[0, height / 2 - height * 0.0175, 0]}
+          key={`pil-${i}`}
+          args={[pil, height, pil]}
+          radius={bevel}
+          smoothness={2}
+          position={[(sx * (width - pil)) / 2, 0, (sz * (depth - pil)) / 2]}
           {...handlers}
         >
-          {material(map)}
+          {mat}
         </RoundedBox>
-      )}
+      ))}
 
-      {/* Plinth: the base spreading where it meets the water. */}
-      {detail.plinth > 0 && (
-        <RoundedBox
-          args={[width * (1 + detail.plinth), height * 0.05, depth * (1 + detail.plinth)]}
-          radius={bevel * 0.5}
-          smoothness={3}
-          position={[0, -height / 2 + height * 0.025, 0]}
-          {...handlers}
-        >
-          {material(map)}
-        </RoundedBox>
-      )}
-
-      {/* Reveals, inset slightly so they catch a shadow line. */}
-      {reveals.map((r, i) => (
-        <mesh key={`reveal-${i}`} position={[0, r.y, 0]}>
-          <boxGeometry args={[width * 0.985, r.thickness, depth * 0.985]} />
-          {material(map)}
+      {/* String courses banding between the pilasters. Proud of the core but
+          shy of the pilasters, so they read as a moulding, not a collar. */}
+      {courses.map((y, i) => (
+        <mesh key={`course-${i}`} position={[0, y, 0]} {...handlers}>
+          <boxGeometry args={[width - pil * 0.5, height * 0.022, depth - pil * 0.5]} />
+          {mat}
         </mesh>
       ))}
+
+      {/* Cornice, in two steps. A single slab reads as a lid; two reads as
+          a moulding. */}
+      {detail.cornice > 0 && (
+        <group position={[0, height / 2, 0]}>
+          <mesh position={[0, -height * 0.026, 0]} {...handlers}>
+            <boxGeometry
+              args={[width * (1 + detail.cornice * 0.6), height * 0.02, depth * (1 + detail.cornice * 0.6)]}
+            />
+            {mat}
+          </mesh>
+          <mesh position={[0, -height * 0.008, 0]} {...handlers}>
+            <boxGeometry
+              args={[width * (1 + detail.cornice * 1.5), height * 0.018, depth * (1 + detail.cornice * 1.5)]}
+            />
+            {mat}
+          </mesh>
+        </group>
+      )}
+
+      {/* Plinth where the pier meets the water. */}
+      {detail.plinth > 0 && (
+        <group position={[0, -height / 2, 0]}>
+          <mesh position={[0, height * 0.016, 0]} {...handlers}>
+            <boxGeometry
+              args={[width * (1 + detail.plinth * 1.4), height * 0.032, depth * (1 + detail.plinth * 1.4)]}
+            />
+            {mat}
+          </mesh>
+          <mesh position={[0, height * 0.042, 0]} {...handlers}>
+            <boxGeometry
+              args={[width * (1 + detail.plinth * 0.6), height * 0.02, depth * (1 + detail.plinth * 0.6)]}
+            />
+            {mat}
+          </mesh>
+        </group>
+      )}
 
       {shoulder && (
         <RoundedBox
           args={[width * shoulder.width, height * shoulder.height, depth * 0.94]}
-          radius={Math.min(0.26, width * 0.045)}
-          smoothness={3}
+          radius={bevel}
+          smoothness={2}
           position={[
             (shoulder.side * (width + width * shoulder.width)) / 2 - shoulder.side * 0.35,
             (height * shoulder.height - height) / 2,
@@ -170,7 +196,7 @@ export function Monolith({
           ]}
           {...handlers}
         >
-          {material(shoulderMap ?? map)}
+          {mat}
         </RoundedBox>
       )}
     </group>
