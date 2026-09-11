@@ -28,7 +28,9 @@ export function SceneCanvas() {
   const dpr: [number, number] = [1, Math.min(maxDpr, ceiling)]
 
   useEffect(() => {
-    setQuality(detectTier())
+    const t = detectTier()
+    ;(window as unknown as Record<string, unknown>).__tier = t
+    setQuality(t)
 
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     setReducedMotion(mq.matches)

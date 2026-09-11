@@ -1,4 +1,4 @@
-import { createRng, range, SEED } from '@/lib/rng'
+import { createRng, range, sign, SEED } from '@/lib/rng'
 
 /**
  * Placement maths for both worlds.
@@ -16,6 +16,21 @@ export interface Placement {
   height: number
   width: number
   depth: number
+  /**
+   * Optional stepped shoulder — a lower mass butted against one side.
+   *
+   * The reference frame's slabs are not plain boxes; several carry an L-shaped
+   * step, and that notch is most of what stops a silhouette reading as a
+   * rectangle. Expressed as fractions of the parent so it scales with it.
+   */
+  shoulder?: {
+    /** Fraction of parent height. */
+    height: number
+    /** Fraction of parent width. */
+    width: number
+    /** -1 attaches to the left face, 1 to the right. */
+    side: -1 | 1
+  }
 }
 
 /**
@@ -55,6 +70,10 @@ export function sectionRing(count: number, radius: number): Placement[] {
 
     const rng = createRng(SEED.fieldMonoliths + i * 7919)
     const height = range(rng, 30, 40) * s.h
+    const width = range(rng, 9, 13) * (s.h > 1.8 ? 1.25 : 1)
+    // Roughly two in three carry a step. Uniformly notched reads as a pattern;
+    // never notched reads as a box.
+    const stepped = rng() < 0.66
     return {
       position: [Math.sin(s.a) * r, height / 2, Math.cos(s.a) * r * -1] as [
         number,
@@ -63,8 +82,15 @@ export function sectionRing(count: number, radius: number): Placement[] {
       ],
       rotationY: -s.a + range(rng, -0.14, 0.14),
       height,
-      width: range(rng, 9, 13) * (s.h > 1.8 ? 1.25 : 1),
+      width,
       depth: range(rng, 8, 11),
+      shoulder: stepped
+        ? {
+            height: range(rng, 0.42, 0.68),
+            width: range(rng, 0.55, 0.85),
+            side: sign(rng) as -1 | 1,
+          }
+        : undefined,
     }
   })
 }
@@ -86,12 +112,21 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
     const r = innerRadius * 1.5 + Math.sqrt(rng()) * innerRadius * 5.5
     // Distant slabs read as taller because fog eats their base.
     const height = range(rng, 14, 52) * (1 + r / 420)
+    const width = range(rng, 4, 13)
+    const stepped = rng() < 0.5
     out.push({
       position: [Math.cos(angle) * r, height / 2, Math.sin(angle) * r],
       rotationY: range(rng, 0, Math.PI * 2),
       height,
-      width: range(rng, 4, 13),
+      width,
       depth: range(rng, 4, 11),
+      shoulder: stepped
+        ? {
+            height: range(rng, 0.35, 0.7),
+            width: range(rng, 0.5, 0.9),
+            side: sign(rng) as -1 | 1,
+          }
+        : undefined,
     })
   }
   return out

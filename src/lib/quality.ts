@@ -23,15 +23,17 @@ export interface QualitySettings {
 
 const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
   high: {
-    reflectorResolution: 1024,
+    // 1024 with a wide blur was the dominant frame cost. 512 is visually
+    // indistinguishable here because the surface is blurred regardless.
+    reflectorResolution: 512,
     particleScale: 1,
     bloom: true,
     depthOfField: true,
-    maxDpr: 2,
+    maxDpr: 1.6,
     rainEnabled: true,
   },
   medium: {
-    reflectorResolution: 512,
+    reflectorResolution: 384,
     particleScale: 0.5,
     bloom: true,
     depthOfField: false,
@@ -39,8 +41,9 @@ const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
     rainEnabled: true,
   },
   low: {
-    reflectorResolution: 0,
-    particleScale: 0.2,
+    // Still reflective, just cheaply. Losing the mirror is losing the world.
+    reflectorResolution: 256,
+    particleScale: 0.25,
     bloom: false,
     depthOfField: false,
     maxDpr: 1,
@@ -69,9 +72,14 @@ export interface DeviceProfile {
  * only discovered on real hardware.
  */
 export function selectTier(p: DeviceProfile): Tier {
-  // Reduced motion is a request for calm, not necessarily a weak device, but
-  // the animated systems it disables are the same ones the low tier drops.
-  if (p.prefersReducedMotion) return 'low'
+  // NOTE: prefers-reduced-motion deliberately does NOT affect the tier.
+  //
+  // An earlier version returned 'low' for it, which silently disabled the
+  // water reflection — and since the key light rakes in almost horizontally, a
+  // flat unlit plane renders BLACK. Anyone with Reduce Motion enabled lost the
+  // entire mirrored plain, which is half the composition. Reduced motion is a
+  // request to stop things MOVING; it says nothing about the GPU. It is
+  // handled in the camera rig and the animated systems instead.
 
   // Software renderers appear in CI and in browsers with GPU blocklists. They
   // cannot sustain a reflector at any resolution.
