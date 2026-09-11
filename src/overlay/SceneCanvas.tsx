@@ -1,7 +1,7 @@
 'use client'
 
 import { Canvas } from '@react-three/fiber'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Stage } from '@/world/Stage'
 import { useScene } from '@/store/scene'
 import { detectTier } from '@/lib/quality'
@@ -22,11 +22,25 @@ import { detectTier } from '@/lib/quality'
 export function SceneCanvas() {
   const setQuality = useScene((s) => s.setQuality)
   const setReducedMotion = useScene((s) => s.setReducedMotion)
-  const maxDpr = useScene((s) => s.quality.maxDpr)
-  const dpr = Math.max(
-    1,
-    Math.floor(Math.min(maxDpr, typeof window === 'undefined' ? 1 : window.devicePixelRatio)),
-  )
+  /**
+   * Resolved ONCE, at mount, and never again.
+   *
+   * This was derived from the quality tier, which the store initialises to
+   * "high" and then replaces from detectTier() in an effect. When that changed
+   * maxDpr the Canvas resized — but EffectComposer's internal render targets
+   * did not reliably follow, leaving the scene drawn into a fraction of the
+   * viewport with the rest black. Alternating between the two is a violent
+   * full-frame flicker, and it is NOT the sub-pixel shimmer that looks similar.
+   *
+   * A lazy initialiser means the value is computed before the first frame and
+   * is stable for the life of the canvas, so no resize can ever be missed.
+   */
+  const [dpr] = useState(() => {
+    if (typeof window === 'undefined') return 1
+    // Whole numbers only: a fractional ratio makes the browser resample every
+    // frame by a non-integer factor on the way to the panel.
+    return Math.max(1, Math.min(2, Math.floor(window.devicePixelRatio)))
+  })
 
   const applyFlags = useScene((s) => s.applyFlags)
 
@@ -44,11 +58,10 @@ export function SceneCanvas() {
 
   return (
     <Canvas
-      // Fixed for the session, never recomputed from frame timings, and always
-      // an integer — floored against the device's own ratio so the framebuffer
-      // maps 1:1 or 1:2 onto physical pixels rather than being resampled by a
-      // fractional factor on its way to the panel.
       dpr={dpr}
+      // Guarantee the composer and the canvas can never disagree about size:
+      // re-resolve on every resize rather than trusting the observer alone.
+      resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
       gl={{ antialias: true, powerPreference: 'high-performance', alpha: false }}
       camera={{ fov: 56, near: 0.35, far: 6000, position: [0, 4.6, 58] }}
       style={{ position: 'absolute', inset: 0 }}
