@@ -53,6 +53,7 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
             onPointerOver={() => setHovered(id)}
             onPointerOut={() => setHovered(null)}
             onClick={() => openSectionPanel(id)}
+            detailed
           />
         )
       })}

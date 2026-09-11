@@ -38,7 +38,10 @@ export function Water({
 
   const coarse = useMemo(() => waterNormals(9, maxAniso), [maxAniso])
   const fine = useMemo(() => waterNormals(26, maxAniso), [maxAniso])
-  const normalScale = useMemo(() => new Vector2(0.5, 0.5), [])
+    // Low. An animated normal map on a near-mirror surface changes the specular
+  // response every frame, and at high amplitude that sparkles — a genuine
+  // per-frame change, unlike the camera shimmer.
+  const normalScale = useMemo(() => new Vector2(0.14, 0.14), [])
 
   // The textures are memoised, so the frame loop can close over them directly
   // — no ref, and nothing dereferenced during render.

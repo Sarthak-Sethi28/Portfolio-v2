@@ -38,8 +38,8 @@ export function ArchedBay({
   // Three orders, each smaller and further back than the last.
   const orders = useMemo(
     () =>
-      [0, 1, 2].map((i) => {
-        const t = i / 3
+      [0, 1].map((i) => {
+        const t = i / 2
         return {
           geo: archedPlate(
             width,

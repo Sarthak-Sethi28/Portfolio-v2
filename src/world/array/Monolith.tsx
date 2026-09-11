@@ -31,6 +31,7 @@ export function Monolith({
   placement,
   palette,
   emphasis = 0,
+  detailed = false,
   onPointerOver,
   onPointerOut,
   onClick,
@@ -38,6 +39,16 @@ export function Monolith({
   placement: Placement
   palette: Palette
   emphasis?: number
+  /**
+   * Whether to cut arched bays into the faces.
+   *
+   * Each bay is three extruded plates plus seven meshes. Applied to every
+   * pier including the scatter field that was well over a thousand meshes and
+   * it collapsed the frame rate — which, on a 120Hz panel, is the judder that
+   * reads as flicker. Only the four section piers are ever looked at closely,
+   * so only they get bays.
+   */
+  detailed?: boolean
   onPointerOver?: () => void
   onPointerOut?: () => void
   onClick?: () => void
@@ -153,7 +164,8 @@ export function Monolith({
       {/* Arched bays, one per storey, on the two faces the camera can see.
           Real recessed voids with layered orders — this is where the sense of
           a carved, built object actually comes from. */}
-      {storeys.map((st, i) =>
+      {detailed &&
+        storeys.map((st, i) =>
         [0, Math.PI].map((rot, f) => (
           <group
             key={`bay-${i}-${f}`}
@@ -170,8 +182,8 @@ export function Monolith({
               </ArchedBay>
             </group>
           </group>
-        )),
-      )}
+          )),
+        )}
 
       {/* String courses banding between the pilasters. Proud of the core but
           shy of the pilasters, so they read as a moulding, not a collar. */}
