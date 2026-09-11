@@ -6,26 +6,37 @@ import { MathUtils, Vector3 } from 'three'
 import { useScene } from '@/store/scene'
 
 /**
- * Resting camera behaviour.
+ * Pixel-stable resting camera.
  *
- * Two motions layered: a very slow orbital breath that never stops, and a
- * pointer parallax that leans the camera a few degrees toward the cursor. The
- * breath is what stops the opening shot feeling like a screenshot; the
- * parallax is what makes it feel like a place you are standing in.
+ * The old rig moved continuously even when the visitor did nothing. That made
+ * every hard edge in the scene cross sub-pixel boundaries forever, which is
+ * exactly when the motion shimmer/flicker appeared. The rendered scene itself
+ * is stable; the permanent camera drift was forcing a new sampling phase every
+ * frame.
  *
- * Disabled entirely under reduced motion — the framing stays, the movement goes.
+ * This rig keeps the camera body completely fixed at rest. Pointer movement
+ * only nudges the LOOK TARGET, and a dead-zone + snap-to-rest means the camera
+ * becomes mathematically still again as soon as input settles.
  */
 
-/**
- * Low, close, looking up.
- *
- * Standing height in the middle of the array reads as a diorama. Dropping the
- * lens to roughly a metre above the water and aiming it up past the near
- * monoliths is the whole trick: the foreground slabs run off the top of the
- * frame, and anything that leaves the frame reads as too big to contain.
- */
 const REST = new Vector3(0, 4.6, 58)
 const TARGET = new Vector3(0, 26, -76)
+
+const POINTER_DEADZONE = 0.045
+const AIM_X = 2.2
+const AIM_Y = 0.9
+const AIM_DAMPING = 8.5
+const SNAP_EPSILON = 0.001
+
+function deadzoned(value: number): number {
+  const a = Math.abs(value)
+  if (a <= POINTER_DEADZONE) return 0
+
+  const n = Math.min(1, (a - POINTER_DEADZONE) / (1 - POINTER_DEADZONE))
+  // Smoothstep keeps the edge of the dead-zone from producing a tiny jerk.
+  const eased = n * n * (3 - 2 * n)
+  return Math.sign(value) * eased
+}
 
 export function IdleRig() {
   const camera = useThree((s) => s.camera)
@@ -34,35 +45,74 @@ export function IdleRig() {
   const freelook = useScene((s) => s.freelook)
   const still = useScene((s) => s.flags.still)
 
-  const lean = useRef(new Vector3())
+  const aim = useRef(TARGET.clone())
+  const desired = useRef(TARGET.clone())
+  const applied = useRef(TARGET.clone())
+  const initialized = useRef(false)
+  const wasFreelook = useRef(false)
 
-  useFrame(({ clock }, delta) => {
-    if (freelook) return
-
-    if (reducedMotion || still) {
-      camera.position.copy(REST)
-      camera.lookAt(TARGET)
+  useFrame((_, delta) => {
+    if (freelook) {
+      wasFreelook.current = true
       return
     }
 
-    const t = clock.elapsedTime
+    // Re-entering from freelook should always return to a known, stable frame.
+    if (!initialized.current || wasFreelook.current) {
+      camera.position.copy(REST)
+      aim.current.copy(TARGET)
+      desired.current.copy(TARGET)
+      applied.current.copy(TARGET)
+      camera.lookAt(TARGET)
+      initialized.current = true
+      wasFreelook.current = false
+    }
 
-    // Orbital breath. Long periods, small amplitudes, deliberately irrational
-    // ratios so the loop never visibly repeats.
-    const breathX = Math.sin(t * 0.062) * 7.4 + Math.sin(t * 0.0211) * 3.0
-    const breathY = Math.sin(t * 0.0431) * 1.4
-    const breathZ = Math.cos(t * 0.0509) * 5.6
+    if (reducedMotion || still) {
+      if (camera.position.distanceToSquared(REST) > 1e-12) camera.position.copy(REST)
+      if (applied.current.distanceToSquared(TARGET) > 1e-12) {
+        aim.current.copy(TARGET)
+        desired.current.copy(TARGET)
+        applied.current.copy(TARGET)
+        camera.lookAt(TARGET)
+      }
+      return
+    }
 
-    // Pointer parallax, heavily damped.
-    lean.current.x = MathUtils.damp(lean.current.x, pointer.x * 9.5, 1.9, delta)
-    lean.current.y = MathUtils.damp(lean.current.y, pointer.y * 2.6, 1.9, delta)
+    // The camera itself never translates during idle interaction. Translation
+    // creates parallax across the whole frame and was the strongest shimmer
+    // amplifier. We only move the gaze target a small amount.
+    const px = deadzoned(pointer.x)
+    const py = deadzoned(pointer.y)
 
-    camera.position.set(
-      REST.x + breathX + lean.current.x,
-      REST.y + breathY + lean.current.y,
-      REST.z + breathZ,
+    desired.current.set(
+      TARGET.x + px * AIM_X,
+      TARGET.y + py * AIM_Y,
+      TARGET.z,
     )
-    camera.lookAt(TARGET)
+
+    aim.current.x = MathUtils.damp(aim.current.x, desired.current.x, AIM_DAMPING, delta)
+    aim.current.y = MathUtils.damp(aim.current.y, desired.current.y, AIM_DAMPING, delta)
+    aim.current.z = TARGET.z
+
+    // MathUtils.damp approaches asymptotically. Without this snap the camera
+    // would technically keep moving forever by microscopic amounts, which is
+    // exactly what we are trying to eliminate.
+    if (Math.abs(aim.current.x - desired.current.x) < SNAP_EPSILON) {
+      aim.current.x = desired.current.x
+    }
+    if (Math.abs(aim.current.y - desired.current.y) < SNAP_EPSILON) {
+      aim.current.y = desired.current.y
+    }
+
+    if (camera.position.distanceToSquared(REST) > 1e-12) camera.position.copy(REST)
+
+    // Do not rewrite the camera matrix when nothing has changed. At rest this
+    // becomes a genuinely static camera, not just a very slowly moving one.
+    if (aim.current.distanceToSquared(applied.current) > 1e-8) {
+      camera.lookAt(aim.current)
+      applied.current.copy(aim.current)
+    }
   })
 
   return null
