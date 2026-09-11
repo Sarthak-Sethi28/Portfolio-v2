@@ -2,6 +2,7 @@
 
 import { Suspense, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { Environment } from '@react-three/drei'
 import { Bloom, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { MathUtils, type DirectionalLight, type FogExp2 } from 'three'
@@ -39,6 +40,22 @@ export function Stage() {
 
   const fogRef = useRef<FogExp2>(null)
 
+  /**
+   * Image-based lighting comes from <Environment> below.
+   *
+   * This is the difference between "a render" and "a photograph", and leaving
+   * it out was the largest single reason the slabs read as flat cardboard.
+   *
+   * A directional light delivers light from exactly one direction, so a face
+   * turned away from it receives nothing but a flat ambient constant. In the
+   * real world — and in the reference frame — every surface is lit by the
+   * WHOLE sky: the teal zenith rakes the tops, the warm horizon catches the
+   * lower faces, and the gradient between them is what makes concrete look
+   * like concrete. Feeding the same panorama that draws the sky in as the
+   * scene environment gives every material that for free, and guarantees the
+   * lighting agrees with the sky the viewer can actually see.
+   */
+
   useFrame((_, delta) => {
     // Ease toward the target rather than snapping — the cross-fade IS the
     // day/night transition, so its duration is the feature.
@@ -53,9 +70,7 @@ export function Stage() {
     }
 
     if (sunRef.current) {
-      sunRef.current.position
-        .copy(palette.sunDirection)
-        .multiplyScalar(420)
+      sunRef.current.position.copy(palette.sunDirection).multiplyScalar(420)
       sunRef.current.color.copy(palette.sunColor)
       sunRef.current.intensity = palette.keyIntensity
     }
@@ -71,10 +86,17 @@ export function Stage() {
         args={[palette.fog.getHex(), CONFIG_DEFAULTS.fogDensity]}
       />
 
+      {/* background={false}: the Sky shader already draws the visible dome,
+          with the sun and the day/night blend the plate cannot provide. This
+          instance exists only to light the scene. */}
+      <Environment files="/sky/dusk.jpg" background={false} environmentIntensity={1.15} />
+
       <Sky palette={palette} anim={animRef} />
 
+      {/* Kept, but weak. The environment map now carries the fill; the
+          hemisphere only tints the very bottom faces the panorama cannot see. */}
       <hemisphereLight
-        args={[palette.ambient, palette.waterTint, palette.ambientIntensity]}
+        args={[palette.ambient, palette.waterTint, palette.ambientIntensity * 0.45]}
       />
       <directionalLight ref={sunRef} castShadow={false} />
 
