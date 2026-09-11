@@ -6,23 +6,14 @@ import { MathUtils, Vector3 } from 'three'
 import { useScene } from '@/store/scene'
 
 /**
- * Resting camera behaviour.
+ * Luxury/cinematic idle motion should be almost subconscious. The previous rig
+ * translated more than ten world units side-to-side before pointer parallax,
+ * which made every hard edge sweep through many pixel phases continuously.
+ * That both looked game-like and exaggerated temporal shimmer.
  *
- * Two motions layered: a very slow orbital breath that never stops, and a
- * pointer parallax that leans the camera a few degrees toward the cursor. The
- * breath is what stops the opening shot feeling like a screenshot; the
- * parallax is what makes it feel like a place you are standing in.
- *
- * Disabled entirely under reduced motion — the framing stays, the movement goes.
- */
-
-/**
- * Low, close, looking up.
- *
- * Standing height in the middle of the array reads as a diorama. Dropping the
- * lens to roughly a metre above the water and aiming it up past the near
- * monoliths is the whole trick: the foreground slabs run off the top of the
- * frame, and anything that leaves the frame reads as too big to contain.
+ * This pass keeps the camera body nearly planted and moves most pointer intent
+ * into the gaze target. The result is closer to a tripod/dolly head than a
+ * floating noclip camera.
  */
 const REST = new Vector3(0, 4.6, 58)
 const TARGET = new Vector3(0, 26, -76)
@@ -34,7 +25,8 @@ export function IdleRig() {
   const freelook = useScene((s) => s.freelook)
   const still = useScene((s) => s.flags.still)
 
-  const lean = useRef(new Vector3())
+  const position = useRef(REST.clone())
+  const target = useRef(TARGET.clone())
 
   useFrame(({ clock }, delta) => {
     if (freelook) return
@@ -42,27 +34,33 @@ export function IdleRig() {
     if (reducedMotion || still) {
       camera.position.copy(REST)
       camera.lookAt(TARGET)
+      position.current.copy(REST)
+      target.current.copy(TARGET)
       return
     }
 
     const t = clock.elapsedTime
 
-    // Orbital breath. Long periods, small amplitudes, deliberately irrational
-    // ratios so the loop never visibly repeats.
-    const breathX = Math.sin(t * 0.062) * 7.4 + Math.sin(t * 0.0211) * 3.0
-    const breathY = Math.sin(t * 0.0431) * 1.4
-    const breathZ = Math.cos(t * 0.0509) * 5.6
+    // Low-frequency dolly breath. Total displacement is intentionally tiny
+    // relative to the old 10+ unit orbit.
+    const desiredX = REST.x + Math.sin(t * 0.052) * 1.55 + Math.sin(t * 0.017) * 0.42
+    const desiredY = REST.y + Math.sin(t * 0.039) * 0.28
+    const desiredZ = REST.z + Math.cos(t * 0.046) * 0.9
 
-    // Pointer parallax, heavily damped.
-    lean.current.x = MathUtils.damp(lean.current.x, pointer.x * 9.5, 1.9, delta)
-    lean.current.y = MathUtils.damp(lean.current.y, pointer.y * 2.6, 1.9, delta)
+    position.current.x = MathUtils.damp(position.current.x, desiredX, 2.4, delta)
+    position.current.y = MathUtils.damp(position.current.y, desiredY, 2.4, delta)
+    position.current.z = MathUtils.damp(position.current.z, desiredZ, 2.4, delta)
 
-    camera.position.set(
-      REST.x + breathX + lean.current.x,
-      REST.y + breathY + lean.current.y,
-      REST.z + breathZ,
-    )
-    camera.lookAt(TARGET)
+    // Pointer interaction rotates the composition by changing the point of
+    // interest instead of translating the whole camera through space.
+    const desiredTargetX = TARGET.x + pointer.x * 5.2
+    const desiredTargetY = TARGET.y + pointer.y * 2.1
+    target.current.x = MathUtils.damp(target.current.x, desiredTargetX, 2.2, delta)
+    target.current.y = MathUtils.damp(target.current.y, desiredTargetY, 2.2, delta)
+    target.current.z = MathUtils.damp(target.current.z, TARGET.z, 2.2, delta)
+
+    camera.position.copy(position.current)
+    camera.lookAt(target.current)
   })
 
   return null
