@@ -47,7 +47,7 @@ export const DAY: Palette = {
   fog: new Color('#b6bda6'),
   fogDensityScale: 1,
   monolith: new Color('#020304'),
-  waterTint: new Color('#aeb6ae'),
+  waterTint: new Color('#e8ece7'),
   ambient: new Color('#5d7a80'),
   ambientIntensity: 0.17,
 }
@@ -63,7 +63,7 @@ export const NIGHT: Palette = {
   fog: new Color('#0e1c2e'),
   fogDensityScale: 1.35,
   monolith: new Color('#010203'),
-  waterTint: new Color('#2b3d55'),
+  waterTint: new Color('#7d8ea8'),
   ambient: new Color('#16304f'),
   ambientIntensity: 0.14,
 }

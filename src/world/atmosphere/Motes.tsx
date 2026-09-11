@@ -63,11 +63,11 @@ export function Motes({
   return (
     <points ref={ref} geometry={geometry} frustumCulled={false}>
       <pointsMaterial
-        size={0.34}
+        size={0.11}
         sizeAttenuation
         color={palette.sunColor}
         transparent
-        opacity={0.5}
+        opacity={0.22}
         depthWrite={false}
         blending={AdditiveBlending}
         toneMapped={false}
