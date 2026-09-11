@@ -41,7 +41,9 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
 
   return (
     <group>
-      {/* Navigation. One monolith per section, always present. */}
+      {/* Navigation masses are the objects the camera sees close enough for
+          architectural micro-detail to matter, so they receive the hero mesh
+          treatment. Keeping the distant scatter lean protects 120 Hz. */}
       {sections.map((placement, i) => {
         const id = SECTIONS[i]
         return (
@@ -49,6 +51,7 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
             key={id}
             placement={placement}
             palette={palette}
+            hero
             emphasis={hovered === id ? 1 : 0}
             onPointerOver={() => setHovered(id)}
             onPointerOut={() => setHovered(null)}
@@ -57,16 +60,12 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
         )
       })}
 
-      {/* Scenery. Count is slider-driven and may legitimately be zero. */}
       {field.map((placement, i) => (
         <Monolith key={`field-${i}`} placement={placement} palette={palette} />
       ))}
 
       <Aperture palette={palette} />
       <Dish palette={palette} />
-
-      {/* Scale reference. See Figure — nothing else in the world has a size
-          the viewer already knows. */}
       <Figure palette={palette} position={[21, 0, -205]} />
     </group>
   )
