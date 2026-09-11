@@ -27,24 +27,34 @@ export function Water({
 
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-      <planeGeometry args={[4000, 4000, 1, 1]} />
+      {/* 4000 units reaches well past the fog's extinction distance; larger
+          only costs reflector fill rate for pixels fog has already erased. */}
+      <planeGeometry args={[2400, 2400, 1, 1]} />
       {reflective ? (
         <MeshReflectorMaterial
-          // Blur grows with distance, which fakes the way a real wet surface
-          // loses coherence toward the horizon.
-          blur={[160, 38]}
+          // Just enough to read as a centimetre of water rather than glass.
+          //
+          // This was [160,38] and then [90,22], and at those values the
+          // reflection was smeared into flat darkness — the lower third of the
+          // frame looked like a void and the whole mirrored-plain effect, which
+          // is half the composition, was simply absent. Blur is also billed per
+          // texel over two passes, so the large values were expensive AND
+          // destructive.
+          blur={[26, 7]}
           resolution={reflectorResolution}
-          mixBlur={0.35}
-          mixStrength={22}
+          mixBlur={0.22}
+          mixStrength={6}
           roughness={roughness}
-          depthScale={1.15}
-          minDepthThreshold={0.35}
-          maxDepthThreshold={1.3}
+          // depthScale fades the reflection by distance from the surface.
+          // Enabled, it was erasing almost everything the plain should be
+          // mirroring — which is why the lower third of the frame read as a
+          // black void rather than as standing water.
+          depthScale={0}
           color={palette.waterTint}
-          metalness={0.78}
-          mirror={0.96}
+          metalness={0.45}
+          mirror={1}
           distortion={distort}
-          reflectorOffset={0.02}
+          reflectorOffset={0}
         />
       ) : (
         <meshStandardMaterial
