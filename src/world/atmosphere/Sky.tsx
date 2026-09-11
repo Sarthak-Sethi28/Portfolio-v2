@@ -2,19 +2,32 @@
 
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { BackSide, Color, ShaderMaterial, Vector3 } from 'three'
+import { useTexture } from '@react-three/drei'
+import {
+  BackSide,
+  Color,
+  MirroredRepeatWrapping,
+  RepeatWrapping,
+  ShaderMaterial,
+  SRGBColorSpace,
+  Vector3,
+  type Texture,
+} from 'three'
 import type { Palette } from './palette'
 import type { AnimRef } from '../anim'
 
 /**
- * Procedural sky.
+ * The sky: a photographic panorama blended over a procedural base.
  *
- * Deliberately not an HDRI. The spec originally called for Poly Haven files,
- * but a shader wins here on three counts: it costs zero bytes so first paint
- * is immediate, it hits the concept palette exactly rather than approximately,
- * and day/night becomes a continuous uniform rather than a cross-fade between
- * two multi-megabyte textures. Image-based lighting is not missed in a scene
- * built almost entirely from silhouettes and fog.
+ * Neither half works alone. A pure shader gradient is what made the first pass
+ * read as synthetic — real skies carry cirrus detail that no cheap fbm
+ * reproduces. A pure photograph, on the other hand, cannot move the sun, cannot
+ * blend continuously between day and night, and cannot light the scene.
+ *
+ * So: the shader owns everything dynamic (gradient, sun disc, day/night mix,
+ * the Milky Way), and the panorama supplies the detail the shader cannot fake.
+ * The sun is composited ON TOP of the plate so it stays where the key light is,
+ * rather than wherever it happened to be when the plate was generated.
  */
 
 const vertex = /* glsl */ `
@@ -29,17 +42,20 @@ const vertex = /* glsl */ `
 const fragment = /* glsl */ `
   precision highp float;
 
-  uniform vec3  uZenith;
-  uniform vec3  uHorizon;
-  uniform vec3  uSunColor;
-  uniform vec3  uSunDir;
-  uniform float uSunIntensity;
-  uniform float uNight;
-  uniform float uTime;
+  uniform vec3      uZenith;
+  uniform vec3      uHorizon;
+  uniform vec3      uSunColor;
+  uniform vec3      uSunDir;
+  uniform float     uSunIntensity;
+  uniform float     uNight;
+  uniform float     uTime;
+  uniform sampler2D uDusk;
+  uniform sampler2D uNightMap;
 
   varying vec3 vWorldDir;
 
-  // Cheap value noise, used only for the soft cloud banding near the horizon.
+  const float PI = 3.14159265359;
+
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
   }
@@ -55,65 +71,90 @@ const fragment = /* glsl */ `
     return v;
   }
 
-  // Star field for the night half. Hashed to a fixed grid so stars do not
-  // swim when the camera moves.
-  float stars(vec3 dir) {
-    vec3 g = dir * 220.0;
-    vec3 id = floor(g);
-    float h = hash(id.xy + id.z * 57.0);
-    if (h < 0.9965) return 0.0;
-    vec3 f = fract(g) - 0.5;
-    float d = length(f);
-    float twinkle = 0.65 + 0.35 * sin(uTime * 1.7 + h * 90.0);
-    return smoothstep(0.34, 0.0, d) * twinkle;
-  }
-
   void main() {
     vec3 dir = normalize(vWorldDir);
-
-    // Height ramp. pow() biases the gradient down toward the horizon, which is
-    // where all the colour interest lives in the reference frames.
     float h = clamp(dir.y, -1.0, 1.0);
+    float az = atan(dir.z, dir.x);
+
+    // --- procedural base -------------------------------------------------
     float t = pow(clamp(h * 0.5 + 0.5, 0.0, 1.0), 0.55);
     vec3 col = mix(uHorizon, uZenith, smoothstep(0.30, 0.88, t));
-
-    // Horizon haze: a bright band hugging y = 0 that sells atmospheric depth.
-    // Kept tight, or it swallows the zenith and the sky reads as one flat wash.
     float haze = exp(-abs(h) * 16.0);
     col = mix(col, uHorizon, haze * 0.72);
 
-    // Sun. A small hot disc inside a very wide, very soft bloom.
+    // --- photographic plate ----------------------------------------------
+    // The dusk plate is a wide sky, not a true sphere, so it is mapped across
+    // the upper hemisphere with mirrored wrap: repetition is invisible in
+    // cirrus, whereas a hard seam would not be.
+    float elev = clamp(asin(clamp(h, -1.0, 1.0)) / (PI * 0.5), 0.0, 1.0);
+
+    // The dusk plate is a wide-angle sky photograph, not a hemisphere: its
+    // frame spans roughly the first 50 degrees of elevation. Mapping it across
+    // the full 0-90 stretched the amber horizon band over everything the
+    // camera can actually see and buried the teal. Compress it to its true
+    // arc and let the procedural zenith take over above.
+    float plateElev = clamp(elev / 0.52, 0.0, 1.0);
+    vec3 duskPlate = texture2D(uDusk, vec2(az / (2.0 * PI), plateElev)).rgb;
+
+    // The plate was shot with a sun in it. Mirrored across the seam that sun
+    // appears twice, and neither copy sits where our key light is — so roll
+    // the highlights off hard. Everything below the knee (the cirrus, the
+    // gradient, the grain) is untouched; only the blown disc is crushed.
+    float plateLum = dot(duskPlate, vec3(0.2126, 0.7152, 0.0722));
+    float over = max(plateLum - 0.62, 0.0);
+    duskPlate /= 1.0 + over * 5.5;
+
+    // A light tint so the plate still answers to the live palette, but not so
+    // much that its own colour is overwritten.
+    duskPlate = mix(duskPlate, duskPlate * mix(uHorizon, uZenith, 0.45) * 1.5, 0.26);
+
+    // Strongest through the striation band; released toward the zenith so the
+    // procedural teal closes the dome, and at the horizon where fog takes over.
+    float plateMix = smoothstep(0.0, 0.10, h) * (1.0 - smoothstep(0.45, 0.92, elev)) * 0.88;
+    col = mix(col, duskPlate, plateMix * (1.0 - uNight));
+
+    // --- night ------------------------------------------------------------
+    vec2 nightUv = vec2(az / (2.0 * PI) + 0.5, clamp(elev / 0.85, 0.0, 1.0));
+    vec3 stars = texture2D(uNightMap, nightUv).rgb;
+    // Lift the plate's faint stars without lifting its black.
+    stars = pow(stars, vec3(0.72)) * 1.45;
+    col = mix(col, col * 0.25 + stars, uNight * smoothstep(-0.03, 0.14, h));
+
+    // Milky Way, kept procedural so it can be placed for composition rather
+    // than wherever the plate put it.
+    float band = exp(-pow(dot(dir, normalize(vec3(0.35, 0.62, 0.70))) * 3.1, 2.0));
+    float dust = fbm(vec2(az * 2.4, h * 5.0) * 2.0);
+    col += vec3(0.52, 0.55, 0.72) * band * dust * 0.34 * uNight;
+
+    // --- sun, composited last so it always sits with the key light ---------
     float cosSun = dot(dir, normalize(uSunDir));
-    float disc  = smoothstep(0.9993, 0.99985, cosSun);
-    float glow  = pow(max(cosSun, 0.0), 260.0);
-    float wide  = pow(max(cosSun, 0.0), 26.0);
-    col += uSunColor * (disc * 18.0 + glow * 1.9 + wide * 0.34) * uSunIntensity;
-
-    // Cloud banding, compressed toward the horizon and drifting slowly.
-    vec2 cuv = vec2(atan(dir.z, dir.x) * 1.35, h * 3.4);
-    float cloud = fbm(cuv * 1.6 + vec2(uTime * 0.006, 0.0));
-    cloud = smoothstep(0.46, 0.92, cloud) * smoothstep(0.62, 0.05, abs(h));
-    col = mix(col, uHorizon * 1.12, cloud * 0.42 * (1.0 - uNight * 0.55));
-
-    // Stars fade in with the night mix, above the horizon only.
-    col += vec3(0.85, 0.9, 1.0) * stars(dir) * uNight * smoothstep(-0.02, 0.16, h);
-
-    // Milky Way: a broad tilted band of dust, the payoff of night mode.
-    float band = exp(-pow((dot(dir, normalize(vec3(0.35, 0.62, 0.70)))) * 3.1, 2.0));
-    float dust = fbm(vec2(atan(dir.z, dir.x) * 2.4, h * 5.0) * 2.0);
-    col += vec3(0.52, 0.55, 0.72) * band * dust * 0.30 * uNight;
+    float disc = smoothstep(0.99965, 0.99992, cosSun);
+    float glow = pow(max(cosSun, 0.0), 420.0);
+    float wide = pow(max(cosSun, 0.0), 40.0);
+    col += uSunColor * (disc * 20.0 + glow * 1.15 + wide * 0.06) * uSunIntensity;
 
     gl_FragColor = vec4(col, 1.0);
-    #include <tonemapping_fragment>
-    #include <colorspace_fragment>
   }
 `
 
 export function Sky({ palette, anim }: { palette: Palette; anim: AnimRef }) {
   const matRef = useRef<ShaderMaterial>(null)
+  // Wrapping and colour space are configured in the loader callback rather
+  // than after the fact: mutating a value returned from a hook is a React
+  // Compiler violation, and this is the hook's own construction point.
+  const [dusk, night] = useTexture(['/sky/dusk.jpg', '/sky/night.jpg'], (loaded) => {
+    const list = (Array.isArray(loaded) ? loaded : [loaded]) as Texture[]
+    list.forEach((tex, i) => {
+      // The dusk plate is a wide sky rather than a full sphere, so it mirrors
+      // across the seam. The night plate is a true equirect and simply wraps.
+      tex.wrapS = i === 0 ? MirroredRepeatWrapping : RepeatWrapping
+      tex.wrapT = RepeatWrapping
+      tex.colorSpace = SRGBColorSpace
+    })
+  }) as Texture[]
 
-  const uniforms = useMemo(
-    () => ({
+  const uniforms = useMemo(() => {
+    return {
       uZenith: { value: new Color() },
       uHorizon: { value: new Color() },
       uSunColor: { value: new Color() },
@@ -121,13 +162,11 @@ export function Sky({ palette, anim }: { palette: Palette; anim: AnimRef }) {
       uSunIntensity: { value: 1 },
       uNight: { value: 0 },
       uTime: { value: 0 },
-    }),
-    [],
-  )
+      uDusk: { value: dusk },
+      uNightMap: { value: night },
+    }
+  }, [dusk, night])
 
-  // Uniforms are written in the frame loop, never during render: Stage owns
-  // the palette blend and `anim` carries the live night mix across without
-  // either component reading a ref while rendering.
   useFrame(({ clock }) => {
     const u = matRef.current?.uniforms
     if (!u) return
@@ -142,7 +181,7 @@ export function Sky({ palette, anim }: { palette: Palette; anim: AnimRef }) {
 
   return (
     <mesh frustumCulled={false} renderOrder={-1000}>
-      <sphereGeometry args={[900, 48, 32]} />
+      <sphereGeometry args={[900, 64, 40]} />
       <shaderMaterial
         ref={matRef}
         uniforms={uniforms}

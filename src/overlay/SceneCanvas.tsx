@@ -41,7 +41,7 @@ export function SceneCanvas() {
     <Canvas
       dpr={dpr}
       gl={{ antialias: true, powerPreference: 'high-performance', alpha: false }}
-      camera={{ fov: 42, near: 0.5, far: 2600, position: [0, 11.5, 104] }}
+      camera={{ fov: 56, near: 0.35, far: 2600, position: [0, 4.6, 58] }}
       style={{ position: 'absolute', inset: 0 }}
     >
       {/* Drops resolution before it drops frames. */}

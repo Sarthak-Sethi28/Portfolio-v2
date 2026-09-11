@@ -2,8 +2,16 @@
 
 import { Suspense, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Bloom, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing'
-import { ToneMappingMode } from 'postprocessing'
+import {
+  Bloom,
+  ChromaticAberration,
+  EffectComposer,
+  Noise,
+  ToneMapping,
+  Vignette,
+} from '@react-three/postprocessing'
+import { BlendFunction, ToneMappingMode } from 'postprocessing'
+import { Vector2 } from 'three'
 import { MathUtils, type DirectionalLight, type FogExp2 } from 'three'
 import { CONFIG_DEFAULTS, useScene, effectiveMoteCount } from '@/store/scene'
 import { blendPalette, createPalette } from './atmosphere/palette'
@@ -29,6 +37,9 @@ export function Stage() {
   const moteCount = useScene((s) => effectiveMoteCount({ config: s.config, quality: s.quality }))
 
   const palette = useMemo(() => createPalette(), [])
+  // Sub-pixel at 1080p. Enough to break the CG-clean edges, not enough to
+  // read as an effect.
+  const aberration = useMemo(() => new Vector2(0.0007, 0.0009), [])
   const animRef = useRef<Anim>(createAnim())
   const sunRef = useRef<DirectionalLight>(null)
 
@@ -52,7 +63,7 @@ export function Stage() {
         .copy(palette.sunDirection)
         .multiplyScalar(420)
       sunRef.current.color.copy(palette.sunColor)
-      sunRef.current.intensity = palette.sunIntensity
+      sunRef.current.intensity = palette.keyIntensity
     }
   })
 
@@ -89,16 +100,20 @@ export function Stage() {
       <EffectComposer enableNormalPass={false}>
         {quality.bloom ? (
           <Bloom
-            intensity={0.62}
-            luminanceThreshold={0.68}
-            luminanceSmoothing={0.3}
+            intensity={0.28}
+            luminanceThreshold={0.93}
+            luminanceSmoothing={0.18}
             mipmapBlur
           />
         ) : (
           <></>
         )}
+        <ChromaticAberration offset={aberration} />
         <Vignette offset={0.2} darkness={0.78} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+        {/* Grain last, over the graded image. A perfectly clean frame is the
+            single loudest tell that something was rendered rather than shot. */}
+        <Noise premultiply blendFunction={BlendFunction.SOFT_LIGHT} opacity={0.20} />
       </EffectComposer>
     </>
   )

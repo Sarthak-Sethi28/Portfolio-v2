@@ -14,7 +14,7 @@ import type { Palette } from '../atmosphere/palette'
  */
 export function Aperture({
   palette,
-  radius = 16,
+  radius = 21,
   charge = 0,
 }: {
   palette: Palette
@@ -34,7 +34,7 @@ export function Aperture({
   })
 
   return (
-    <group position={[0, radius + 1.2, -26]}>
+    <group position={[0, radius + 1.0, -78]}>
       {/* The ring itself. radialSegments of 4 gives flat faces. */}
       <mesh castShadow rotation={[0, 0, Math.PI / 4]}>
         <torusGeometry args={[radius, 1.85, 4, 96]} />

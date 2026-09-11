@@ -27,8 +27,8 @@ export function Title() {
           fontWeight: 300,
           letterSpacing: 'clamp(10px, 3.6vw, 34px)',
           paddingLeft: 'clamp(10px, 3.6vw, 34px)',
-          color: 'rgba(12,14,16,0.92)',
-          textShadow: '0 1px 30px rgba(255,255,255,0.25)',
+          color: 'rgba(244,241,234,0.94)',
+          textShadow: '0 2px 42px rgba(0,0,0,0.85), 0 0 90px rgba(0,0,0,0.5)',
         }}
       >
         {letters.map((ch, i) => (
