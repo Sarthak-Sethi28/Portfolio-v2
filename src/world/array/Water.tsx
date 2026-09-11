@@ -43,7 +43,7 @@ export function Water({
           blur={[26, 7]}
           resolution={reflectorResolution}
           mixBlur={0.22}
-          mixStrength={9}
+          mixStrength={6}
           roughness={roughness}
           // depthScale fades the reflection by distance from the surface.
           // Enabled, it was erasing almost everything the plain should be
@@ -51,7 +51,7 @@ export function Water({
           // black void rather than as standing water.
           depthScale={0}
           color={palette.waterTint}
-          metalness={0.45}
+          metalness={1}
           mirror={1}
           distortion={distort}
           reflectorOffset={0}

@@ -2,8 +2,8 @@
 
 import { Suspense, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Bloom, EffectComposer, Noise, ToneMapping, Vignette } from '@react-three/postprocessing'
-import { BlendFunction, ToneMappingMode } from 'postprocessing'
+import { Bloom, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { ToneMappingMode } from 'postprocessing'
 import { MathUtils, type DirectionalLight, type FogExp2 } from 'three'
 import { CONFIG_DEFAULTS, useScene, effectiveMoteCount } from '@/store/scene'
 import { blendPalette, createPalette } from './atmosphere/palette'
@@ -104,9 +104,13 @@ export function Stage() {
         )}
         <Vignette offset={0.2} darkness={0.78} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-        {/* Grain last, over the graded image. A perfectly clean frame is the
-            single loudest tell that something was rendered rather than shot. */}
-        <Noise premultiply blendFunction={BlendFunction.SOFT_LIGHT} opacity={0.20} />
+        {/* NO GRAIN.
+            The Noise effect regenerates a fresh random field every frame. On a
+            120Hz display that is not "film grain", it is the image flickering
+            120 times a second — it was the flicker, not a frame-rate problem
+            (measured: a locked 120fps with zero drops). Static grain would
+            need to be a fixed texture sampled in screen space; a per-frame
+            random is unusable regardless of opacity. */}
       </EffectComposer>
     </>
   )
