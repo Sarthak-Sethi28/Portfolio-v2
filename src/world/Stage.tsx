@@ -102,7 +102,25 @@ export function Stage() {
       <hemisphereLight
         args={[palette.ambient, palette.waterTint, palette.ambientIntensity * 0.45]}
       />
-      <directionalLight ref={sunRef} castShadow={false} />
+      {/*
+        The sun casts now. A shadow map covers a fixed volume, so the frustum
+        is sized to the composition rather than to the whole world — spread
+        over 1600 units every shadow would be a blurry smear, and tight to the
+        piers they are crisp where anyone is looking.
+      */}
+      <directionalLight
+        ref={sunRef}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-220}
+        shadow-camera-right={220}
+        shadow-camera-top={220}
+        shadow-camera-bottom={-220}
+        shadow-camera-near={120}
+        shadow-camera-far={900}
+        shadow-bias={-0.0009}
+        shadow-normalBias={0.6}
+      />
 
       <Suspense fallback={null}>
         <Water

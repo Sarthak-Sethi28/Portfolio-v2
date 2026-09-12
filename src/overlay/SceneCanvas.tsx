@@ -68,6 +68,11 @@ export function SceneCanvas() {
       // Guarantee the composer and the canvas can never disagree about size:
       // re-resolve on every resize rather than trusting the observer alone.
       resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
+      // Shadows were never switched on. Nothing in this scene has been
+      // blocking light from anything else, which is most of why it read as
+      // clay: a real object's most recognisable property is that it casts a
+      // shadow. PCF soft, because hard-edged shadow maps look worse than none.
+      shadows="soft"
       gl={{ antialias: true, powerPreference: 'high-performance', alpha: false }}
       camera={{ fov: 50, near: 0.35, far: 6000, position: [0, 34, 132] }}
       style={{ position: 'absolute', inset: 0 }}

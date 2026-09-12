@@ -239,14 +239,14 @@ function MonolithImpl({
     <group position={position} rotation={[0, rotationY, tilt]}>
       {/* The only thing in this pier that can be hit by a ray. */}
       {interactive && (
-        <mesh {...handlers} visible={false}>
+        <mesh castShadow receiveShadow {...handlers} visible={false}>
           <boxGeometry args={[width * 1.2, height, depth * 1.2]} />
         </mesh>
       )}
 
       {/* Recessed core. Set back on all four sides so each face reads as a
           deep panel rather than a flat side. */}
-      <mesh raycast={noHit}>
+      <mesh castShadow receiveShadow raycast={noHit}>
         <boxGeometry args={[coreW, height, coreD]} />
         {mat}
       </mesh>
@@ -254,6 +254,8 @@ function MonolithImpl({
       {/* Corner pilasters, standing proud the full height. */}
       {corners.map(([sx, sz], i) => (
         <RoundedBox
+          castShadow
+          receiveShadow
           key={`pil-${i}`}
           args={[pil, height, pil]}
           radius={bevel}
@@ -292,7 +294,7 @@ function MonolithImpl({
       {/* String courses banding between the pilasters. Proud of the core but
           shy of the pilasters, so they read as a moulding, not a collar. */}
       {courses.map((y, i) => (
-        <mesh key={`course-${i}`} position={[0, y, 0]} raycast={noHit}>
+        <mesh castShadow receiveShadow key={`course-${i}`} position={[0, y, 0]} raycast={noHit}>
           <boxGeometry args={[width - pil * 0.5, height * 0.022, depth - pil * 0.5]} />
           {mat}
         </mesh>
@@ -343,13 +345,13 @@ function MonolithImpl({
           a moulding. */}
       {!ruined && detail.cornice > 0 && (
         <group position={[0, height / 2, 0]}>
-          <mesh position={[0, -height * 0.026, 0]} raycast={noHit}>
+          <mesh castShadow receiveShadow position={[0, -height * 0.026, 0]} raycast={noHit}>
             <boxGeometry
               args={[width * (1 + detail.cornice * 0.6), height * 0.02, depth * (1 + detail.cornice * 0.6)]}
             />
             {mat}
           </mesh>
-          <mesh position={[0, -height * 0.008, 0]} raycast={noHit}>
+          <mesh castShadow receiveShadow position={[0, -height * 0.008, 0]} raycast={noHit}>
             <boxGeometry
               args={[width * (1 + detail.cornice * 1.5), height * 0.018, depth * (1 + detail.cornice * 1.5)]}
             />
@@ -382,13 +384,13 @@ function MonolithImpl({
       {/* Plinth where the pier meets the water. */}
       {detail.plinth > 0 && (
         <group position={[0, -height / 2, 0]}>
-          <mesh position={[0, height * 0.016, 0]} raycast={noHit}>
+          <mesh castShadow receiveShadow position={[0, height * 0.016, 0]} raycast={noHit}>
             <boxGeometry
               args={[width * (1 + detail.plinth * 1.4), height * 0.032, depth * (1 + detail.plinth * 1.4)]}
             />
             {mat}
           </mesh>
-          <mesh position={[0, height * 0.042, 0]} raycast={noHit}>
+          <mesh castShadow receiveShadow position={[0, height * 0.042, 0]} raycast={noHit}>
             <boxGeometry
               args={[width * (1 + detail.plinth * 0.6), height * 0.02, depth * (1 + detail.plinth * 0.6)]}
             />
@@ -402,7 +404,7 @@ function MonolithImpl({
           stays wet — lower roughness, so it catches a sheen the dry stone
           above it does not. The tide mark is sharp, which is what makes a
           pier read as standing IN the water rather than placed on top of it. */}
-      <mesh position={[0, waterLocalY + height * 0.028, 0]} raycast={noHit}>
+      <mesh castShadow receiveShadow position={[0, waterLocalY + height * 0.028, 0]} raycast={noHit}>
         <boxGeometry args={[width * 1.004, height * 0.056, depth * 1.004]} />
         <meshStandardMaterial
           ref={collect}
@@ -417,6 +419,8 @@ function MonolithImpl({
 
       {shoulder && (
         <RoundedBox
+          castShadow
+          receiveShadow
           args={[width * shoulder.width, height * shoulder.height, depth * 0.94]}
           radius={bevel}
           smoothness={2}

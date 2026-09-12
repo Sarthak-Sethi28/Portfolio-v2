@@ -170,7 +170,7 @@ export function Aperture({
     <group position={[0, radius * 1.06, -150]}>
       {/* Outer ring of voussoirs — true arc segments, not boxes. */}
       {voussoirs.map((v, i) => (
-        <mesh key={i} geometry={v.geo}>
+        <mesh castShadow receiveShadow key={i} geometry={v.geo}>
           <meshStandardMaterial
             {...stoneProps}
             color={palette.monolith.clone().offsetHSL(0, 0, v.tint)}
@@ -180,7 +180,7 @@ export function Aperture({
 
       {/* Concentric orders receding into the opening. */}
       {orders.map((o, i) => (
-        <mesh key={`ord-${i}`} position={[0, 0, o.z]}>
+        <mesh castShadow receiveShadow key={`ord-${i}`} position={[0, 0, o.z]}>
           <torusGeometry args={[o.r, o.tube, o.machined ? 10 : 6, 88]} />
           <meshStandardMaterial
             color={palette.monolith}
@@ -194,7 +194,7 @@ export function Aperture({
       ))}
 
       {/* The membrane, set deep in the bore. */}
-      <mesh ref={glow} position={[0, 0, -blockDepth * 2.6]}>
+      <mesh castShadow receiveShadow ref={glow} position={[0, 0, -blockDepth * 2.6]}>
         <circleGeometry args={[radius * 0.36, 72]} />
         <meshBasicMaterial
           color={palette.sunColor}
@@ -213,7 +213,7 @@ export function Aperture({
             const w = radius * (0.3 + step * 0.13)
             const h = radius * 0.2
             return (
-              <mesh key={step} position={[s * step * radius * 0.05, -step * h, 0]}>
+              <mesh castShadow receiveShadow key={step} position={[s * step * radius * 0.05, -step * h, 0]}>
                 <boxGeometry args={[w, h, blockDepth * (1.5 + step * 0.4)]} />
                 <meshStandardMaterial {...stoneProps} />
               </mesh>
