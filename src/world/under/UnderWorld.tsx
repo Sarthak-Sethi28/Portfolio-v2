@@ -49,6 +49,23 @@ export function UnderWorld({ palette }: { palette: Palette }) {
         <ArrayWorld palette={palette} />
       </group>
 
+      {/*
+        NO LIGHT SHAFTS — for now.
+
+        Cones with an additive material are the classic cheap god ray, and
+        they were tried here and removed. At an opacity low enough to read as
+        light they vanished; at one high enough to see they read as solid
+        glass shards with hard silhouettes standing in front of the arch.
+        There is no setting between those two, because the cheat depends on
+        the beam never having a visible EDGE — and a cone seen side-on is all
+        edge.
+
+        Doing this properly means either a screen-space god-ray pass keyed to
+        the surface, or a shader that fades the cone by view angle so its rim
+        is always softest. Both are real work, and an absent effect beats a
+        broken one.
+      */}
+
       <Silt />
     </group>
   )
