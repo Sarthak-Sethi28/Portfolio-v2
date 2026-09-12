@@ -2,6 +2,7 @@ import { SceneCanvas } from '@/overlay/SceneCanvas'
 import { Title } from '@/overlay/Title'
 import { Stats } from '@/overlay/Stats'
 import { HoverLabel } from '@/overlay/HoverLabel'
+import { Controls } from '@/overlay/Chrome/Controls'
 
 export default function Home() {
   return (
@@ -9,6 +10,7 @@ export default function Home() {
       <SceneCanvas />
       <Title />
       <HoverLabel />
+      <Controls />
       <Stats />
     </main>
   )

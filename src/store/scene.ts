@@ -71,6 +71,16 @@ interface SceneState {
   /** URL debug flags. Read once at startup; see lib/flags.ts. */
   flags: Flags
   applyFlags: () => void
+  /**
+   * Environment-map strength, eased with the day/night blend.
+   *
+   * Lives here rather than in a ref because the frame loop writes it and the
+   * render reads it — and reading a ref during render is a React Compiler
+   * violation. Updated only when it moves meaningfully, so a continuous blend
+   * costs a couple of dozen renders rather than one per frame.
+   */
+  envIntensity: number
+  setEnvIntensity: (v: number) => void
   /** Peak frame-to-frame luminance delta per probe region. */
   flicker: number[]
   setFlicker: (v: number[]) => void
@@ -125,6 +135,7 @@ export const useScene = create<SceneState>((set) => ({
     noMs: false,
   },
   flicker: [],
+  envIntensity: 1.15,
 
   hovered: null,
   openSection: null,
@@ -142,6 +153,7 @@ export const useScene = create<SceneState>((set) => ({
   setReducedMotion: (reducedMotion) => set({ reducedMotion }),
   applyFlags: () => set({ flags: readFlags() }),
   setFlicker: (flicker) => set({ flicker }),
+  setEnvIntensity: (envIntensity) => set({ envIntensity }),
   setHovered: (hovered) => set({ hovered }),
   openSectionPanel: (openSection) => set({ openSection, openProject: null }),
   openProjectPanel: (openProject) => set({ openProject, openSection: null }),

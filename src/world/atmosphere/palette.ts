@@ -60,7 +60,7 @@ export const DAY: Palette = {
 }
 
 export const NIGHT: Palette = {
-  skyZenith: new Color('#03060f'),
+  skyZenith: new Color('#02040b'),
   skyHorizon: new Color('#16273f'),
   sunColor: new Color('#9fb6d8'),
   // The "sun" at night is the moon, low and opposite the day sun.
@@ -70,7 +70,7 @@ export const NIGHT: Palette = {
   fog: new Color('#0e1c2e'),
   fogDensityScale: 1.35,
   monolith: new Color('#2b3138'),
-  waterTint: new Color('#7d8ea8'),
+  waterTint: new Color('#26374d'),
   ambient: new Color('#16304f'),
   ambientIntensity: 0.14,
 }

@@ -8,11 +8,8 @@ import { SECTIONS } from '@/content'
 import { useScene } from '@/store/scene'
 import { scatterField, sectionRing } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
-import { Monolith } from './Monolith'
 import { Pier } from './Pier'
 import { ModelPier } from './ModelPier'
-import { DishModel } from './DishModel'
-import { Dish } from './Dish'
 import { Aperture } from './Aperture'
 import { Figure } from './Figure'
 
@@ -33,17 +30,7 @@ import { Figure } from './Figure'
  * interaction, which is exactly the reported symptom. Loading once in the
  * parent means there is only one suspension, before anything is on screen.
  */
-/**
- * How many scattered piers may carry carved bays.
- *
- * A COUNT, not a radius. Each bay is three extruded plates and seven meshes,
- * and putting them on every pier once collapsed the frame rate outright. A
- * radius bounds nothing — raise the density slider and the carved count rises
- * with it — whereas a fixed budget spent on the nearest piers is stable
- * whatever the world is set to. Everything past it is deep enough in fog that
- * an opening would be a few pixels of mush.
- */
-const CARVED_BUDGET = 12
+
 
 export function ArrayWorld({ palette }: { palette: Palette }) {
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
@@ -80,14 +67,14 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
     [config.fieldDensity, config.arraySpacing],
   )
 
-  // The indices of the nearest piers, which are the ones worth carving.
-  const carved = useMemo(() => {
-    const byDistance = field
-      .map((p, i) => ({ i, d: Math.hypot(p.position[0], p.position[2]) }))
-      .sort((a, b) => a.d - b.d)
-      .slice(0, CARVED_BUDGET)
-    return new Set(byDistance.map((e) => e.i))
-  }, [field])
+  /*
+   * The carved-bay budget is retired.
+   *
+   * It capped how many procedural piers got arched openings, because each was
+   * three extruded plates and seven meshes and putting them everywhere
+   * collapsed the frame rate. Every pier is a downloaded mesh now and brings
+   * its own carving, so there is nothing left to budget.
+   */
 
   return (
     <group>

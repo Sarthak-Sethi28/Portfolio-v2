@@ -31,6 +31,8 @@ export function Stage() {
   const rain = useScene((s) => s.rain)
   const moteCount = useScene((s) => effectiveMoteCount({ config: s.config, quality: s.quality }))
   const flags = useScene((s) => s.flags)
+  const envIntensity = useScene((s) => s.envIntensity)
+  const setEnvIntensity = useScene((s) => s.setEnvIntensity)
   const setFlicker = useScene((s) => s.setFlicker)
 
   const palette = useMemo(() => createPalette(), [])
@@ -40,6 +42,7 @@ export function Stage() {
   // and blue dots, which reads as coloured speckle crawling over the frame
   // rather than as a lens characteristic. Grain alone carries the film feel.
   const animRef = useRef<Anim>(createAnim())
+
   const sunRef = useRef<DirectionalLight>(null)
 
   const fogRef = useRef<FogExp2>(null)
@@ -66,6 +69,11 @@ export function Stage() {
     const anim = animRef.current
     anim.night = MathUtils.damp(anim.night, night ? 1 : 0, 1.4, delta)
     blendPalette(anim.night, palette)
+    // Moonlight is a fraction of dusk, not a dimmer version of it. Written to
+    // the store only when it has moved enough to see, so a smooth blend does
+    // not cost a render every frame.
+    const nextEnv = 1.15 - anim.night * 0.95
+    if (Math.abs(nextEnv - envIntensity) > 0.02) setEnvIntensity(nextEnv)
 
     const fog = fogRef.current
     if (fog) {
@@ -93,7 +101,23 @@ export function Stage() {
       {/* background={false}: the Sky shader already draws the visible dome,
           with the sun and the day/night blend the plate cannot provide. This
           instance exists only to light the scene. */}
-      <Environment files="/sky/dusk.jpg" background={false} environmentIntensity={1.15} />
+      {/*
+        The environment must dim with the sky.
+        
+        It is a photograph of a dusk sky, and nothing was modulating it — so at
+        night every surface was still being lit by a sunset that is no longer
+        there. The stars would come out while the stone stayed warm, which is
+        the single loudest thing wrong with a naive night mode.
+        
+        Driven from the same blend as everything else, so holding the
+        transition mid-way gives a consistent dusk rather than a half-lit
+        contradiction.
+      */}
+      <Environment
+        files="/sky/dusk.jpg"
+        background={false}
+        environmentIntensity={envIntensity}
+      />
 
       <Sky palette={palette} anim={animRef} />
 
