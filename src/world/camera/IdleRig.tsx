@@ -53,6 +53,7 @@ export function IdleRig() {
   const reducedMotion = useScene((s) => s.reducedMotion)
   const freelook = useScene((s) => s.freelook)
   const still = useScene((s) => s.flags.still)
+  const closeup = useScene((s) => s.flags.closeup)
 
   const aim = useRef(TARGET.clone())
   const desired = useRef(TARGET.clone())
@@ -75,6 +76,13 @@ export function IdleRig() {
       camera.lookAt(TARGET)
       initialized.current = true
       wasFreelook.current = false
+    }
+
+    // Inspection framing: close enough to judge whether the stonework holds up.
+    if (closeup) {
+      camera.position.set(6, 44, -66)
+      camera.lookAt(0, 44, -150)
+      return
     }
 
     if (reducedMotion || still) {

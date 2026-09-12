@@ -2,9 +2,10 @@
 
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { DoubleSide, MathUtils, RepeatWrapping, type Mesh, type Texture } from 'three'
+import { DoubleSide, MathUtils, RepeatWrapping, Vector2, type Mesh, type Texture } from 'three'
 import type { Palette } from '../atmosphere/palette'
 import { voussoir as voussoirGeometry } from '../geometry/arch'
+import { createRng, range } from '@/lib/rng'
 
 /**
  * The aperture — the threshold to World 2.
@@ -39,15 +40,47 @@ export function Aperture({
   const glow = useRef<Mesh>(null)
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
 
-  const map = useMemo(() => {
+  /*
+   * The orders need their OWN tiling.
+   *
+   * A torus carries 0-1 UVs wrapped around and through it, whereas
+   * ExtrudeGeometry writes world coordinates. One texture instance cannot
+   * serve both — at the blocks' repeat the rings came out glass-smooth, which
+   * is why the bore still looked moulded after the voussoirs stopped.
+   */
+  const ringMap = useMemo(() => {
     if (!stone) return null
     const t = stone.clone()
     t.wrapS = t.wrapT = RepeatWrapping
-    t.repeat.set(2, 2)
+    // Many times around the ring, a few times through its section.
+    t.repeat.set(26, 3)
     t.anisotropy = maxAniso
     t.needsUpdate = true
     return t
   }, [stone, maxAniso])
+
+  const map = useMemo(() => {
+    if (!stone) return null
+    const t = stone.clone()
+    t.wrapS = t.wrapT = RepeatWrapping
+    /*
+     * ExtrudeGeometry writes UVs in WORLD coordinates.
+     *
+     * The shape spans about 84 units across, so a repeat of 2 tiled the stone
+     * roughly eighty times over each block — compressed into invisible noise,
+     * which is why the arch read as smooth grey plastic however good the
+     * texture was. A repeat near 1/9 puts one tile every nine world units,
+     * which is the scale a hand-sized rock face actually is.
+     */
+    t.repeat.set(0.11, 0.11)
+    t.anisotropy = maxAniso
+    t.needsUpdate = true
+    return t
+  }, [stone, maxAniso])
+
+  // Strong relief. On a megalithic block the erosion is centimetres deep, and
+  // a timid normal map is indistinguishable from none.
+  const normalScale = useMemo(() => new Vector2(1.8, 1.8), [])
 
   /** Wedge blocks around the outer ring. */
   // FEWER, BIGGER blocks.
@@ -65,9 +98,26 @@ export function Aperture({
     const joint = step * 0.11
     const innerR = radius - blockThickness / 2
     const outerR = radius + blockThickness / 2
-    return Array.from({ length: VOUSSOIRS }, (_, i) =>
-      voussoirGeometry(innerR, outerR, i * step + joint / 2, step - joint, blockDepth),
-    )
+    /*
+     * No two stones alike.
+     *
+     * Identical wedges are what made this read as a moulding rather than as
+     * masonry. Each block now takes its own radial thickness, its own depth
+     * and a slightly different share of the arc, seeded per index so the ring
+     * is stable across reloads — a real arch is cut from stones that were
+     * never quite the same size.
+     */
+    const rng = createRng(0x2b17f3)
+    return Array.from({ length: VOUSSOIRS }, (_, i) => {
+      const outer = outerR * range(rng, 0.965, 1.035)
+      const inner = innerR * range(rng, 0.97, 1.02)
+      const d = blockDepth * range(rng, 0.88, 1.14)
+      const shrink = range(rng, 0.94, 1.0)
+      return {
+        geo: voussoirGeometry(inner, outer, i * step + joint / 2, (step - joint) * shrink, d),
+        tint: range(rng, -0.1, 0.08),
+      }
+    })
   }, [radius, blockThickness, blockDepth])
 
   /**
@@ -109,18 +159,22 @@ export function Aperture({
 
   const stoneProps = {
     color: palette.monolith,
-    roughness: 0.88,
+    roughness: 0.92,
     metalness: 0,
-    envMapIntensity: 0.4,
+    envMapIntensity: 0.35,
     normalMap: map,
+    normalScale: normalScale,
   }
 
   return (
     <group position={[0, radius * 1.06, -150]}>
       {/* Outer ring of voussoirs — true arc segments, not boxes. */}
-      {voussoirs.map((geo, i) => (
-        <mesh key={i} geometry={geo}>
-          <meshStandardMaterial {...stoneProps} />
+      {voussoirs.map((v, i) => (
+        <mesh key={i} geometry={v.geo}>
+          <meshStandardMaterial
+            {...stoneProps}
+            color={palette.monolith.clone().offsetHSL(0, 0, v.tint)}
+          />
         </mesh>
       ))}
 
@@ -133,7 +187,8 @@ export function Aperture({
             roughness={o.machined ? 0.42 : 0.8}
             metalness={o.machined ? 0.55 : 0}
             envMapIntensity={o.machined ? 0.9 : 0.4}
-            normalMap={o.machined ? null : map}
+            normalMap={o.machined ? null : ringMap}
+            normalScale={normalScale}
           />
         </mesh>
       ))}

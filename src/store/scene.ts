@@ -107,6 +107,7 @@ export const useScene = create<SceneState>((set) => ({
     noReflect: false,
     noPost: false,
     probe: false,
+    closeup: false,
     noTex: false,
     noPlate: false,
     noUi: false,
