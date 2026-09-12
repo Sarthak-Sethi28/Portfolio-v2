@@ -12,6 +12,15 @@ import { createRng, range, rangeInt, sign, SEED } from '@/lib/rng'
 export interface Placement {
   position: [number, number, number]
   rotationY: number
+  /**
+   * Lean, in radians about the view axis.
+   *
+   * A flooded ruin settles unevenly — foundations give way at different rates
+   * and nothing stays plumb. A pier that leans reads as SUBSIDED, which is a
+   * much stronger cue than one standing perfectly upright in water, and it
+   * keeps a symmetrical pair from looking like a matched set of bookends.
+   */
+  tilt: number
   /** Height in world units. */
   height: number
   width: number
@@ -85,10 +94,15 @@ export function sectionRing(count: number, radius: number): Placement[] {
    * random width on a near mass either blocks the centre or looks like a post.
    */
   const staging = [
-    { a: -1.52, r: 1.02, h: 1.85, w: 2.6 }, // wide mass, crops the left edge
-    { a: 1.55, r: 1.08, h: 1.7, w: 2.5 }, // wide mass, crops the right edge
-    { a: -1.05, r: 3.2, h: 2.6, w: 0.72 }, // the tall tower, well back and clear of the ring
-    { a: 1.08, r: 2.6, h: 1.45, w: 1.5 }, // mid right, clear of the ring
+    // The pair that flanks the aperture, set at its depth so the three read as
+    // one group. They lean AWAY from each other: leaning inward would close
+    // the composition around the ring and crowd the thing it frames.
+    { a: -0.52, r: 2.75, h: 2.15, w: 2.4, tilt: -0.15 },
+    { a: 0.56, r: 2.85, h: 2.0, w: 2.3, tilt: 0.135 },
+    // The tall tower, well back and clear.
+    { a: -1.28, r: 3.0, h: 2.6, w: 0.72, tilt: 0.04 },
+    // Mid right, further out still.
+    { a: 1.34, r: 2.7, h: 1.45, w: 1.5, tilt: -0.05 },
   ]
 
   return Array.from({ length: count }, (_, i) => {
@@ -118,6 +132,7 @@ export function sectionRing(count: number, radius: number): Placement[] {
         number,
       ],
       rotationY: -s.a + range(rng, -0.14, 0.14),
+      tilt: s.tilt,
       height,
       width,
       depth: range(rng, 13, 19),
@@ -184,6 +199,8 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
       submerge,
       position: [Math.cos(angle) * r, height / 2 - submerge, Math.sin(angle) * r],
       rotationY: range(rng, 0, Math.PI * 2),
+      // Scattered piers lean too, by smaller and unrelated amounts.
+      tilt: range(rng, -0.055, 0.055),
       height,
       width,
       depth: range(rng, 9, 20),
@@ -233,6 +250,7 @@ export function colonnade(
       out.push({
         position: [0, height / 2, -(pairs + 1) * spacing],
         rotationY: 0,
+        tilt: 0,
         submerge: 0,
         height,
         width,
@@ -247,6 +265,7 @@ export function colonnade(
     out.push({
       position: [side * halfWidth, height / 2, -(row + 1) * spacing],
       rotationY: side * range(rng, 0.02, 0.07),
+      tilt: side * range(rng, 0.02, 0.05),
       submerge: 0,
       height,
       width,

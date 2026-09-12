@@ -60,7 +60,7 @@ function MonolithImpl({
   onPointerOut?: () => void
   onClick?: () => void
 }) {
-  const { position, rotationY, width, height, depth, shoulder, detail, submerge } = placement
+  const { position, rotationY, tilt, width, height, depth, shoulder, detail, submerge } = placement
 
   /**
    * Local height of the real water surface.
@@ -215,7 +215,7 @@ function MonolithImpl({
   ]
 
   return (
-    <group position={position} rotation={[0, rotationY, 0]}>
+    <group position={position} rotation={[0, rotationY, tilt]}>
       {/* The only thing in this pier that can be hit by a ray. */}
       {interactive && (
         <mesh {...handlers} visible={false}>
