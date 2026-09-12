@@ -28,8 +28,8 @@ import { useScene } from '@/store/scene'
  * waterline, and the plain opens out behind them instead of being a sliver at
  * the bottom of frame.
  */
-const REST = new Vector3(0, 52, 168)
-const TARGET = new Vector3(0, 14, -96)
+const REST = new Vector3(0, 34, 132)
+const TARGET = new Vector3(0, 30, -110)
 
 const POINTER_DEADZONE = 0.08
 const AIM_X = 1.1
