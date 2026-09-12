@@ -16,7 +16,6 @@ import { useScene } from '@/store/scene'
  * dusk that is neither state. That is worth having and worth not hiding.
  */
 export function Controls() {
-  const night = useScene((s) => s.night)
   const toggleNight = useScene((s) => s.toggleNight)
   const rain = useScene((s) => s.rain)
   const toggleRain = useScene((s) => s.toggleRain)
@@ -29,6 +28,7 @@ export function Controls() {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      // Development only: there is no night control in the interface.
       if (e.key === 'n' || e.key === 'N') toggleNight()
       if (e.key === 'r' || e.key === 'R') toggleRain()
     }
@@ -52,18 +52,22 @@ export function Controls() {
         pointerEvents: open ? 'none' : 'auto',
       }}
     >
-      <button
-        onClick={toggleNight}
-        aria-pressed={night}
-        className="cursor-pointer select-none border-0 bg-transparent px-1 py-1"
-        style={{
-          ...label,
-          color: night ? 'rgba(190,208,235,0.95)' : 'rgba(250,246,238,0.88)',
-          textShadow: '0 1px 10px rgba(0,0,0,0.75)',
-        }}
-      >
-        mode :: {night ? 'night' : 'day'}
-      </button>
+      {/*
+        NO day/night toggle.
+
+        Night is not a mode, it is where the gate takes you. A control that
+        flips it spends the reveal before the visitor has earned it — they
+        find the setting in the first five seconds and arriving at night later
+        is no longer a reveal, just a preference they already changed.
+
+        It also fixes what we could not get right: night was being judged from
+        the DAY camera in the DAY composition, and failing, because that shot
+        is staged for a low sun. As an arrival it gets its own framing, and
+        stops being the same picture with the lights down.
+
+        The N key survives for development — see the handler above — because
+        building the arrival means looking at night constantly.
+      */}
 
       <button
         onClick={toggleRain}
