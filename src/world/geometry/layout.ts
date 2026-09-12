@@ -141,9 +141,24 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
     // it — but push each pier away from the axis on the side it is ALREADY
     // on. Pushing everything the same direction, as a first attempt did,
     // simply moves the whole field left and bunches it there.
-    const forward = Math.atan2(Math.sin(angle), -Math.cos(angle))
-    if (Math.abs(forward) < 0.5) {
-      angle += Math.sign(forward || 1) * (0.5 - Math.abs(forward)) * 1.6
+    /*
+     * Clear the corridor the camera looks down.
+     *
+     * A pier sits at (cos a * r, _, sin a * r) and the camera looks toward -Z,
+     * so "directly ahead" is a = -PI/2, NOT a = 0. An earlier version measured
+     * deviation from the wrong axis and cleared an arc off to the side, which
+     * is why piers kept appearing THROUGH the aperture however wide the
+     * exclusion was made.
+     *
+     * dev is the signed angular distance from straight ahead, wrapped to
+     * [-PI, PI]; anything inside the corridor is pushed out on the side it is
+     * already on, so the field opens rather than shifting.
+     */
+    const AHEAD = -Math.PI / 2
+    const CLEAR = 0.62
+    const dev = Math.atan2(Math.sin(angle - AHEAD), Math.cos(angle - AHEAD))
+    if (Math.abs(dev) < CLEAR) {
+      angle += Math.sign(dev || 1) * (CLEAR - Math.abs(dev))
     }
     // sqrt keeps the scatter area-uniform instead of clustering at the centre.
     const r = innerRadius * 1.7 + Math.sqrt(rng()) * innerRadius * 11

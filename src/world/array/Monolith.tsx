@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { RoundedBox } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector2, type MeshStandardMaterial } from 'three'
@@ -29,7 +29,7 @@ import { useScene } from '@/store/scene'
  * move. That is the difference between something modelled and something
  * printed on a slab, and it is why the reference reads as built.
  */
-export function Monolith({
+function MonolithImpl({
   placement,
   palette,
   emphasis = 0,
@@ -316,3 +316,16 @@ export function Monolith({
     </group>
   )
 }
+
+/**
+ * Memoised.
+ *
+ * Hovering changes one value in the store, but ArrayWorld re-renders on it and
+ * every pier re-renders with it — fifty components rebuilding their trees on
+ * each pointer move, for a highlight that affects exactly one of them. That is
+ * a large amount of work on a frame the user is already moving the camera
+ * through, and dropping such a frame is a visible black flash.
+ *
+ * With this, only the pier whose emphasis actually changed re-renders.
+ */
+export const Monolith = memo(MonolithImpl)
