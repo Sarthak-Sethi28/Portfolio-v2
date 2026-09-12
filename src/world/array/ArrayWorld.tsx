@@ -30,6 +30,18 @@ import { Figure } from './Figure'
  * interaction, which is exactly the reported symptom. Loading once in the
  * parent means there is only one suspension, before anything is on screen.
  */
+/**
+ * How many scattered piers may carry carved bays.
+ *
+ * A COUNT, not a radius. Each bay is three extruded plates and seven meshes,
+ * and putting them on every pier once collapsed the frame rate outright. A
+ * radius bounds nothing — raise the density slider and the carved count rises
+ * with it — whereas a fixed budget spent on the nearest piers is stable
+ * whatever the world is set to. Everything past it is deep enough in fog that
+ * an opening would be a few pixels of mush.
+ */
+const CARVED_BUDGET = 12
+
 export function ArrayWorld({ palette }: { palette: Palette }) {
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
   const [stoneNormal, stoneRough] = useTexture(
@@ -65,6 +77,15 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
     [config.fieldDensity, config.arraySpacing],
   )
 
+  // The indices of the nearest piers, which are the ones worth carving.
+  const carved = useMemo(() => {
+    const byDistance = field
+      .map((p, i) => ({ i, d: Math.hypot(p.position[0], p.position[2]) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, CARVED_BUDGET)
+    return new Set(byDistance.map((e) => e.i))
+  }, [field])
+
   return (
     <group>
       {/* Navigation. One monolith per section, always present. */}
@@ -86,7 +107,9 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
         )
       })}
 
-      {/* Scenery. Count is slider-driven and may legitimately be zero. */}
+      {/* Scenery. Count is slider-driven and may legitimately be zero.
+          These take no emphasis, so with Monolith memoised they do not
+          re-render when the hovered section changes. */}
       {field.map((placement, i) => (
         <Monolith
           key={`field-${i}`}
@@ -94,6 +117,7 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
           palette={palette}
           stoneNormal={stoneNormal}
           stoneRough={stoneRough}
+          detailed={carved.has(i)}
         />
       ))}
 
