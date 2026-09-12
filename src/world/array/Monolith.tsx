@@ -60,7 +60,16 @@ function MonolithImpl({
   onPointerOut?: () => void
   onClick?: () => void
 }) {
-  const { position, rotationY, width, height, depth, shoulder, detail } = placement
+  const { position, rotationY, width, height, depth, shoulder, detail, submerge } = placement
+
+  /**
+   * Local height of the real water surface.
+   *
+   * The group sits at world y = height/2 - submerge, so world y = 0 — the
+   * water — is at this local height. The stain has to sit exactly there or it
+   * floats above the surface, or drowns below it.
+   */
+  const waterLocalY = submerge - height / 2
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
   const noTex = useScene((s) => s.flags.noTex)
 
@@ -358,7 +367,7 @@ function MonolithImpl({
           stays wet — lower roughness, so it catches a sheen the dry stone
           above it does not. The tide mark is sharp, which is what makes a
           pier read as standing IN the water rather than placed on top of it. */}
-      <mesh position={[0, -height / 2 + height * 0.028, 0]} raycast={noHit}>
+      <mesh position={[0, waterLocalY + height * 0.028, 0]} raycast={noHit}>
         <boxGeometry args={[width * 1.004, height * 0.056, depth * 1.004]} />
         <meshStandardMaterial
           ref={collect}

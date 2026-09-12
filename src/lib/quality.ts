@@ -23,14 +23,19 @@ export interface QualitySettings {
 
 const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
   high: {
-    // 512.
+    // NO REFLECTOR.
     //
-    // The reflector renders the entire scene a second time every frame, and
-    // the longer that pass is the more likely it lands late — which shows as a
-    // dark frame in the water. The surface is heavily blurred and now draws
-    // most of its light from the environment map, so resolution here buys
-    // very little and costs the one thing that was going wrong.
-    reflectorResolution: 512,
+    // Confirmed by bisect: with ?noreflect=1 the black flash stops, and with
+    // the reflector at any resolution it returns. It renders the entire scene
+    // a second time every frame, and when that pass arrives late the water
+    // loses its light for a frame — a dark flash in the lower third, which is
+    // what a frame-by-frame analysis of a screen recording located.
+    //
+    // The surface mirrors the environment map instead: it still reflects the
+    // sky and still carries the sun's path across the ripples, for no
+    // per-frame cost. What it gives up is the piers' own reflections, and a
+    // scene that does not flash is worth more than that.
+    reflectorResolution: 0,
     particleScale: 1,
     bloom: true,
     depthOfField: true,
@@ -46,7 +51,7 @@ const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
     rainEnabled: true,
   },
   medium: {
-    reflectorResolution: 1024,
+    reflectorResolution: 0,
     particleScale: 0.5,
     bloom: true,
     depthOfField: false,
@@ -55,7 +60,7 @@ const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
   },
   low: {
     // Still reflective, just cheaply. Losing the mirror is losing the world.
-    reflectorResolution: 512,
+    reflectorResolution: 0,
     particleScale: 0.25,
     bloom: false,
     depthOfField: false,
