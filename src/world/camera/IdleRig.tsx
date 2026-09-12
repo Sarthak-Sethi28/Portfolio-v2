@@ -54,6 +54,7 @@ export function IdleRig() {
   const freelook = useScene((s) => s.freelook)
   const still = useScene((s) => s.flags.still)
   const closeup = useScene((s) => s.flags.closeup)
+  const under = useScene((s) => s.flags.under)
 
   const aim = useRef(TARGET.clone())
   const desired = useRef(TARGET.clone())
@@ -76,6 +77,20 @@ export function IdleRig() {
       camera.lookAt(TARGET)
       initialized.current = true
       wasFreelook.current = false
+    }
+
+    /*
+     * Beneath the surface, looking UP.
+     *
+     * Height is the whole read: too shallow and the ceiling fills the frame,
+     * too deep and the hanging city is lost in the murk. This sits low enough
+     * to see the columns descending past the lens and still catch the
+     * membrane above them.
+     */
+    if (under) {
+      camera.position.set(0, -46, 96)
+      camera.lookAt(0, -14, -120)
+      return
     }
 
     // Inspection framing: close enough to judge whether the stonework holds up.

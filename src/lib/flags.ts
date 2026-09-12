@@ -22,6 +22,8 @@ export interface Flags {
   noPost: boolean
   /** Run the frame-to-frame luminance probe. Costs a pipeline stall. */
   probe: boolean
+  /** Enter the world beneath the surface. */
+  under: boolean
   /** Park the camera close to the aperture, for inspecting detail. */
   closeup: boolean
   /** Drop the concrete surface map — isolates texture shimmer from edge crawl. */
@@ -43,6 +45,7 @@ const EMPTY: Flags = {
   noReflect: false,
   noPost: false,
   probe: false,
+  under: false,
   closeup: false,
   noTex: false,
   noPlate: false,
@@ -62,6 +65,7 @@ export function readFlags(): Flags {
     noReflect: plain || q.has('noreflect'),
     noPost: plain || q.has('nopost'),
     probe: q.has('flicker'),
+    under: q.has('under'),
     closeup: q.has('closeup'),
     noTex: plain || q.has('notex'),
     noPlate: plain || q.has('noplate'),
