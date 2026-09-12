@@ -74,3 +74,47 @@ export function archedPlate(
   geo.translate(0, 0, -thickness / 2)
   return geo
 }
+
+
+/**
+ * One voussoir: an annular sector, extruded.
+ *
+ * A straight box cannot be a wedge. Spanning twenty degrees of arc, its
+ * corners protrude past the circle on both sides, and a ring of them reads as
+ * a cog rather than as masonry — which is exactly what the first attempt
+ * looked like. A real voussoir is bounded by two radii and two arcs, so that
+ * is what this builds: the outer edge follows the circle exactly, and the only
+ * gaps are the joints between one stone and the next.
+ */
+export function voussoir(
+  innerR: number,
+  outerR: number,
+  startAngle: number,
+  sweep: number,
+  depth: number,
+  segments = 6,
+): ExtrudeGeometry {
+  const shape = new Shape()
+
+  shape.absarc(0, 0, outerR, startAngle, startAngle + sweep, false)
+  // Close across to the inner arc and back, which makes the sector solid.
+  const inner: [number, number][] = []
+  for (let i = segments; i >= 0; i--) {
+    const a = startAngle + (sweep * i) / segments
+    inner.push([Math.cos(a) * innerR, Math.sin(a) * innerR])
+  }
+  inner.forEach(([x, y], i) => (i === 0 ? shape.lineTo(x, y) : shape.lineTo(x, y)))
+  shape.closePath()
+
+  const geo = new ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    // A chamfered arris catches the light the way a dressed stone edge does.
+    bevelThickness: depth * 0.06,
+    bevelSize: depth * 0.06,
+    bevelSegments: 1,
+    curveSegments: segments,
+  })
+  geo.translate(0, 0, -depth / 2)
+  return geo
+}

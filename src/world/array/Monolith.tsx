@@ -60,7 +60,28 @@ function MonolithImpl({
   onPointerOut?: () => void
   onClick?: () => void
 }) {
-  const { position, rotationY, tilt, width, height, depth, shoulder, detail, submerge } = placement
+  const { position, rotationY, tilt, width, height, depth, shoulder, detail, submerge, ruined } =
+    placement
+
+  /**
+   * Fragments of a broken crown.
+   *
+   * Rather than model damage, the top is left uncapped and a handful of
+   * surviving blocks are set along it at varying heights and slight angles.
+   * At silhouette distance an irregular top edge IS the ruin — no amount of
+   * surface weathering says it as clearly.
+   */
+  const crown = useMemo(() => {
+    if (!ruined) return []
+    const rng = createRng(Math.round(width * 313 + height * 71))
+    return Array.from({ length: 5 }, (_, i) => ({
+      x: ((i + 0.5) / 5 - 0.5) * width * 0.86,
+      h: range(rng, height * 0.015, height * 0.06),
+      w: width * range(rng, 0.1, 0.2),
+      lean: range(rng, -0.09, 0.09),
+      drop: range(rng, 0, height * 0.03),
+    }))
+  }, [ruined, width, height])
 
   /**
    * Local height of the real water surface.
@@ -283,7 +304,7 @@ function MonolithImpl({
           of the cheapest details that unmistakably reads as carved rather than
           cast. Only on detailed piers — the count is per-pier, so it is the
           one piece of geometry here that scales badly if applied everywhere. */}
-      {detailed && detail.cornice > 0 && (
+      {detailed && !ruined && detail.cornice > 0 && (
         <group position={[0, height / 2 - height * 0.045, 0]}>
           {Array.from({ length: 9 }, (_, i) => {
             const t = (i + 0.5) / 9 - 0.5
@@ -304,9 +325,23 @@ function MonolithImpl({
         </group>
       )}
 
+      {/* Broken crown: the surviving blocks of a lost cornice. */}
+      {ruined &&
+        crown.map((c, i) => (
+          <mesh
+            key={`crown-${i}`}
+            position={[c.x, height / 2 - c.drop + c.h / 2, 0]}
+            rotation={[0, 0, c.lean]}
+            raycast={noHit}
+          >
+            <boxGeometry args={[c.w, c.h, depth * 0.96]} />
+            {mat}
+          </mesh>
+        ))}
+
       {/* Cornice, in two steps. A single slab reads as a lid; two reads as
           a moulding. */}
-      {detail.cornice > 0 && (
+      {!ruined && detail.cornice > 0 && (
         <group position={[0, height / 2, 0]}>
           <mesh position={[0, -height * 0.026, 0]} raycast={noHit}>
             <boxGeometry
