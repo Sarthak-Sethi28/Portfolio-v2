@@ -76,8 +76,8 @@ export function sectionRing(count: number, radius: number): Placement[] {
   const staging = [
     { a: -1.52, r: 1.02, h: 1.85, w: 2.6 }, // wide mass, crops the left edge
     { a: 1.55, r: 1.08, h: 1.7, w: 2.5 }, // wide mass, crops the right edge
-    { a: -0.52, r: 3.4, h: 2.6, w: 0.72 }, // the tall tower, well back and off-axis
-    { a: 0.62, r: 2.3, h: 1.45, w: 1.5 }, // mid right, behind the gap
+    { a: -1.05, r: 3.2, h: 2.6, w: 0.72 }, // the tall tower, well back and clear of the ring
+    { a: 1.08, r: 2.6, h: 1.45, w: 1.5 }, // mid right, clear of the ring
   ]
 
   return Array.from({ length: count }, (_, i) => {
@@ -136,7 +136,15 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
   const out: Placement[] = []
 
   for (let i = 0; i < count; i++) {
-    const angle = range(rng, 0, Math.PI * 2)
+    let angle = range(rng, 0, Math.PI * 2)
+    // Clear the central corridor so the aperture always has open sky behind
+    // it — but push each pier away from the axis on the side it is ALREADY
+    // on. Pushing everything the same direction, as a first attempt did,
+    // simply moves the whole field left and bunches it there.
+    const forward = Math.atan2(Math.sin(angle), -Math.cos(angle))
+    if (Math.abs(forward) < 0.5) {
+      angle += Math.sign(forward || 1) * (0.5 - Math.abs(forward)) * 1.6
+    }
     // sqrt keeps the scatter area-uniform instead of clustering at the centre.
     const r = innerRadius * 1.5 + Math.sqrt(rng()) * innerRadius * 5.5
     // Distant slabs read as taller because fog eats their base.
