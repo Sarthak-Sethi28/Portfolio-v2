@@ -10,6 +10,8 @@ import { scatterField, sectionRing } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
 import { Monolith } from './Monolith'
 import { Pier } from './Pier'
+import { ModelPier } from './ModelPier'
+import { DishModel } from './DishModel'
 import { Dish } from './Dish'
 import { Aperture } from './Aperture'
 import { Figure } from './Figure'
@@ -92,6 +94,21 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
       {/* Navigation. One monolith per section, always present. */}
       {sections.map((placement, i) => {
         const id = SECTIONS[i]
+        // Every section pier is the real mesh, cropped differently per slot.
+        /*
+         * Two traditions, deliberately mixed.
+         *
+         * The pair flanking the aperture are muqarnas columns — Islamic
+         * carved work — and the ones set back are gothic spires. A drowned
+         * city built by one hand reads as one asset repeated; a city that
+         * held more than one architecture reads as a place with a history.
+         * It also solves the practical problem: different silhouettes stop
+         * the eye noticing it is looking at the same mesh.
+         *
+         * Columns flank because that is what a column is for.
+         */
+        const src = i < 2 ? '/models/muqarnas.glb' : '/models/pillar.glb'
+        return <ModelPier key={id} placement={placement} variant={i < 2 ? 0 : i % 3} src={src} />
         return (
           <Pier
             key={id}
@@ -110,19 +127,42 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
       {/* Scenery. Count is slider-driven and may legitimately be zero.
           These take no emphasis, so with Monolith memoised they do not
           re-render when the hovered section changes. */}
+      {/* Distant ruins: the same asset again, cropped and scaled so a dozen
+          silhouettes never read as one object repeated. */}
       {field.map((placement, i) => (
-        <Monolith
+        <ModelPier
           key={`field-${i}`}
           placement={placement}
-          palette={palette}
-          stoneNormal={stoneNormal}
-          stoneRough={stoneRough}
-          detailed={carved.has(i)}
+          variant={(i + 1) % 3}
+          // Alternating out to the horizon, so the distance is mixed too.
+          src={i % 3 === 0 ? '/models/muqarnas.glb' : '/models/pillar.glb'}
         />
       ))}
 
       <Aperture palette={palette} stone={stoneNormal} />
-      <Dish palette={palette} />
+      {/* The telescope, well clear on the right and near enough to approach. */}
+      {/*
+        Left of the axis, not right.
+        
+        There is no room on the right: the column sits at 23 degrees off the
+        view axis and occludes everything inside about 28, while the lens only
+        sees 25. Every attempt to place the dish there either hid it behind
+        the column or pushed it out of frame. The left side has the depth.
+      */}
+      <DishModel position={[-118, 0, -268]} height={72} rotation={0.7} />
+
+      {/*
+        Dish hidden.
+
+        It is a lathed ellipse standing next to photogrammetried stone, and
+        that gap reads immediately — it was the least convincing thing in the
+        frame and it kept colliding with the right-hand tower whichever way it
+        was moved. It comes back when it can be a real mesh, or a modelled
+        radio telescope sourced the same way as the towers.
+
+        It matters more than scenery: the dish is the contact form (spec 5a),
+        so it has to be the best object in the world, not the worst.
+      */}
 
       {/* Scale reference. See Figure — nothing else in the world has a size
           the viewer already knows. */}
