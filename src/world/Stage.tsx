@@ -13,6 +13,7 @@ import { Motes } from './atmosphere/Motes'
 import { Birds } from './atmosphere/Birds'
 import { Water } from './array/Water'
 import { ArrayWorld } from './array/ArrayWorld'
+import { UnderWorld } from './under/UnderWorld'
 import { IdleRig } from './camera/IdleRig'
 import { createAnim, type Anim } from './anim'
 import { FlickerProbe } from './FlickerProbe'
@@ -78,6 +79,7 @@ export function Stage() {
     const fog = fogRef.current
     if (fog) {
       fog.color.copy(palette.fog)
+      if (flags.under) fog.color.set('#0a1d2b')
       fog.density = config.fogDensity * palette.fogDensityScale
     }
 
@@ -123,8 +125,16 @@ export function Stage() {
 
       {/* Kept, but weak. The environment map now carries the fill; the
           hemisphere only tints the very bottom faces the panorama cannot see. */}
+      {/*
+        Beneath the surface the only light is what filters down, so the key
+        weakens and the fill takes on the water's colour rather than the sky's.
+      */}
       <hemisphereLight
-        args={[palette.ambient, palette.waterTint, palette.ambientIntensity * 0.45]}
+        args={[
+          flags.under ? '#5c86a0' : palette.ambient,
+          flags.under ? '#030a14' : palette.waterTint,
+          palette.ambientIntensity * (flags.under ? 2.2 : 0.45),
+        ]}
       />
       {/*
         The sun casts now. A shadow map covers a fixed volume, so the frustum
@@ -147,13 +157,19 @@ export function Stage() {
       />
 
       <Suspense fallback={null}>
-        <Water
-          palette={palette}
-          roughness={config.waterRoughness}
-          reflectorResolution={flags.noReflect ? 0 : quality.reflectorResolution}
-          distort={rain ? 0.75 : 0.32}
-        />
-        <ArrayWorld palette={palette} />
+        {flags.under ? (
+          <UnderWorld palette={palette} />
+        ) : (
+          <>
+            <Water
+              palette={palette}
+              roughness={config.waterRoughness}
+              reflectorResolution={flags.noReflect ? 0 : quality.reflectorResolution}
+              distort={rain ? 0.75 : 0.32}
+            />
+            <ArrayWorld palette={palette} />
+          </>
+        )}
       </Suspense>
 
       <Motes count={flags.noMotes ? 0 : moteCount} palette={palette} />
