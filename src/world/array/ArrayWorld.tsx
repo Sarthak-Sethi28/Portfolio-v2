@@ -107,8 +107,10 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
          *
          * Columns flank because that is what a column is for.
          */
-        const src = i < 2 ? '/models/muqarnas.glb' : '/models/pillar.glb'
-        return <ModelPier key={id} placement={placement} variant={i < 2 ? 0 : i % 3} src={src} />
+        // All four are the same order. A colonnade is one column repeated —
+        // mixing traditions along a single line would read as an accident.
+        const src = '/models/muqarnas.glb'
+        return <ModelPier key={id} placement={placement} variant={0} src={src} />
         return (
           <Pier
             key={id}
@@ -149,7 +151,23 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
         sees 25. Every attempt to place the dish there either hid it behind
         the column or pushed it out of frame. The left side has the depth.
       */}
-      <DishModel position={[-118, 0, -268]} height={72} rotation={0.7} />
+      {/*
+        DISH DISABLED pending diagnosis.
+
+        The Garecra satellite dish renders as a flat grey slab rather than a
+        telescope. It survived four placements and two decimation passes —
+        0.01 and 0.0008 simplify error — with the same result, so this is not
+        over-compression, which was the first assumption. Most likely the
+        asset's parts sit in a node hierarchy that the optimiser's prune step
+        flattens wrongly, or its geometry is one merged mesh that simplifies
+        into rubble whatever the tolerance.
+
+        Diagnosis is to load the raw scene.gltf directly, before any
+        processing, and see whether it is right there. That separates the
+        asset from our pipeline in one step, and until it is answered a broken
+        object is worse than an absent one.
+      */}
+
 
       {/*
         Dish hidden.

@@ -92,7 +92,16 @@ export function ModelPier({
           0,
           -height / 2 +
             submerge -
-            height * (variant === 1 ? 0.42 : variant === 2 ? 0.62 : 0.02),
+            /*
+             * Into the water, not onto it.
+             *
+             * This has swung twice: drowned to the spire tips, then lifted
+             * clear so the columns perched on the surface like furniture. The
+             * middle is a base that is genuinely cut by the waterline — deep
+             * enough that the foot is gone, shallow enough that the carving
+             * above it is all visible.
+             */
+            height * (variant === 1 ? 0.3 : variant === 2 ? 0.46 : 0.085),
           0,
         ]}
       />
