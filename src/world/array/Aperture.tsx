@@ -88,14 +88,14 @@ export function Aperture({
   // 26 thin wedges read as gear teeth, not as masonry. A real arch of this
   // span is built from a modest number of very large stones, and it is their
   // SIZE — and the black joint beside each one — that says quarried and set.
-  const VOUSSOIRS = 17
+  const VOUSSOIRS = 19
   const blockDepth = radius * 0.34
-  const blockThickness = radius * 0.36
+  const blockThickness = radius * 0.42
 
   const voussoirs = useMemo(() => {
     const step = (Math.PI * 2) / VOUSSOIRS
     // The joint. Wide enough to throw a real shadow line between stones.
-    const joint = step * 0.11
+    const joint = step * 0.16
     const innerR = radius - blockThickness / 2
     const outerR = radius + blockThickness / 2
     /*
@@ -137,12 +137,20 @@ export function Aperture({
        * from the front they overlap into a bore you look down rather than
        * rings you look at.
        */
-      [0, 1, 2, 3].map((i) => {
-        const t = (i + 1) / 4
+      /*
+       * Nine thin bands, not four thick ones.
+       *
+       * The reference's bore is threaded — a dense stack of fine concentric
+       * rings stepping back into the dark. Four heavy tori read as a few
+       * chunky hoops; many slender ones read as something MACHINED, which is
+       * the whole point of a stone shell with an engineered core.
+       */
+      Array.from({ length: 9 }, (_, i) => {
+        const t = (i + 1) / 9
         return {
-          r: radius * (1 - t * 0.2),
-          tube: blockThickness * (0.3 - i * 0.05),
-          z: -blockDepth * (0.6 + i * 1.15),
+          r: radius * (1 - t * 0.16),
+          tube: blockThickness * (0.12 - i * 0.007),
+          z: -blockDepth * (0.35 + i * 0.52),
           machined: i >= 2,
         }
       }),
@@ -167,14 +175,16 @@ export function Aperture({
   }
 
   /*
-   * Positioned so the foot of the arch dips just under the surface.
+   * Roughly a third of the arch is under the water.
    *
-   * Sitting exactly ON the water it reads as placed there; a little of it
-   * drowned reads as something that has been standing while the water rose
-   * around it. Only a little — the opening still has to show sky through it.
+   * A sliver under the surface reads as a ring resting on it. Genuinely
+   * drowned — the springing of the arch at about the waterline — reads as
+   * something that has stood while the water rose, which is the story this
+   * world is telling. The opening still clears the surface, so you can see
+   * sky through it.
    */
   return (
-    <group position={[0, radius * 0.965, -150]}>
+    <group position={[0, radius * 0.72, -150]}>
       {/* Outer ring of voussoirs — true arc segments, not boxes. */}
       {voussoirs.map((v, i) => (
         <mesh castShadow receiveShadow key={i} geometry={v.geo}>
@@ -201,23 +211,13 @@ export function Aperture({
       ))}
 
       {/*
-        Wet band at the waterline.
+        No wet band.
 
-        The submerged foot alone is not enough: what says half-drowned is the
-        wet stone just ABOVE the surface, dark and much less rough, catching a
-        sheen the dry stone above it does not. Same treatment the piers get.
+        A darker slab across the foot was meant to read as wet stone at the
+        waterline. On a flat face it worked; on a ring it reads as a separate
+        block floating under the arch, because it has edges where the ring has
+        none. Deeper submersion says the same thing without adding geometry.
       */}
-      <mesh castShadow={false} receiveShadow position={[0, -radius * 0.9, 0]}>
-        <boxGeometry args={[radius * 0.9, radius * 0.2, blockDepth * 1.25]} />
-        <meshStandardMaterial
-          color={palette.monolith.clone().offsetHSL(0, 0.02, -0.17)}
-          roughness={0.3}
-          metalness={0}
-          envMapIntensity={0.75}
-          normalMap={map}
-          normalScale={normalScale}
-        />
-      </mesh>
 
       {/* The membrane, set deep in the bore. */}
       <mesh castShadow receiveShadow ref={glow} position={[0, 0, -blockDepth * 2.6]}>
