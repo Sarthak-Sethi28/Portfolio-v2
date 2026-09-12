@@ -47,7 +47,7 @@ function wingShape(): Shape {
   return s
 }
 
-export function Birds({ count = 14, palette }: { count?: number; palette: Palette }) {
+export function Birds({ count = 11, palette }: { count?: number; palette: Palette }) {
   const group = useRef<Group>(null)
 
   const wing = useMemo(() => new ShapeGeometry(wingShape(), 12), [])
@@ -78,7 +78,7 @@ export function Birds({ count = 14, palette }: { count?: number; palette: Palett
       child.position.set(
         Math.cos(a) * b.radius,
         b.height + Math.sin(a * 2.3 + b.phase) * b.bob,
-        Math.sin(a) * b.radius - 105,
+        Math.sin(a) * b.radius - 125,
       )
 
       // Heading along the tangent, and BANKED into the turn. A circling bird

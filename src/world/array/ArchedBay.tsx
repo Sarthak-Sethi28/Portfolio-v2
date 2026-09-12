@@ -86,6 +86,31 @@ export function ArchedBay({
         </group>
       ))}
 
+      {/* TRACERY.
+          The stonework that fills the head of a gothic opening: a central
+          mullion dividing it into lights, and a foil ring above. It is the
+          single most recognisable thing about a carved arch — without it an
+          opening reads as a hole with a pointed top, which is what these were.
+          Thin members, because tracery is mostly void. */}
+      <group position={[0, sill, depth * 0.1]}>
+        {/* Central mullion, rising to the springing of the head. */}
+        <mesh position={[0, openH * 0.33, 0]}>
+          <boxGeometry args={[colW * 0.62, openH * 0.66, colW * 0.62]} />
+          {children}
+        </mesh>
+        {/* Foil ring in the head. */}
+        <mesh position={[0, openH * 0.78, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[openW * 0.17, colW * 0.26, 6, 20]} />
+          {children}
+        </mesh>
+        {/* No cusps.
+            The small arcs springing off the mullion are correct gothic
+            detailing and completely illegible at this distance — they read as
+            specks of noise inside the opening rather than as carving, and cost
+            two meshes per bay for it. The mullion and the foil ring are what
+            actually carry the tracery at this scale. */}
+      </group>
+
       {/* Sill, projecting slightly. */}
       <mesh position={[0, sill * 0.5, depth * 0.14]}>
         <boxGeometry args={[openW * 1.5, sill, depth * 0.42]} />
