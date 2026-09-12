@@ -23,14 +23,14 @@ export interface QualitySettings {
 
 const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
   high: {
-    // 768.
+    // 512.
     //
-    // The reflector renders the entire scene a second time every frame. 2048
-    // cost roughly 70fps; 1024 is affordable on paper but the pass is long
-    // enough that under load it can land late, and a late reflection shows as
-    // a dark flash in the water while the camera moves. 768 shortens it
-    // materially and the surface is blurred anyway.
-    reflectorResolution: 768,
+    // The reflector renders the entire scene a second time every frame, and
+    // the longer that pass is the more likely it lands late — which shows as a
+    // dark frame in the water. The surface is heavily blurred and now draws
+    // most of its light from the environment map, so resolution here buys
+    // very little and costs the one thing that was going wrong.
+    reflectorResolution: 512,
     particleScale: 1,
     bloom: true,
     depthOfField: true,
