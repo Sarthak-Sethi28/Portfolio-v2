@@ -52,6 +52,14 @@ export interface Placement {
    */
   submerge: number
   /**
+   * Whether the top is broken off.
+   *
+   * A clean cornice on every pier reads as a maintained building. A ruin has
+   * lost its crown, and an irregular top edge is the strongest silhouette cue
+   * there is that something has stood a long time with nobody caring for it.
+   */
+  ruined: boolean
+  /**
    * Architectural detail.
    *
    * A rectangular prism reads as a primitive no matter how it is textured.
@@ -103,8 +111,10 @@ export function sectionRing(count: number, radius: number): Placement[] {
     // positive tilt to fall away to the left and the right mass a negative one
     // to fall away to the right. Leaning apart opens the frame around the
     // aperture; leaning together closed in on it.
-    { a: -0.86, r: 1.65, h: 2.5, w: 2.4, tilt: 0.34 },
-    { a: 0.90, r: 1.70, h: 2.4, w: 2.3, tilt: -0.30 },
+    // Tall, slab-proportioned and broken-topped. Narrow relative to height is
+    // what makes a pier read as a carved SLAB rather than as a tower.
+    { a: -0.86, r: 1.65, h: 3.5, w: 1.45, tilt: 0.34 },
+    { a: 0.90, r: 1.70, h: 3.3, w: 1.35, tilt: -0.30 },
     // The tall tower, well back and clear.
     { a: -1.28, r: 3.0, h: 2.6, w: 0.72, tilt: 0.04 },
     // Mid right, further out still.
@@ -129,7 +139,7 @@ export function sectionRing(count: number, radius: number): Placement[] {
     // Roughly two in three carry a step. Uniformly notched reads as a pattern;
     // never notched reads as a box.
     const stepped = rng() < 0.66
-    const depth = range(rng, 13, 19)
+    const depth = range(rng, 13, 19) * (s.w < 1.6 ? 0.62 : 1)
     /*
      * Tilting lifts a corner out of the water.
      *
@@ -160,6 +170,7 @@ export function sectionRing(count: number, radius: number): Placement[] {
             side: sign(rng) as -1 | 1,
           }
         : undefined,
+      ruined: i < 2,
       detail: {
         cornice: rng() < 0.7 ? range(rng, 0.03, 0.075) : 0,
         plinth: rng() < 0.55 ? range(rng, 0.04, 0.09) : 0,
@@ -228,6 +239,7 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
             side: sign(rng) as -1 | 1,
           }
         : undefined,
+      ruined: rng() < 0.45,
       detail: {
         cornice: rng() < 0.5 ? range(rng, 0.03, 0.06) : 0,
         plinth: 0,
@@ -268,6 +280,7 @@ export function colonnade(
         position: [0, height / 2, -(pairs + 1) * spacing],
         rotationY: 0,
         tilt: 0,
+        ruined: false,
         submerge: 0,
         height,
         width,
@@ -283,6 +296,7 @@ export function colonnade(
       position: [side * halfWidth, height / 2, -(row + 1) * spacing],
       rotationY: side * range(rng, 0.02, 0.07),
       tilt: side * range(rng, 0.02, 0.05),
+      ruined: false,
       submerge: 0,
       height,
       width,

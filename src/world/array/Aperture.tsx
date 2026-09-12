@@ -1,109 +1,169 @@
 'use client'
 
 import { useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { MathUtils, type Mesh, type MeshBasicMaterial } from 'three'
+import { useFrame, useThree } from '@react-three/fiber'
+import { DoubleSide, MathUtils, RepeatWrapping, type Mesh, type Texture } from 'three'
 import type { Palette } from '../atmosphere/palette'
+import { voussoir as voussoirGeometry } from '../geometry/arch'
 
 /**
  * The aperture — the threshold to World 2.
  *
- * It was a plain torus, which reads as a hoop rather than as a structure
- * somebody built. A ring of this scale would be ASSEMBLED, and what sells that
- * is the vocabulary of assembly:
+ * Built as a real arch, because the previous torus read as a hoop: something
+ * bent, not something constructed. What makes masonry legible is seeing HOW it
+ * was assembled, so this is built the way an arch actually is:
  *
- *  - a squared cross-section, so it has faces that catch light rather than a
- *    single rolling highlight
- *  - segment collars at the joints between cast sections, the way a real ring
- *    of this size would be poured or forged in parts
- *  - a recessed inner channel, so the opening has depth instead of being a
- *    hole cut in a tube
- *  - splayed buttresses carrying it into the water, rather than the ring
- *    apparently balancing on nothing
+ *  - VOUSSOIRS. A ring of wedge-shaped blocks, each cut to the arc, with a
+ *    gap of shadow at every joint. The joints are the detail — a smooth ring
+ *    of stone reads as poured, a jointed one as quarried and set.
+ *  - CONCENTRIC ORDERS. Inside the outer ring, narrower rings step BACK into
+ *    the opening, so the bore has depth and reads as a passage rather than a
+ *    hole. This is where the machined character lives: the inner orders are
+ *    finer, tighter and darker than the stone around them.
+ *  - PLINTHS. Stepped masonry carrying it into the water, so it stands rather
+ *    than balances.
  */
 export function Aperture({
   palette,
+  stone,
   radius = 42,
   charge = 0,
 }: {
   palette: Palette
+  /** Shared limestone normal map, loaded once by ArrayWorld. */
+  stone?: Texture
   radius?: number
   /** 0 to 1 while the visitor holds to enter. */
   charge?: number
 }) {
   const glow = useRef<Mesh>(null)
-  const tube = radius * 0.085
+  const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
 
-  // Segment collars: slightly larger blocks straddling each joint.
-  const SEGMENTS = 12
-  const collars = useMemo(
+  const map = useMemo(() => {
+    if (!stone) return null
+    const t = stone.clone()
+    t.wrapS = t.wrapT = RepeatWrapping
+    t.repeat.set(2, 2)
+    t.anisotropy = maxAniso
+    t.needsUpdate = true
+    return t
+  }, [stone, maxAniso])
+
+  /** Wedge blocks around the outer ring. */
+  // FEWER, BIGGER blocks.
+  //
+  // 26 thin wedges read as gear teeth, not as masonry. A real arch of this
+  // span is built from a modest number of very large stones, and it is their
+  // SIZE — and the black joint beside each one — that says quarried and set.
+  const VOUSSOIRS = 17
+  const blockDepth = radius * 0.34
+  const blockThickness = radius * 0.36
+
+  const voussoirs = useMemo(() => {
+    const step = (Math.PI * 2) / VOUSSOIRS
+    // The joint. Wide enough to throw a real shadow line between stones.
+    const joint = step * 0.11
+    const innerR = radius - blockThickness / 2
+    const outerR = radius + blockThickness / 2
+    return Array.from({ length: VOUSSOIRS }, (_, i) =>
+      voussoirGeometry(innerR, outerR, i * step + joint / 2, step - joint, blockDepth),
+    )
+  }, [radius, blockThickness, blockDepth])
+
+  /**
+   * Concentric orders stepping back into the bore.
+   *
+   * Each is narrower and set further into the opening than the last, so the
+   * eye reads depth. The innermost are dark and fine — the mechanism.
+   */
+  const orders = useMemo(
     () =>
-      Array.from({ length: SEGMENTS }, (_, i) => {
-        const a = (i / SEGMENTS) * Math.PI * 2
-        return { a, x: Math.cos(a) * radius, y: Math.sin(a) * radius }
+      /*
+       * Orders must recede, not stack.
+       *
+       * Evenly spaced and barely stepped back, these rendered as concentric
+       * circles seen flat on — a bullseye. Depth is the whole point: each
+       * order sits only slightly inside the last but MUCH further back, so
+       * from the front they overlap into a bore you look down rather than
+       * rings you look at.
+       */
+      [0, 1, 2, 3].map((i) => {
+        const t = (i + 1) / 4
+        return {
+          r: radius * (1 - t * 0.2),
+          tube: blockThickness * (0.3 - i * 0.05),
+          z: -blockDepth * (0.6 + i * 1.15),
+          machined: i >= 2,
+        }
       }),
-    [radius],
+    [radius, blockThickness, blockDepth],
   )
 
   useFrame(({ clock }) => {
-    const mat = glow.current?.material as MeshBasicMaterial | undefined
+    const mat = glow.current?.material as { opacity: number } | undefined
     if (!mat) return
     const t = clock.elapsedTime
-    const pulse = 0.5 + 0.5 * Math.sin(t * (0.5 + charge * 6))
-    mat.opacity = MathUtils.lerp(mat.opacity, 0.04 + pulse * 0.04 + charge * 0.55, 0.08)
+    const pulse = 0.5 + 0.5 * Math.sin(t * (0.45 + charge * 6))
+    mat.opacity = MathUtils.lerp(mat.opacity, 0.03 + pulse * 0.035 + charge * 0.5, 0.08)
   })
 
+  const stoneProps = {
+    color: palette.monolith,
+    roughness: 0.88,
+    metalness: 0,
+    envMapIntensity: 0.4,
+    normalMap: map,
+  }
+
   return (
-    <group position={[0, radius + 1.2, -168]}>
-      {/* Main ring. radialSegments 4 gives a squared section with flat faces. */}
-      <mesh rotation={[0, 0, Math.PI / 4]} castShadow>
-        <torusGeometry args={[radius, tube, 4, 128]} />
-        <meshStandardMaterial color={palette.monolith} roughness={0.62} metalness={0} />
-      </mesh>
-
-      {/* Recessed inner channel: a thinner ring set inside the main section,
-          so the opening reads as a machined bore rather than a hoop. */}
-      <mesh rotation={[0, 0, Math.PI / 4]}>
-        <torusGeometry args={[radius - tube * 0.55, tube * 0.4, 4, 128]} />
-        <meshStandardMaterial color={palette.monolith} roughness={0.4} metalness={0} />
-      </mesh>
-
-      {/* Segment collars at the cast joints. */}
-      {collars.map((c, i) => (
-        <mesh key={i} position={[c.x, c.y, 0]} rotation={[0, 0, c.a]} castShadow>
-          <boxGeometry args={[tube * 0.5, tube * 3.1, tube * 3.1]} />
-          <meshStandardMaterial color={palette.monolith} roughness={0.55} metalness={0} />
+    <group position={[0, radius * 1.06, -150]}>
+      {/* Outer ring of voussoirs — true arc segments, not boxes. */}
+      {voussoirs.map((geo, i) => (
+        <mesh key={i} geometry={geo}>
+          <meshStandardMaterial {...stoneProps} />
         </mesh>
       ))}
 
-      {/* Membrane across the opening. */}
-      <mesh ref={glow}>
-        <circleGeometry args={[radius - tube * 1.2, 96]} />
+      {/* Concentric orders receding into the opening. */}
+      {orders.map((o, i) => (
+        <mesh key={`ord-${i}`} position={[0, 0, o.z]}>
+          <torusGeometry args={[o.r, o.tube, o.machined ? 10 : 6, 88]} />
+          <meshStandardMaterial
+            color={palette.monolith}
+            roughness={o.machined ? 0.42 : 0.8}
+            metalness={o.machined ? 0.55 : 0}
+            envMapIntensity={o.machined ? 0.9 : 0.4}
+            normalMap={o.machined ? null : map}
+          />
+        </mesh>
+      ))}
+
+      {/* The membrane, set deep in the bore. */}
+      <mesh ref={glow} position={[0, 0, -blockDepth * 2.6]}>
+        <circleGeometry args={[radius * 0.36, 72]} />
         <meshBasicMaterial
           color={palette.sunColor}
           transparent
-          opacity={0.06}
+          opacity={0.04}
           toneMapped={false}
           depthWrite={false}
+          side={DoubleSide}
         />
       </mesh>
 
-      {/* Splayed buttresses down into the water. */}
+      {/* Stepped plinths carrying the arch into the water. */}
       {[-1, 1].map((s) => (
-        <group key={s}>
-          <mesh
-            position={[s * radius * 0.74, -radius * 0.79, 0]}
-            rotation={[0, 0, s * 0.42]}
-            castShadow
-          >
-            <boxGeometry args={[tube * 1.5, radius * 0.62, tube * 2.2]} />
-            <meshStandardMaterial color={palette.monolith} roughness={0.7} metalness={0} />
-          </mesh>
-          {/* Footing spreading where it meets the plain. */}
-          <mesh position={[s * radius * 0.86, -radius * 1.04, 0]} castShadow>
-            <boxGeometry args={[tube * 3.4, tube * 1.5, tube * 3.4]} />
-            <meshStandardMaterial color={palette.monolith} roughness={0.78} metalness={0} />
-          </mesh>
+        <group key={s} position={[s * radius * 0.78, -radius * 0.72, 0]}>
+          {[0, 1, 2].map((step) => {
+            const w = radius * (0.3 + step * 0.13)
+            const h = radius * 0.2
+            return (
+              <mesh key={step} position={[s * step * radius * 0.05, -step * h, 0]}>
+                <boxGeometry args={[w, h, blockDepth * (1.5 + step * 0.4)]} />
+                <meshStandardMaterial {...stoneProps} />
+              </mesh>
+            )
+          })}
         </group>
       ))}
     </group>

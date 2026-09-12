@@ -121,7 +121,7 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
         />
       ))}
 
-      <Aperture palette={palette} />
+      <Aperture palette={palette} stone={stoneNormal} />
       <Dish palette={palette} />
 
       {/* Scale reference. See Figure — nothing else in the world has a size
