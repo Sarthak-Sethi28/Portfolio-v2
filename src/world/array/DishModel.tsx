@@ -40,9 +40,7 @@ export function DishModel({
   const scale = useMemo(() => {
     const size = new Vector3()
     new Box3().setFromObject(cloned).getSize(size)
-    // Measure against Z, since the asset is Z-up before we rotate it.
-    const tall = Math.max(size.z, size.y)
-    return tall > 0 ? height / tall : 1
+    return size.y > 0 ? height / size.y : 1
   }, [cloned, height])
 
   return (
@@ -56,7 +54,16 @@ export function DishModel({
         checking on every downloaded asset: it is the single most common
         surprise in a glTF from the wild.
       */}
-      <primitive object={cloned} scale={scale} rotation={[-Math.PI / 2, 0, 0]} />
+      {/*
+        NO axis correction.
+        
+        A quarter turn about X was added on the assumption the asset was
+        authored Z-up, which is the usual convention. This one is not — its
+        exporter already corrected the axes, so the extra rotation was laying
+        an upright dish flat on the water. Measuring before assuming would
+        have caught it: the root node's transform says which.
+      */}
+      <primitive object={cloned} scale={scale} />
     </group>
   )
 }
