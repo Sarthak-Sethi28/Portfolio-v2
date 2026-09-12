@@ -139,20 +139,12 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
         the column or pushed it out of frame. The left side has the depth.
       */}
       {/*
-        DISH DISABLED pending diagnosis.
+        No dish.
 
-        The Garecra satellite dish renders as a flat grey slab rather than a
-        telescope. It survived four placements and two decimation passes —
-        0.01 and 0.0008 simplify error — with the same result, so this is not
-        over-compression, which was the first assumption. Most likely the
-        asset's parts sit in a node hierarchy that the optimiser's prune step
-        flattens wrongly, or its geometry is one merged mesh that simplifies
-        into rubble whatever the tolerance.
-
-        Diagnosis is to load the raw scene.gltf directly, before any
-        processing, and see whether it is right there. That separates the
-        asset from our pipeline in one step, and until it is answered a broken
-        object is worse than an absent one.
+        Removed on request. The asset works now — the fault was an axis
+        correction added on assumption, not compression — and DishModel is
+        kept so it can come back without redoing any of that. The note in
+        DishModel records why it needs no rotation.
       */}
 
 
