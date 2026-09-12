@@ -146,9 +146,9 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
       angle += Math.sign(forward || 1) * (0.5 - Math.abs(forward)) * 1.6
     }
     // sqrt keeps the scatter area-uniform instead of clustering at the centre.
-    const r = innerRadius * 1.5 + Math.sqrt(rng()) * innerRadius * 5.5
+    const r = innerRadius * 1.7 + Math.sqrt(rng()) * innerRadius * 11
     // Distant slabs read as taller because fog eats their base.
-    const height = range(rng, 14, 46) * (1 + r / 420)
+    const height = range(rng, 16, 52) * (1 + r / 520)
     const width = range(rng, 10, 26)
     const stepped = rng() < 0.5
     out.push({

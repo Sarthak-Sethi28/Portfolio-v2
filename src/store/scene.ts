@@ -29,8 +29,8 @@ export interface Config {
 }
 
 export const CONFIG_DEFAULTS: Config = {
-  arraySpacing: 42,
-  fieldDensity: 18,
+  arraySpacing: 46,
+  fieldDensity: 46,
   fogDensity: 0.0019,
   // Off by default. Sub-pixel additive points flicker as they cross pixel
   // boundaries, and large enough to be stable they read as bright squares.
