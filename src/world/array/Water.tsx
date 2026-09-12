@@ -77,7 +77,18 @@ export function Water({
           blur={[30, 9]}
           resolution={reflectorResolution}
           mixBlur={0.22}
-          mixStrength={6}
+          // Lower, deliberately.
+          //
+          // At 6 the surface's brightness came almost entirely from the
+          // reflection pass — a second full render of the scene, every frame.
+          // Miss that pass once and the water loses most of its light: a
+          // single dark frame confined to the lower third, which is precisely
+          // what a frame-by-frame analysis of a screen recording found (three
+          // dips of 12-15%, none anywhere else in the frame).
+          //
+          // With the environment map carrying more of the load, a late
+          // reflection is a small change rather than a blackout.
+          mixStrength={2.6}
           roughness={roughness}
           depthScale={0}
           color={palette.waterTint}
@@ -96,6 +107,9 @@ export function Water({
           // anything out of bounds.
           normalMap={coarse}
           normalScale={normalScale}
+          // The sky is reflected from the environment map regardless of the
+          // reflection pass, so the surface always has light of its own.
+          envMapIntensity={1.35}
           reflectorOffset={0}
         />
       ) : (
