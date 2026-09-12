@@ -97,14 +97,14 @@ export function sectionRing(count: number, radius: number): Placement[] {
     // The pair that flanks the aperture, set at its depth so the three read as
     // one group. They lean AWAY from each other: leaning inward would close
     // the composition around the ring and crowd the thing it frames.
-    // Close, huge, and steeply tilted INWARD so they funnel the eye to the
-    // ring. Positive tilt leans a shaft's top toward -X, so the left pier
-    // takes a negative tilt to lean right and the right pier a positive one.
-    // They are meant to run off the bottom of frame — a mass that leaves the
-    // frame reads as too big to contain, which upright mid-distance piers
-    // never do however tall they are.
-    { a: -0.86, r: 1.65, h: 2.5, w: 2.4, tilt: -0.34 },
-    { a: 0.90, r: 1.70, h: 2.4, w: 2.3, tilt: 0.30 },
+    // Tilted OUTWARD, away from each other.
+    //
+    // Positive tilt leans a shaft's top toward -X, so the left mass takes a
+    // positive tilt to fall away to the left and the right mass a negative one
+    // to fall away to the right. Leaning apart opens the frame around the
+    // aperture; leaning together closed in on it.
+    { a: -0.86, r: 1.65, h: 2.5, w: 2.4, tilt: 0.34 },
+    { a: 0.90, r: 1.70, h: 2.4, w: 2.3, tilt: -0.30 },
     // The tall tower, well back and clear.
     { a: -1.28, r: 3.0, h: 2.6, w: 0.72, tilt: 0.04 },
     // Mid right, further out still.
