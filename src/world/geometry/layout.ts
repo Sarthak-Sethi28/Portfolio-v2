@@ -113,8 +113,13 @@ export function sectionRing(count: number, radius: number): Placement[] {
     // aperture; leaning together closed in on it.
     // Tall, slab-proportioned and broken-topped. Narrow relative to height is
     // what makes a pier read as a carved SLAB rather than as a tower.
-    { a: -0.86, r: 1.65, h: 3.5, w: 1.45, tilt: 0.34 },
-    { a: 0.90, r: 1.70, h: 3.3, w: 1.35, tilt: -0.30 },
+    // Column proportions: a real pier is far taller than it is thick, and
+    // round rather than slab-like, so width comes down and height goes up.
+    // Thick enough to read as monumental, short enough that the CAPITAL is
+    // in frame — a column whose head is cropped loses the detail that makes
+    // it a column rather than a post.
+    { a: -0.78, r: 1.5, h: 2.9, w: 1.6, tilt: 0.17 },
+    { a: 0.82, r: 1.55, h: 2.75, w: 1.5, tilt: -0.15 },
     // The tall tower, well back and clear.
     { a: -1.28, r: 3.0, h: 2.6, w: 0.72, tilt: 0.04 },
     // Mid right, further out still.
