@@ -15,7 +15,7 @@ import { RepeatWrapping, type Texture } from 'three'
  */
 
 /** Tile size in world units. One repeat covers roughly this much surface. */
-const TILE = 9
+const TILE = 7
 
 export function tileStone(tex: Texture, worldWidth: number, worldHeight: number, aniso: number) {
   const t = tex.clone()

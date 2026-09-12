@@ -22,6 +22,8 @@ export interface Flags {
   noPost: boolean
   /** Run the frame-to-frame luminance probe. Costs a pipeline stall. */
   probe: boolean
+  /** Park the camera close to the aperture, for inspecting detail. */
+  closeup: boolean
   /** Drop the concrete surface map — isolates texture shimmer from edge crawl. */
   noTex: boolean
   /** Drop the photographic sky plate, leaving the procedural gradient. */
@@ -41,6 +43,7 @@ const EMPTY: Flags = {
   noReflect: false,
   noPost: false,
   probe: false,
+  closeup: false,
   noTex: false,
   noPlate: false,
   noUi: false,
@@ -59,6 +62,7 @@ export function readFlags(): Flags {
     noReflect: plain || q.has('noreflect'),
     noPost: plain || q.has('nopost'),
     probe: q.has('flicker'),
+    closeup: q.has('closeup'),
     noTex: plain || q.has('notex'),
     noPlate: plain || q.has('noplate'),
     noUi: q.has('noui'),

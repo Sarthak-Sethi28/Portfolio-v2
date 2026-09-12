@@ -112,7 +112,7 @@ function MonolithImpl({
   const vary = useMemo(() => {
     const rng = createRng(Math.round(width * 977 + height * 131 + depth * 17))
     return {
-      relief: range(rng, 1.15, 1.6),
+      relief: range(rng, 1.9, 2.6),
       tint: range(rng, -0.11, 0.09),
       rough: range(rng, -0.05, 0.06),
     }
