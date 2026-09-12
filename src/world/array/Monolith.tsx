@@ -4,6 +4,7 @@ import { useMemo, useRef } from 'react'
 import { RoundedBox } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector2, type MeshStandardMaterial } from 'three'
+import { createRng, range } from '@/lib/rng'
 import type { Placement } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
 import { type Texture } from 'three'
@@ -71,7 +72,39 @@ export function Monolith({
     () => tileStone(stoneRough, width, height, maxAniso),
     [stoneRough, width, height, maxAniso],
   )
-  const normalScale = useMemo(() => new Vector2(0.85, 0.85), [])
+  // Per-pier variation.
+  //
+  // Identical material on every pier is the clearest tell that these came out
+  // of a loop. Real masonry differs block to block — quarried at different
+  // times, weathered at different rates — so each takes a small deterministic
+  // offset in tone and relief, seeded from its own dimensions so it is stable
+  // across reloads and visual tests.
+  const vary = useMemo(() => {
+    const rng = createRng(Math.round(width * 977 + height * 131 + depth * 17))
+    return {
+      relief: range(rng, 1.15, 1.6),
+      tint: range(rng, -0.11, 0.09),
+      rough: range(rng, -0.05, 0.06),
+    }
+  }, [width, height, depth])
+
+  const normalScale = useMemo(
+    () => new Vector2(vary.relief, vary.relief),
+    [vary.relief],
+  )
+
+  const wetColor = useMemo(() => {
+    const c = palette.monolith.clone()
+    c.offsetHSL(0, 0.02, -0.16)
+    return c
+  }, [palette.monolith])
+
+  const bodyColor = useMemo(() => {
+    const c = palette.monolith.clone()
+    // Vary lightness only; a hue shift would read as different stone entirely.
+    c.offsetHSL(0, 0, vary.tint)
+    return c
+  }, [palette.monolith, vary.tint])
 
   const mats = useRef<MeshStandardMaterial[]>([])
   const eased = useRef(0)
@@ -82,7 +115,7 @@ export function Monolith({
     for (const m of mats.current) {
       if (!m) continue
       m.emissiveIntensity = e * 0.045
-      m.roughness = 0.86 - e * 0.06
+      m.roughness = 0.86 + vary.rough - e * 0.06
       m.envMapIntensity = 0.35 + e * 0.1
     }
   })
@@ -94,8 +127,8 @@ export function Monolith({
   const mat = (
     <meshStandardMaterial
       ref={collect}
-      color={palette.monolith}
-      roughness={0.86}
+      color={bodyColor}
+      roughness={0.86 + vary.rough}
       metalness={0}
       envMapIntensity={0.35}
       normalMap={noTex ? null : normalMap}
@@ -246,6 +279,24 @@ export function Monolith({
           </mesh>
         </group>
       )}
+
+      {/* Waterline.
+          Anything standing in water darkens for the first metre or so and
+          stays wet — lower roughness, so it catches a sheen the dry stone
+          above it does not. The tide mark is sharp, which is what makes a
+          pier read as standing IN the water rather than placed on top of it. */}
+      <mesh position={[0, -height / 2 + height * 0.028, 0]} {...handlers}>
+        <boxGeometry args={[width * 1.004, height * 0.056, depth * 1.004]} />
+        <meshStandardMaterial
+          ref={collect}
+          color={wetColor}
+          roughness={0.34}
+          metalness={0}
+          envMapIntensity={0.6}
+          normalMap={noTex ? null : normalMap}
+          normalScale={normalScale}
+        />
+      </mesh>
 
       {shoulder && (
         <RoundedBox
