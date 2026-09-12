@@ -243,6 +243,33 @@ function MonolithImpl({
         </mesh>
       ))}
 
+      {/* DENTIL COURSE.
+          A row of small blocks under the cornice. Repetition at a fine pitch
+          is what gives a cornice its shadow texture at distance, and it is one
+          of the cheapest details that unmistakably reads as carved rather than
+          cast. Only on detailed piers — the count is per-pier, so it is the
+          one piece of geometry here that scales badly if applied everywhere. */}
+      {detailed && detail.cornice > 0 && (
+        <group position={[0, height / 2 - height * 0.045, 0]}>
+          {Array.from({ length: 9 }, (_, i) => {
+            const t = (i + 0.5) / 9 - 0.5
+            return [0, 1].map((axis) => (
+              <mesh
+                key={`${i}-${axis}`}
+                position={
+                  axis === 0
+                    ? [t * width * 0.92, 0, (depth / 2) * 1.01]
+                    : [t * width * 0.92, 0, (-depth / 2) * 1.01]
+                }
+              >
+                <boxGeometry args={[width * 0.032, height * 0.016, depth * 0.035]} />
+                {mat}
+              </mesh>
+            ))
+          })}
+        </group>
+      )}
+
       {/* Cornice, in two steps. A single slab reads as a lid; two reads as
           a moulding. */}
       {detail.cornice > 0 && (
@@ -261,6 +288,27 @@ function MonolithImpl({
           </mesh>
         </group>
       )}
+
+      {/* CORNER BUTTRESSES.
+          Sloped masses thickening the base, which is how a real pier carries
+          its load into the ground — and which fixes the silhouette problem of
+          a shaft meeting the water at a bare right angle. */}
+      {detailed &&
+        corners.map(([sx, sz], i) => (
+          <mesh
+            key={`butt-${i}`}
+            position={[
+              (sx * (width - pil * 0.5)) / 2,
+              -height / 2 + height * 0.11,
+              (sz * (depth - pil * 0.5)) / 2,
+            ]}
+            rotation={[sz * 0.07, 0, -sx * 0.07]}
+            {...handlers}
+          >
+            <boxGeometry args={[pil * 1.25, height * 0.22, pil * 1.25]} />
+            {mat}
+          </mesh>
+        ))}
 
       {/* Plinth where the pier meets the water. */}
       {detail.plinth > 0 && (
