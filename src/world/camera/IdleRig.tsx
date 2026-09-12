@@ -31,10 +31,10 @@ import { useScene } from '@/store/scene'
 const REST = new Vector3(0, 52, 168)
 const TARGET = new Vector3(0, 14, -96)
 
-const POINTER_DEADZONE = 0.045
-const AIM_X = 2.2
-const AIM_Y = 0.9
-const AIM_DAMPING = 8.5
+const POINTER_DEADZONE = 0.08
+const AIM_X = 1.1
+const AIM_Y = 0.45
+const AIM_DAMPING = 4.5
 const SNAP_EPSILON = 0.001
 
 function deadzoned(value: number): number {
