@@ -113,10 +113,26 @@ export function Water({
           reflectorOffset={0}
         />
       ) : (
+        /*
+         * The reflection-free surface.
+         *
+         * Not a fallback any more — a real alternative. It reflects the
+         * ENVIRONMENT MAP instead of re-rendering the scene, so it still
+         * mirrors the sky, still carries the sun's path across the ripples,
+         * and costs nothing per frame. What it loses is the piers' own
+         * reflections.
+         *
+         * That trade is worth stating plainly: the reflector renders the whole
+         * scene a second time every frame, and a pass that long is the one
+         * thing in this scene that can arrive late — which shows as the water
+         * going dark for a frame.
+         */
         <meshStandardMaterial
           color={palette.waterTint}
-          roughness={Math.max(roughness, 0.35)}
-          metalness={0.6}
+          // Low roughness plus full metalness is a mirror of the environment.
+          roughness={Math.max(roughness, 0.06)}
+          metalness={1}
+          envMapIntensity={2.1}
           normalMap={coarse}
           normalScale={normalScale}
         />
