@@ -23,14 +23,14 @@ export interface QualitySettings {
 
 const SETTINGS: Record<Tier, Omit<QualitySettings, 'tier'>> = {
   high: {
-    // 1024, not 2048.
+    // 768.
     //
-    // 512 stair-stepped the reflected edges; 2048 cost roughly 70fps. At DPR 2
-    // the reflector renders the whole scene again into a 2048 target every
-    // frame, and that plus 8x multisampling took a locked 120fps down to a
-    // juddering 43-50 — which, on a 120Hz panel, is what the "flicker"
-    // actually was. 1024 is sharp enough and affordable.
-    reflectorResolution: 1024,
+    // The reflector renders the entire scene a second time every frame. 2048
+    // cost roughly 70fps; 1024 is affordable on paper but the pass is long
+    // enough that under load it can land late, and a late reflection shows as
+    // a dark flash in the water while the camera moves. 768 shortens it
+    // materially and the surface is blurred anyway.
+    reflectorResolution: 768,
     particleScale: 1,
     bloom: true,
     depthOfField: true,
