@@ -6,8 +6,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector2, type MeshStandardMaterial } from 'three'
 import type { Placement } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
-import { useTexture } from '@react-three/drei'
-import { RepeatWrapping, type Texture } from 'three'
+import { type Texture } from 'three'
 import { tileStone } from '../materials/stone'
 import { ArchedBay } from './ArchedBay'
 import { useScene } from '@/store/scene'
@@ -34,6 +33,8 @@ export function Monolith({
   palette,
   emphasis = 0,
   detailed = false,
+  stoneNormal,
+  stoneRough,
   onPointerOver,
   onPointerOut,
   onClick,
@@ -51,6 +52,9 @@ export function Monolith({
    * so only they get bays.
    */
   detailed?: boolean
+  /** Shared, loaded once by ArrayWorld — never per instance. See the note there. */
+  stoneNormal: Texture
+  stoneRough: Texture
   onPointerOver?: () => void
   onPointerOut?: () => void
   onClick?: () => void
@@ -59,25 +63,13 @@ export function Monolith({
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
   const noTex = useScene((s) => s.flags.noTex)
 
-  const [normalSrc, roughSrc] = useTexture(
-    ['/stone-normal.jpg', '/stone-rough.jpg'],
-    (loaded) => {
-      const list = (Array.isArray(loaded) ? loaded : [loaded]) as Texture[]
-      for (const t of list) {
-        t.wrapS = RepeatWrapping
-        t.wrapT = RepeatWrapping
-        t.anisotropy = maxAniso
-      }
-    },
-  ) as Texture[]
-
   const normalMap = useMemo(
-    () => tileStone(normalSrc, width, height, maxAniso),
-    [normalSrc, width, height, maxAniso],
+    () => tileStone(stoneNormal, width, height, maxAniso),
+    [stoneNormal, width, height, maxAniso],
   )
   const roughMap = useMemo(
-    () => tileStone(roughSrc, width, height, maxAniso),
-    [roughSrc, width, height, maxAniso],
+    () => tileStone(stoneRough, width, height, maxAniso),
+    [stoneRough, width, height, maxAniso],
   )
   const normalScale = useMemo(() => new Vector2(0.85, 0.85), [])
 

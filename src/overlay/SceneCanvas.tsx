@@ -1,6 +1,7 @@
 'use client'
 
 import { Canvas } from '@react-three/fiber'
+import { useTexture } from '@react-three/drei'
 import { useEffect, useState } from 'react'
 import { Stage } from '@/world/Stage'
 import { useScene } from '@/store/scene'
@@ -19,6 +20,11 @@ import { detectTier } from '@/lib/quality'
  * dips caused by its own resizes then oscillates, and the whole page appears
  * to flicker. Pick a resolution from the device and hold it.
  */
+// Warm the cache at module load. Anything already resolved cannot suspend, and
+// a suspension after first paint blanks the whole scene through the shared
+// Suspense boundary.
+useTexture.preload(['/stone-normal.jpg', '/stone-rough.jpg', '/water-normal.jpg', '/sky/dusk.jpg', '/sky/night.jpg'])
+
 export function SceneCanvas() {
   const setQuality = useScene((s) => s.setQuality)
   const setReducedMotion = useScene((s) => s.setReducedMotion)
