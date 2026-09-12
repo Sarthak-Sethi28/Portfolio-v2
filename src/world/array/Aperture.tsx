@@ -166,8 +166,15 @@ export function Aperture({
     normalScale: normalScale,
   }
 
+  /*
+   * Positioned so the foot of the arch dips just under the surface.
+   *
+   * Sitting exactly ON the water it reads as placed there; a little of it
+   * drowned reads as something that has been standing while the water rose
+   * around it. Only a little — the opening still has to show sky through it.
+   */
   return (
-    <group position={[0, radius * 1.06, -150]}>
+    <group position={[0, radius * 0.965, -150]}>
       {/* Outer ring of voussoirs — true arc segments, not boxes. */}
       {voussoirs.map((v, i) => (
         <mesh castShadow receiveShadow key={i} geometry={v.geo}>
@@ -193,6 +200,25 @@ export function Aperture({
         </mesh>
       ))}
 
+      {/*
+        Wet band at the waterline.
+
+        The submerged foot alone is not enough: what says half-drowned is the
+        wet stone just ABOVE the surface, dark and much less rough, catching a
+        sheen the dry stone above it does not. Same treatment the piers get.
+      */}
+      <mesh castShadow={false} receiveShadow position={[0, -radius * 0.9, 0]}>
+        <boxGeometry args={[radius * 0.9, radius * 0.2, blockDepth * 1.25]} />
+        <meshStandardMaterial
+          color={palette.monolith.clone().offsetHSL(0, 0.02, -0.17)}
+          roughness={0.3}
+          metalness={0}
+          envMapIntensity={0.75}
+          normalMap={map}
+          normalScale={normalScale}
+        />
+      </mesh>
+
       {/* The membrane, set deep in the bore. */}
       <mesh castShadow receiveShadow ref={glow} position={[0, 0, -blockDepth * 2.6]}>
         <circleGeometry args={[radius * 0.36, 72]} />
@@ -207,78 +233,17 @@ export function Aperture({
       </mesh>
 
       {/*
-        BUTTRESSES.
+        NO BUTTRESSES.
 
-        The arch rested on two small stepped blocks, which read as debris
-        beneath it rather than as anything holding it up. An arch of this span
-        has to be carried, and the carrying has to be visible: a mass meeting
-        the ring's outer face at a clear point, widening as it descends, and
-        disappearing into the water.
+        Side supports were built and removed. Structurally they were the right
+        idea — an arch this size needs its thrust taken — but they read as
+        lumps stuck to the ring rather than as anything carrying it, and they
+        broke the one thing the ring has going for it: a clean circle against
+        the sky. The silhouette is the whole object here.
 
-        They meet it LOW on either side rather than at the very bottom. A
-        support touching the bottom reads as a pedestal the ring sits on; one
-        touching the side reads as a pier taking its thrust, which is what an
-        arch actually needs.
-
-        The first attempt put them at upper left and upper right, because
-        Math.PI + 0.72 is measured anticlockwise and lands above the axis, not
-        below it. The angles here are stated explicitly rather than derived
-        from the side, which is harder to get backwards.
+        If the arch ever needs to look supported, the answer is foundations
+        UNDER it rather than masses beside it.
       */}
-      {([-1, 1] as const).map((side) => {
-        // Lower-left is just past half a turn; lower-right is just short of none.
-        const contact = side < 0 ? Math.PI + 0.62 : -0.62
-        const cx = Math.cos(contact) * (radius + blockThickness * 0.3)
-        const cy = Math.sin(contact) * (radius + blockThickness * 0.3)
-
-        const footY = -radius * 1.15
-        const height = cy - footY
-        const lean = 0.13 * side
-
-        return (
-          <group key={side} position={[cx, 0, 0]}>
-            {/* Shaft, from the contact point down into the water. */}
-            <mesh
-              castShadow
-              receiveShadow
-              position={[Math.sin(lean) * height * 0.5, footY + height / 2, 0]}
-              rotation={[0, 0, -lean]}
-            >
-              <boxGeometry args={[blockThickness * 1.35, height, blockDepth * 1.3]} />
-              <meshStandardMaterial {...stoneProps} />
-            </mesh>
-
-            {/* Capital where it takes the ring, so the join is not a butt. */}
-            <mesh castShadow receiveShadow position={[0, cy - blockThickness * 0.22, 0]}>
-              <boxGeometry args={[blockThickness * 1.9, blockThickness * 0.62, blockDepth * 1.5]} />
-              <meshStandardMaterial {...stoneProps} />
-            </mesh>
-
-            {/* Stepped footing spreading into the water. */}
-            {[0, 1].map((step) => (
-              <mesh
-                key={step}
-                castShadow
-                receiveShadow
-                position={[
-                  Math.sin(lean) * height,
-                  footY - step * blockThickness * 0.42,
-                  0,
-                ]}
-              >
-                <boxGeometry
-                  args={[
-                    blockThickness * (1.9 + step * 0.7),
-                    blockThickness * 0.45,
-                    blockDepth * (1.5 + step * 0.5),
-                  ]}
-                />
-                <meshStandardMaterial {...stoneProps} />
-              </mesh>
-            ))}
-          </group>
-        )
-      })}
     </group>
   )
 }
