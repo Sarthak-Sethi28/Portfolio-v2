@@ -101,31 +101,27 @@ export function sectionRing(count: number, radius: number): Placement[] {
    * and `w` scale height and width. Width is explicit per slot because a
    * random width on a near mass either blocks the centre or looks like a post.
    */
+  /*
+   * A receding colonnade, not a scatter.
+   *
+   * The instinct when a frame looks empty is to add objects, and it is always
+   * wrong — clutter reads as busy, never as grand. What makes a vast space
+   * feel full is RHYTHM IN DEPTH: the same form repeating at increasing
+   * distance, each pair smaller and fainter than the last, until fog takes
+   * them. The eye reads that as a procession and infers a city it cannot see.
+   *
+   * So the four section piers are two PAIRS, not four scattered points: a near
+   * pair set wide enough to frame the aperture without crowding it, and a
+   * second pair further back and inboard, continuing the line. Anything beyond
+   * lives in the scatter field, deeper still.
+   */
   const staging = [
-    // The pair that flanks the aperture, set at its depth so the three read as
-    // one group. They lean AWAY from each other: leaning inward would close
-    // the composition around the ring and crowd the thing it frames.
-    // Tilted OUTWARD, away from each other.
-    //
-    // Positive tilt leans a shaft's top toward -X, so the left mass takes a
-    // positive tilt to fall away to the left and the right mass a negative one
-    // to fall away to the right. Leaning apart opens the frame around the
-    // aperture; leaning together closed in on it.
-    // Tall, slab-proportioned and broken-topped. Narrow relative to height is
-    // what makes a pier read as a carved SLAB rather than as a tower.
-    // Column proportions: a real pier is far taller than it is thick, and
-    // round rather than slab-like, so width comes down and height goes up.
-    // Thick enough to read as monumental, short enough that the CAPITAL is
-    // in frame — a column whose head is cropped loses the detail that makes
-    // it a column rather than a post.
-    // Wider apart and smaller: the columns were crowding the aperture, and
-    // the thing they frame has to be able to breathe between them.
-    { a: -1.02, r: 1.95, h: 2.1, w: 1.6, tilt: 0.13 },
-    { a: 1.06, r: 2.0, h: 2.0, w: 1.5, tilt: -0.11 },
-    // The tall tower, well back and clear.
-    { a: -1.28, r: 3.0, h: 2.6, w: 0.72, tilt: 0.04 },
-    // Mid right, further out still.
-    { a: 1.34, r: 2.7, h: 1.45, w: 1.5, tilt: -0.05 },
+    // Near pair — wide, so the aperture and the dish both have air.
+    { a: -1.16, r: 2.15, h: 2.1, w: 1.6, tilt: 0.11 },
+    { a: 1.2, r: 2.2, h: 2.0, w: 1.5, tilt: -0.09 },
+    // Second pair — further back, drawn inboard, continuing the perspective.
+    { a: -0.55, r: 5.2, h: 2.5, w: 1.4, tilt: 0.06 },
+    { a: 0.6, r: 5.4, h: 2.4, w: 1.35, tilt: -0.05 },
   ]
 
   return Array.from({ length: count }, (_, i) => {
@@ -157,7 +153,7 @@ export function sectionRing(count: number, radius: number): Placement[] {
      * the low corner buried whatever the lean.
      */
     const lift = (Math.hypot(width, depth) / 2) * Math.abs(Math.sin(s.tilt))
-    const submerge = range(rng, height * 0.03, height * 0.08) + lift
+    const submerge = range(rng, height * 0.06, height * 0.11) + lift
     return {
       submerge,
       position: [Math.sin(s.a) * r, height / 2 - submerge, Math.cos(s.a) * r * -1] as [
@@ -232,7 +228,7 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
      * architecture should — give the world depth and a sense that it
      * continues — without asking to be looked at.
      */
-    const r = innerRadius * 9 + Math.sqrt(rng()) * innerRadius * 20
+    const r = innerRadius * 13 + Math.sqrt(rng()) * innerRadius * 22
     // Distant slabs read as taller because fog eats their base.
     const height = range(rng, 22, 68) * (1 + r / 900)
     const width = range(rng, 10, 26)
