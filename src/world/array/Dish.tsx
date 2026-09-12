@@ -70,14 +70,14 @@ export function Dish({
       {braceLevels.map((f, li) => (
         <group key={`brace-${li}`} position={[0, towerHeight * f, 0]}>
           {[0, 1].map((r) => (
-            <mesh key={r} rotation={[0, (r * Math.PI) / 2, 0]}>
+            <mesh castShadow receiveShadow key={r} rotation={[0, (r * Math.PI) / 2, 0]}>
               <boxGeometry args={[towerHalf * 1.5, radius * 0.02, radius * 0.02]} />
               <meshStandardMaterial color={darkSteel} roughness={0.72} metalness={0.4} />
             </mesh>
           ))}
           {/* Diagonals — what makes a truss read as a truss at silhouette size. */}
           {[-1, 1].map((d) => (
-            <mesh key={`d${d}`} rotation={[0, 0, d * 0.62]}>
+            <mesh castShadow receiveShadow key={`d${d}`} rotation={[0, 0, d * 0.62]}>
               <boxGeometry args={[towerHalf * 1.9, radius * 0.014, radius * 0.014]} />
               <meshStandardMaterial color={darkSteel} roughness={0.75} metalness={0.35} />
             </mesh>
@@ -86,7 +86,7 @@ export function Dish({
       ))}
 
       {/* Azimuth turret at the top of the tower. */}
-      <mesh position={[0, towerHeight + radius * 0.1, 0]}>
+      <mesh castShadow receiveShadow position={[0, towerHeight + radius * 0.1, 0]}>
         <cylinderGeometry args={[towerHalf * 0.7, towerHalf * 0.85, radius * 0.2, 12]} />
         <meshStandardMaterial color={steel} roughness={0.62} metalness={0.45} />
       </mesh>
@@ -94,7 +94,7 @@ export function Dish({
       {/* --- everything above the elevation axis tilts together ---------- */}
       <group position={[0, towerHeight + radius * 0.2, 0]} rotation={[tilt, 0, 0]}>
         {/* The reflector. */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh castShadow receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
           <latheGeometry args={[profile, 72]} />
           <meshStandardMaterial
             color="#cdd1cd"
@@ -105,7 +105,7 @@ export function Dish({
         </mesh>
 
         {/* Rim. A defined edge is the strongest single "this is a dish" cue. */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+        <mesh castShadow receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
           <torusGeometry args={[radius * 0.995, radius * 0.016, 8, 80]} />
           <meshStandardMaterial color={steel} roughness={0.5} metalness={0.5} />
         </mesh>
@@ -142,7 +142,7 @@ export function Dish({
             </mesh>
           )
         })}
-        <mesh position={[0, radius * 0.83, 0]}>
+        <mesh castShadow receiveShadow position={[0, radius * 0.83, 0]}>
           <cylinderGeometry args={[radius * 0.05, radius * 0.035, radius * 0.17, 10]} />
           <meshStandardMaterial color="#e0e4e0" roughness={0.44} metalness={0.5} />
         </mesh>
@@ -150,7 +150,7 @@ export function Dish({
         {/* Red aircraft warning lights around the rim. §5a blinks these as the
             morse channel for an outgoing transmission. */}
         {lights.map((l) => (
-          <mesh key={l.index} position={l.position}>
+          <mesh castShadow receiveShadow key={l.index} position={l.position}>
             <sphereGeometry args={[radius * 0.013, 8, 8]} />
             <meshBasicMaterial color="#ff2d20" toneMapped={false} />
           </mesh>
@@ -158,7 +158,7 @@ export function Dish({
       </group>
 
       {/* Keeps the dish tied to the palette across the day/night blend. */}
-      <mesh position={[0, 0.12, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh castShadow receiveShadow position={[0, 0.12, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[towerHalf * 1.6, 24]} />
         <meshStandardMaterial color={palette.monolith} roughness={0.9} metalness={0.1} />
       </mesh>

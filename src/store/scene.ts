@@ -31,7 +31,10 @@ export interface Config {
 export const CONFIG_DEFAULTS: Config = {
   arraySpacing: 46,
   fieldDensity: 46,
-  fogDensity: 0.0019,
+  // Halved. Fog lifts every distant value toward one mid-grey, and a scene
+  // with no dark values in it cannot look lit — the reference frames keep
+  // deep blacks in the joints and under the arch.
+  fogDensity: 0.00092,
   // Off by default. Sub-pixel additive points flicker as they cross pixel
   // boundaries, and large enough to be stable they read as bright squares.
   // Available on the slider for anyone who wants them.

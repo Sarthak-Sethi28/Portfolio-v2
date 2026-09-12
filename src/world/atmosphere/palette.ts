@@ -43,7 +43,7 @@ export const DAY: Palette = {
   sunColor: new Color('#ffd8a0'),
   sunDirection: new Vector3(0.44, 0.04, -0.90).normalize(),
   sunIntensity: 3.4,
-  keyIntensity: 0.85,
+  keyIntensity: 2.4,
   fog: new Color('#b6bda6'),
   fogDensityScale: 1,
   // Stone grey, not black.
@@ -56,7 +56,7 @@ export const DAY: Palette = {
   monolith: new Color('#8a8e88'),
   waterTint: new Color('#e8ece7'),
   ambient: new Color('#5d7a80'),
-  ambientIntensity: 0.17,
+  ambientIntensity: 0.10,
 }
 
 export const NIGHT: Palette = {
