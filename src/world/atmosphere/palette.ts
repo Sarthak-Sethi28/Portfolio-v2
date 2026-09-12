@@ -46,7 +46,14 @@ export const DAY: Palette = {
   keyIntensity: 0.85,
   fog: new Color('#b6bda6'),
   fogDensityScale: 1,
-  monolith: new Color('#020304'),
+  // Stone grey, not black.
+  //
+  // The original concept framed these as black monoliths, and with no surface
+  // texture black was the only thing that read. Now that they carry a
+  // photographed limestone normal and roughness, a near-black base swallows
+  // all of it — the pitting and cracks have nothing to modulate. Grey lets the
+  // material show, which is what "weathered stone" actually means.
+  monolith: new Color('#8a8e88'),
   waterTint: new Color('#e8ece7'),
   ambient: new Color('#5d7a80'),
   ambientIntensity: 0.17,
@@ -62,7 +69,7 @@ export const NIGHT: Palette = {
   keyIntensity: 0.14,
   fog: new Color('#0e1c2e'),
   fogDensityScale: 1.35,
-  monolith: new Color('#010203'),
+  monolith: new Color('#2b3138'),
   waterTint: new Color('#7d8ea8'),
   ambient: new Color('#16304f'),
   ambientIntensity: 0.14,

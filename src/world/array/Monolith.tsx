@@ -3,10 +3,12 @@
 import { useMemo, useRef } from 'react'
 import { RoundedBox } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { MathUtils, type MeshStandardMaterial } from 'three'
+import { MathUtils, Vector2, type MeshStandardMaterial } from 'three'
 import type { Placement } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
-import { concreteTiled } from '../materials/concrete'
+import { useTexture } from '@react-three/drei'
+import { RepeatWrapping, type Texture } from 'three'
+import { tileStone } from '../materials/stone'
 import { ArchedBay } from './ArchedBay'
 import { useScene } from '@/store/scene'
 
@@ -57,7 +59,27 @@ export function Monolith({
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
   const noTex = useScene((s) => s.flags.noTex)
 
-  const map = useMemo(() => concreteTiled(width / 11, maxAniso), [width, maxAniso])
+  const [normalSrc, roughSrc] = useTexture(
+    ['/stone-normal.jpg', '/stone-rough.jpg'],
+    (loaded) => {
+      const list = (Array.isArray(loaded) ? loaded : [loaded]) as Texture[]
+      for (const t of list) {
+        t.wrapS = RepeatWrapping
+        t.wrapT = RepeatWrapping
+        t.anisotropy = maxAniso
+      }
+    },
+  ) as Texture[]
+
+  const normalMap = useMemo(
+    () => tileStone(normalSrc, width, height, maxAniso),
+    [normalSrc, width, height, maxAniso],
+  )
+  const roughMap = useMemo(
+    () => tileStone(roughSrc, width, height, maxAniso),
+    [roughSrc, width, height, maxAniso],
+  )
+  const normalScale = useMemo(() => new Vector2(0.85, 0.85), [])
 
   const mats = useRef<MeshStandardMaterial[]>([])
   const eased = useRef(0)
@@ -67,9 +89,9 @@ export function Monolith({
     const e = eased.current
     for (const m of mats.current) {
       if (!m) continue
-      m.emissiveIntensity = e * 0.14
-      m.roughness = 0.86 - e * 0.16
-      m.envMapIntensity = 0.35 + e * 0.25
+      m.emissiveIntensity = e * 0.045
+      m.roughness = 0.86 - e * 0.06
+      m.envMapIntensity = 0.35 + e * 0.1
     }
   })
 
@@ -84,7 +106,9 @@ export function Monolith({
       roughness={0.86}
       metalness={0}
       envMapIntensity={0.35}
-      roughnessMap={noTex ? null : map}
+      normalMap={noTex ? null : normalMap}
+      normalScale={normalScale}
+      roughnessMap={noTex ? null : roughMap}
       emissive={palette.sunColor}
       emissiveIntensity={0}
     />
