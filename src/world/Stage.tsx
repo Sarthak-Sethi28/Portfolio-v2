@@ -86,7 +86,9 @@ export function Stage() {
     if (sunRef.current) {
       sunRef.current.position.copy(palette.sunDirection).multiplyScalar(420)
       sunRef.current.color.copy(palette.sunColor)
-      sunRef.current.intensity = palette.keyIntensity
+      // The sun does not reach down here. Leaving it on put warm highlights
+      // on submerged stone, which is the one thing water cannot do.
+      sunRef.current.intensity = flags.under ? 0 : palette.keyIntensity
     }
   })
 
@@ -118,7 +120,12 @@ export function Stage() {
       <Environment
         files="/sky/dusk.jpg"
         background={false}
-        environmentIntensity={envIntensity}
+        // Underwater the sky's contribution is almost nothing. Leaving the
+        // dusk environment at full strength was lighting submerged stone
+        // sunset-orange, which is the single most wrong thing about the first
+        // pass: water absorbs red within the first few metres, so nothing down
+        // there can be warm.
+        environmentIntensity={flags.under ? envIntensity * 0.06 : envIntensity}
       />
 
       <Sky palette={palette} anim={animRef} />
@@ -133,7 +140,7 @@ export function Stage() {
         args={[
           flags.under ? '#5c86a0' : palette.ambient,
           flags.under ? '#030a14' : palette.waterTint,
-          palette.ambientIntensity * (flags.under ? 2.2 : 0.45),
+          palette.ambientIntensity * (flags.under ? 7 : 0.45),
         ]}
       />
       {/*
@@ -142,6 +149,11 @@ export function Stage() {
         over 1600 units every shadow would be a blurry smear, and tight to the
         piers they are crisp where anyone is looking.
       */}
+      {/* Filtered daylight from above: cold, weak, straight down. */}
+      {flags.under && (
+        <directionalLight position={[10, 400, 40]} intensity={3.2} color="#6fb4cf" />
+      )}
+
       <directionalLight
         ref={sunRef}
         castShadow
