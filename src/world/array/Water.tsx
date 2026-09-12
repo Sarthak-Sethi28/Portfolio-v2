@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { MeshReflectorMaterial, useTexture } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { MirroredRepeatWrapping, Vector2, type Texture } from 'three'
+import { RepeatWrapping, Vector2, type Texture } from 'three'
 import type { Palette } from '../atmosphere/palette'
 
 /**
@@ -17,9 +17,14 @@ import type { Palette } from '../atmosphere/palette'
  *
  * The field drifts continuously, so the surface is never the same twice.
  *
- * Mirrored wrapping, not repeat: mirroring is seamless by construction, which
- * matters because a visible tile grid over the plain was exactly the previous
- * failure.
+ * PLAIN repeat wrapping, not mirrored.
+ *
+ * Mirroring is seamless by construction, but it makes every tile a reflection
+ * of its neighbour — and that symmetry reads as a hard grid across the
+ * surface, kaleidoscoping about each boundary. The source is already made
+ * seamless by cross-fading opposite edges into each other
+ * (scripts/make-water-normal.mjs), so it can simply repeat, and a repeat has
+ * no symmetry for the eye to latch onto.
  */
 export function Water({
   palette,
@@ -38,16 +43,16 @@ export function Water({
 
   const base = useTexture('/water-normal.jpg', (t) => {
     const tex = (Array.isArray(t) ? t[0] : t) as Texture
-    tex.wrapS = MirroredRepeatWrapping
-    tex.wrapT = MirroredRepeatWrapping
+    tex.wrapS = RepeatWrapping
+    tex.wrapT = RepeatWrapping
     tex.anisotropy = maxAniso
   }) as Texture
 
   // Independent clones so each can carry its own tiling and drift.
   const coarse = useMemo(() => {
     const t = base.clone()
-    t.wrapS = t.wrapT = MirroredRepeatWrapping
-    t.repeat.set(34, 34)
+    t.wrapS = t.wrapT = RepeatWrapping
+    t.repeat.set(22, 22)
     t.anisotropy = maxAniso
     t.needsUpdate = true
     return t
