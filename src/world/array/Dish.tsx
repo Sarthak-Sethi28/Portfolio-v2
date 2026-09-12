@@ -20,10 +20,32 @@ import type { Palette } from '../atmosphere/palette'
  */
 export function Dish({
   palette,
-  position = [128, 0, -196],
-  radius = 30,
+  /*
+   * Close, and clear of everything.
+   *
+   * Two constraints pull against each other here. It must not be occluded —
+   * it was originally behind the right-hand pier, so the thing competing with
+   * it for attention was also the thing hiding it. But it also cannot retreat
+   * to the horizon, because this dish is the CONTACT form (spec 5a): the
+   * visitor approaches it, writes into the water, and it swings down to read
+   * the message and transmit. A destination has to be somewhere you can go.
+   *
+   * So: well right of the piers on open water, near enough to read as
+   * reachable, with nothing between it and the camera.
+   */
+  position = [138, 0, -262],
+  radius = 40,
   tilt = -0.5,
-  heading = 2.55,
+/*
+   * Turned to show its FACE.
+   *
+   * At 2.55 radians the dish was presenting its back — the truss and the
+   * underside — which is the least interesting side of the most distinctive
+   * object in the world. Turned toward the camera the concave reflector reads
+   * immediately, and it matters more than usual here because this dish is the
+   * contact form: the visitor has to recognise it as something aimed.
+   */
+  heading = -0.42,
   /** 0 to 1. Lights the struts and rim during a transmission. */
   transmit = 0,
 }: {

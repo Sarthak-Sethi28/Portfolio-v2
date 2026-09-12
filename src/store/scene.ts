@@ -30,7 +30,14 @@ export interface Config {
 
 export const CONFIG_DEFAULTS: Config = {
   arraySpacing: 46,
-  fieldDensity: 46,
+  // Far fewer.
+  //
+  // Procedural boxes cannot survive being looked at — the only things in this
+  // scene that read as real are real meshes and the arch, which is genuinely
+  // CONSTRUCTED rather than textured. A dozen distant silhouettes give the
+  // horizon depth; forty nearby ones advertise that most of the world is
+  // boxes. Fake and prominent is worse than sparse.
+  fieldDensity: 13,
   // Halved. Fog lifts every distant value toward one mid-grey, and a scene
   // with no dark values in it cannot look lit — the reference frames keep
   // deep blacks in the joints and under the arch.

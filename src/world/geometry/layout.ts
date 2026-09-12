@@ -118,8 +118,10 @@ export function sectionRing(count: number, radius: number): Placement[] {
     // Thick enough to read as monumental, short enough that the CAPITAL is
     // in frame — a column whose head is cropped loses the detail that makes
     // it a column rather than a post.
-    { a: -0.78, r: 1.5, h: 2.9, w: 1.6, tilt: 0.17 },
-    { a: 0.82, r: 1.55, h: 2.75, w: 1.5, tilt: -0.15 },
+    // Wider apart and smaller: the columns were crowding the aperture, and
+    // the thing they frame has to be able to breathe between them.
+    { a: -1.02, r: 1.95, h: 2.1, w: 1.6, tilt: 0.13 },
+    { a: 1.06, r: 2.0, h: 2.0, w: 1.5, tilt: -0.11 },
     // The tall tower, well back and clear.
     { a: -1.28, r: 3.0, h: 2.6, w: 0.72, tilt: 0.04 },
     // Mid right, further out still.
@@ -155,7 +157,7 @@ export function sectionRing(count: number, radius: number): Placement[] {
      * the low corner buried whatever the lean.
      */
     const lift = (Math.hypot(width, depth) / 2) * Math.abs(Math.sin(s.tilt))
-    const submerge = range(rng, height * 0.05, height * 0.12) + lift
+    const submerge = range(rng, height * 0.03, height * 0.08) + lift
     return {
       submerge,
       position: [Math.sin(s.a) * r, height / 2 - submerge, Math.cos(s.a) * r * -1] as [
@@ -222,21 +224,53 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
       angle += Math.sign(dev || 1) * (CLEAR - Math.abs(dev))
     }
     // sqrt keeps the scatter area-uniform instead of clustering at the centre.
-    const r = innerRadius * 1.7 + Math.sqrt(rng()) * innerRadius * 11
+    /*
+     * Pushed much further out.
+     *
+     * The scattered ruins were close enough to compete with the piers and the
+     * arch for the eye. Held back near the horizon they do what distant
+     * architecture should — give the world depth and a sense that it
+     * continues — without asking to be looked at.
+     */
+    const r = innerRadius * 9 + Math.sqrt(rng()) * innerRadius * 20
     // Distant slabs read as taller because fog eats their base.
-    const height = range(rng, 16, 52) * (1 + r / 520)
+    const height = range(rng, 22, 68) * (1 + r / 900)
     const width = range(rng, 10, 26)
     const stepped = rng() < 0.5
-    const submerge = range(rng, height * 0.04, height * 0.16)
+    const depth = range(rng, 9, 20)
+
+    /*
+     * These are FALLING, not standing.
+     *
+     * A lean of three degrees reads as a surveying error. What says a city
+     * went under is a skyline where things are going over — some barely off
+     * plumb, some halfway to the water — so the lean is drawn from a wide
+     * range and a few are pushed hard. Nothing here is load-bearing in the
+     * composition, so they can be as dramatic as the eye will accept.
+     */
+    /*
+     * Restrained lean.
+     *
+     * These were pushed to forty degrees to read as collapsing. At close range
+     * a flat box tipped that far does not read as a falling building — it
+     * reads as a flat box that has been tipped, because a real collapse has a
+     * broken top and rubble and these have neither. Held far back as fog
+     * silhouettes, a slight lean is all that is needed and all that survives.
+     */
+    const scatterTilt = sign(rng) * range(rng, 0.02, 0.13)
+
+    // Tilting about the centre lifts one corner clear of the water, so the
+    // harder it leans the deeper it has to sit.
+    const tiltLift = (Math.hypot(width, depth) / 2) * Math.abs(Math.sin(scatterTilt))
+    const submerge = range(rng, height * 0.1, height * 0.23) + tiltLift
     out.push({
       submerge,
       position: [Math.cos(angle) * r, height / 2 - submerge, Math.sin(angle) * r],
       rotationY: range(rng, 0, Math.PI * 2),
-      // Scattered piers lean too, by smaller and unrelated amounts.
-      tilt: range(rng, -0.055, 0.055),
+      tilt: scatterTilt,
       height,
       width,
-      depth: range(rng, 9, 20),
+      depth,
       shoulder: stepped
         ? {
             height: range(rng, 0.35, 0.7),
