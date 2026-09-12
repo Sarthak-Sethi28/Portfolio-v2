@@ -146,7 +146,7 @@ const fragment = /* glsl */ `
     // than wherever the plate put it.
     float band = exp(-pow(dot(dir, normalize(vec3(0.35, 0.62, 0.70))) * 3.1, 2.0));
     float dust = fbm(vec2(az * 2.4, h * 5.0) * 2.0);
-    col += vec3(0.52, 0.55, 0.72) * band * dust * 0.34 * uNight;
+    col += vec3(0.58, 0.60, 0.80) * band * dust * 0.62 * uNight;
 
     // --- sun, composited last so it always sits with the key light ---------
     float cosSun = dot(dir, normalize(uSunDir));

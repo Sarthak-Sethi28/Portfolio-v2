@@ -61,18 +61,31 @@ export const DAY: Palette = {
 
 export const NIGHT: Palette = {
   skyZenith: new Color('#02040b'),
-  skyHorizon: new Color('#16273f'),
+  skyHorizon: new Color('#0a1524'),
   sunColor: new Color('#9fb6d8'),
-  // The "sun" at night is the moon, low and opposite the day sun.
-  sunDirection: new Vector3(-0.45, 0.22, 0.86).normalize(),
-  sunIntensity: 0.35,
-  keyIntensity: 0.14,
-  fog: new Color('#0e1c2e'),
+  /*
+   * The moon sits HIGH and near the view axis.
+   *
+   * Low and centred it landed at exactly the height of the name, so the title
+   * ran straight through it — the disc appeared to be resting on the K.
+   * Raised, it frames in the upper half of the ring's opening, above the type,
+   * which is a better composition than the accident was.
+   */
+  sunDirection: new Vector3(0.05, 0.46, -0.89).normalize(),
+  // Moonlight is DIM but HARD.
+  //
+  // Night was built by turning the day lights down, which is the wrong model
+  // — it gives a uniformly murky frame rather than a dark one. Real night is
+  // extreme contrast: a single cold key that rims an edge, and genuine black
+  // behind it. So the key stays low but the FILL goes to almost nothing.
+  sunIntensity: 1.6,
+  keyIntensity: 0.5,
+  fog: new Color('#070e1a'),
   fogDensityScale: 1.35,
   monolith: new Color('#2b3138'),
-  waterTint: new Color('#26374d'),
-  ambient: new Color('#16304f'),
-  ambientIntensity: 0.14,
+  waterTint: new Color('#0a1220'),
+  ambient: new Color('#0b1a2e'),
+  ambientIntensity: 0.03,
 }
 
 /** Linear blend between the two palettes. `t` of 0 is day, 1 is night. */
