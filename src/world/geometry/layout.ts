@@ -32,6 +32,17 @@ export interface Placement {
     side: -1 | 1
   }
   /**
+   * How far the pier sits BELOW the waterline, in world units.
+   *
+   * With reflections gone there is nothing anchoring a pier to the surface, so
+   * a base resting exactly at water level reads as an object placed on top of
+   * the water rather than standing in it. Sinking each one — by a different
+   * amount, since a flooded ruin does not settle evenly — puts the waterline
+   * partway up the shaft, and a surface that cuts ACROSS a solid is the cue
+   * that sells submersion.
+   */
+  submerge: number
+  /**
    * Architectural detail.
    *
    * A rectangular prism reads as a primitive no matter how it is textured.
@@ -98,8 +109,10 @@ export function sectionRing(count: number, radius: number): Placement[] {
     // Roughly two in three carry a step. Uniformly notched reads as a pattern;
     // never notched reads as a box.
     const stepped = rng() < 0.66
+    const submerge = range(rng, height * 0.05, height * 0.13)
     return {
-      position: [Math.sin(s.a) * r, height / 2, Math.cos(s.a) * r * -1] as [
+      submerge,
+      position: [Math.sin(s.a) * r, height / 2 - submerge, Math.cos(s.a) * r * -1] as [
         number,
         number,
         number,
@@ -166,8 +179,10 @@ export function scatterField(count: number, innerRadius: number): Placement[] {
     const height = range(rng, 16, 52) * (1 + r / 520)
     const width = range(rng, 10, 26)
     const stepped = rng() < 0.5
+    const submerge = range(rng, height * 0.04, height * 0.16)
     out.push({
-      position: [Math.cos(angle) * r, height / 2, Math.sin(angle) * r],
+      submerge,
+      position: [Math.cos(angle) * r, height / 2 - submerge, Math.sin(angle) * r],
       rotationY: range(rng, 0, Math.PI * 2),
       height,
       width,
@@ -218,6 +233,7 @@ export function colonnade(
       out.push({
         position: [0, height / 2, -(pairs + 1) * spacing],
         rotationY: 0,
+        submerge: 0,
         height,
         width,
         depth: width,
@@ -231,6 +247,7 @@ export function colonnade(
     out.push({
       position: [side * halfWidth, height / 2, -(row + 1) * spacing],
       rotationY: side * range(rng, 0.02, 0.07),
+      submerge: 0,
       height,
       width,
       depth: width,
