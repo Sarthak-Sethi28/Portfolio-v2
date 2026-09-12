@@ -9,6 +9,7 @@ import { useScene } from '@/store/scene'
 import { scatterField, sectionRing } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
 import { Monolith } from './Monolith'
+import { Pier } from './Pier'
 import { Dish } from './Dish'
 import { Aperture } from './Aperture'
 import { Figure } from './Figure'
@@ -92,7 +93,7 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
       {sections.map((placement, i) => {
         const id = SECTIONS[i]
         return (
-          <Monolith
+          <Pier
             key={id}
             placement={placement}
             palette={palette}
@@ -100,7 +101,6 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
             onPointerOver={() => setHovered(id)}
             onPointerOut={() => setHovered(null)}
             onClick={() => openSectionPanel(id)}
-            detailed
             stoneNormal={stoneNormal}
             stoneRough={stoneRough}
           />
