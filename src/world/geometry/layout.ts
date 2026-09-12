@@ -97,8 +97,14 @@ export function sectionRing(count: number, radius: number): Placement[] {
     // The pair that flanks the aperture, set at its depth so the three read as
     // one group. They lean AWAY from each other: leaning inward would close
     // the composition around the ring and crowd the thing it frames.
-    { a: -0.52, r: 2.75, h: 2.15, w: 2.4, tilt: -0.15 },
-    { a: 0.56, r: 2.85, h: 2.0, w: 2.3, tilt: 0.135 },
+    // Close, huge, and steeply tilted INWARD so they funnel the eye to the
+    // ring. Positive tilt leans a shaft's top toward -X, so the left pier
+    // takes a negative tilt to lean right and the right pier a positive one.
+    // They are meant to run off the bottom of frame — a mass that leaves the
+    // frame reads as too big to contain, which upright mid-distance piers
+    // never do however tall they are.
+    { a: -0.86, r: 1.65, h: 2.5, w: 2.4, tilt: -0.34 },
+    { a: 0.90, r: 1.70, h: 2.4, w: 2.3, tilt: 0.30 },
     // The tall tower, well back and clear.
     { a: -1.28, r: 3.0, h: 2.6, w: 0.72, tilt: 0.04 },
     // Mid right, further out still.
@@ -123,7 +129,18 @@ export function sectionRing(count: number, radius: number): Placement[] {
     // Roughly two in three carry a step. Uniformly notched reads as a pattern;
     // never notched reads as a box.
     const stepped = rng() < 0.66
-    const submerge = range(rng, height * 0.05, height * 0.13)
+    const depth = range(rng, 13, 19)
+    /*
+     * Tilting lifts a corner out of the water.
+     *
+     * A pier rotates about its own centre, so a lean of t radians raises the
+     * rising corner by roughly half the footprint diagonal times sin(t) — and
+     * on a steeply tilted mass that is enough to leave it hanging above the
+     * surface with daylight underneath. Sinking it by that much again keeps
+     * the low corner buried whatever the lean.
+     */
+    const lift = (Math.hypot(width, depth) / 2) * Math.abs(Math.sin(s.tilt))
+    const submerge = range(rng, height * 0.05, height * 0.12) + lift
     return {
       submerge,
       position: [Math.sin(s.a) * r, height / 2 - submerge, Math.cos(s.a) * r * -1] as [
@@ -135,7 +152,7 @@ export function sectionRing(count: number, radius: number): Placement[] {
       tilt: s.tilt,
       height,
       width,
-      depth: range(rng, 13, 19),
+      depth,
       shoulder: stepped
         ? {
             height: range(rng, 0.42, 0.68),
