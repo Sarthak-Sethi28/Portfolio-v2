@@ -37,7 +37,6 @@ export function Aperture({
   /** 0 to 1 while the visitor holds to enter. */
   charge?: number
 }) {
-  const glow = useRef<Mesh>(null)
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
 
   /*
@@ -80,7 +79,19 @@ export function Aperture({
 
   // Strong relief. On a megalithic block the erosion is centimetres deep, and
   // a timid normal map is indistinguishable from none.
-  const normalScale = useMemo(() => new Vector2(1.8, 1.8), [])
+  /*
+   * Gentle. This was the checkerboard.
+   *
+   * At 1.8, paired with a repeat of 0.11 that puts one tile every nine world
+   * units, each voussoir received a single huge low-frequency lump of the
+   * normal map — and a hemisphere light is driven by nothing but normal.y, so
+   * those lumps swung entire blocks between full sky colour and full ground
+   * colour. The blue-and-black alternation everyone kept reading as a broken
+   * texture WAS the normal map, amplified past what the geometry could carry.
+   * Tamed, it does what a normal map is for: roughening the surface, not
+   * relighting it.
+   */
+  const normalScale = useMemo(() => new Vector2(0.45, 0.45), [])
 
   /** Wedge blocks around the outer ring. */
   // FEWER, BIGGER blocks.
@@ -94,8 +105,20 @@ export function Aperture({
 
   const voussoirs = useMemo(() => {
     const step = (Math.PI * 2) / VOUSSOIRS
-    // The joint. Wide enough to throw a real shadow line between stones.
-    const joint = step * 0.16
+    /*
+     * A JOINT, not a gap.
+     *
+     * This was 16% of each block's arc, with another 3% of shrink on top —
+     * nearly a fifth of the ring was empty air. Brightened up, the arch read
+     * as a sawblade: nineteen separate wedges floating at arm's length from
+     * one another, which is the opposite of what a voussoir arch is. The
+     * blocks in a real arch TOUCH; the whole structure stands because each
+     * stone presses on its neighbours, and the mortar line between them is a
+     * couple of percent of the stone, not a fifth of it.
+     *
+     * Thin enough to be a shadow line, thick enough to be seen.
+     */
+    const joint = step * 0.02
     const innerR = radius - blockThickness / 2
     const outerR = radius + blockThickness / 2
     /*
@@ -125,10 +148,21 @@ export function Aperture({
       const outer = outerR * range(rng, 0.995, 1.008)
       const inner = innerR * range(rng, 0.994, 1.006)
       const d = blockDepth * range(rng, 0.94, 1.1)
-      const shrink = range(rng, 0.97, 1.0)
+      // Was 0.97, which reopened as much of a gap as the joint itself.
+      const shrink = range(rng, 0.995, 1.0)
       return {
         geo: voussoirGeometry(inner, outer, i * step + joint / 2, (step - joint) * shrink, d),
-        tint: range(rng, -0.1, 0.08),
+        /*
+         * Barely any variation at all.
+         *
+         * At ±0.1 the blocks read as a blue-and-black checkerboard rather than
+         * as one carved ring: lit from a single hard angle, a lightness
+         * difference that looks subtle in a material preview becomes the most
+         * obvious thing in the frame, because the eye reads a repeating
+         * light/dark alternation as a broken texture long before it reads it
+         * as quarry variation. Real ashlar varies far less than intuition says.
+         */
+        tint: range(rng, -0.025, 0.02),
       }
     })
   }, [radius, blockThickness, blockDepth])
@@ -169,14 +203,6 @@ export function Aperture({
       }),
     [radius, blockThickness, blockDepth],
   )
-
-  useFrame(({ clock }) => {
-    const mat = glow.current?.material as { opacity: number } | undefined
-    if (!mat) return
-    const t = clock.elapsedTime
-    const pulse = 0.5 + 0.5 * Math.sin(t * (0.45 + charge * 6))
-    mat.opacity = MathUtils.lerp(mat.opacity, 0.03 + pulse * 0.035 + charge * 0.5, 0.08)
-  })
 
   const stoneProps = {
     color: palette.monolith,
@@ -232,18 +258,16 @@ export function Aperture({
         none. Deeper submersion says the same thing without adding geometry.
       */}
 
-      {/* The membrane, set deep in the bore. */}
-      <mesh castShadow receiveShadow ref={glow} position={[0, 0, -blockDepth * 2.6]}>
-        <circleGeometry args={[radius * 0.36, 72]} />
-        <meshBasicMaterial
-          color={palette.sunColor}
-          transparent
-          opacity={0.04}
-          toneMapped={false}
-          depthWrite={false}
-          side={DoubleSide}
-        />
-      </mesh>
+      {/*
+        NO MEMBRANE.
+
+        A translucent disc sat deep in the bore, pulsing, meant to read as the
+        gate holding something back. In daylight it was invisible; at night it
+        turned into a flat olive dome plugging the opening — the single most
+        artificial object in the frame, and it killed the one thing the arch
+        is for, which is that you can see THROUGH it. The charge animation will
+        have to announce itself with light on the stone rather than with a lid.
+      */}
 
       {/*
         NO BUTTRESSES.
