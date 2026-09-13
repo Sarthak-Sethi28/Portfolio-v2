@@ -47,12 +47,28 @@ import { useScene } from '@/store/scene'
 export function Aperture({
   palette,
   stone,
+  rough,
   radius = 60,
   charge = 0,
 }: {
   palette: Palette
   /** Shared limestone normal map, loaded once by ArrayWorld. */
   stone?: Texture
+  /**
+   * The matching roughness map, used here as BOTH roughness and a faint
+   * albedo mottle.
+   *
+   * The normal map alone was doing nothing visible on the block faces, and
+   * the reason is lighting: this composition is backlit, so the fronts of the
+   * voussoirs are lit almost entirely by a smooth environment, and a smooth
+   * environment barely changes as the normal is perturbed. Varying the
+   * SURFACE RESPONSE works where varying the normal does not — mottled
+   * roughness breaks up the specular, and the same greyscale multiplied into
+   * the base colour gives the stone the blotching that every real limestone
+   * face has. It is checked greyscale (135/133/132), so it is safe in the
+   * green channel that roughnessMap actually reads.
+   */
+  rough?: Texture
   /**
    * Default 60, not 42.
    *
@@ -88,10 +104,13 @@ export function Aperture({
     () => ({
       rOut: R,
       rIn: R * 0.70,
-      depth: R * 0.26,
+      depth: R * 0.34,
       // The machine beneath, slightly smaller so the stone covers it at rest.
       coreOut: R * 0.985,
-      coreIn: R * 0.685,
+      // Never narrower than the stone's opening: at 0.685 the machine's inner
+      // band protruded past the intrados and was visible as a gold hoop inside
+      // the arch before anything had happened.
+      coreIn: R * 0.705,
     }),
     [R],
   )
@@ -114,15 +133,42 @@ export function Aperture({
      * the shape's span, not by taste: at repeat 2 it tiled eighty times across
      * a single block and vanished into noise.
      */
-    t.repeat.set(0.11, 0.11)
+    /*
+     * Finer than the 0.11 the blocks inherited.
+     *
+     * That put one tile every nine world units, which on a ring of radius 60
+     * meant roughly two tiles across an entire voussoir — far too coarse to be
+     * surface, so the stone rendered as smooth clay. Erosion on a block this
+     * size is a centimetres-deep texture, and it has to tile at that scale or
+     * it may as well not be there.
+     */
+    t.repeat.set(0.34, 0.34)
     t.anisotropy = maxAniso
     t.needsUpdate = true
     return t
   }, [stone, maxAniso])
 
-  // Enough to roughen the surface, not enough to relight it. At 1.8 the map's
-  // low-frequency lumps swung whole blocks between sky and ground colour.
-  const normalScale = useMemo(() => new Vector2(0.5, 0.5), [])
+  const roughMap = useMemo(() => {
+    if (!rough) return null
+    const t = rough.clone()
+    t.wrapS = t.wrapT = RepeatWrapping
+    t.repeat.set(0.26, 0.26)
+    t.anisotropy = maxAniso
+    t.needsUpdate = true
+    return t
+  }, [rough, maxAniso])
+
+  /*
+   * Stronger than before, and now safe to be.
+   *
+   * This was pinned at 0.45 after a bug where the map's huge low-frequency
+   * lumps swung whole blocks between sky and ground colour. That was a
+   * symptom of the coarse tiling above, not of the strength — at a proper
+   * repeat the map is surface detail rather than a per-block gradient, so it
+   * can be pushed to where weathered stone actually lives. A timid normal map
+   * is indistinguishable from none.
+   */
+  const normalScale = useMemo(() => new Vector2(1.0, 1.0), [])
 
   /* ------------------------------------------------------------------ *
    * THE VOUSSOIRS — large, unequal, deeply jointed
@@ -147,30 +193,67 @@ export function Aperture({
      * the structure stands because each stone presses on its neighbours, and
      * the mortar line is a couple of percent of the stone, not a fifth of it.
      */
-    const joint = 0.022
+    const joint = 0.03
     const rng = createRng(0x7c31a9)
     const out: {
       geo: ReturnType<typeof arcPlate>
       mid: number
       tint: number
+      hue: number
+      z: number
       lift: number
     }[] = []
     let a = -Math.PI / 2
     for (let i = 0; i < BLOCKS; i++) {
       const sweep = (Math.PI * 2 * W[i]) / total
       const span = sweep * (1 - joint)
-      // Radii barely move: an arch only holds together if its stones share a
-      // circle. The variation goes into depth, which reads as different hands
-      // cutting without disturbing the geometry that matters.
-      const d = L.depth * range(rng, 0.9, 1.12)
+
+      /*
+       * INTRADOS TRUE, EXTRADOS ROUGH. This is the whole thing.
+       *
+       * Every block shared one inner and one outer radius, so the ring came
+       * out as a mathematically perfect annulus with hairline joints — a
+       * washer turned on a lathe, which is exactly what it looked like. Real
+       * voussoirs are dressed precisely on the face that forms the opening,
+       * because that face IS the arch and it has to be a true circle, and left
+       * rough on the back where nobody was going to look. So the inner radius
+       * is identical for all eighteen and the OUTER one varies by several
+       * percent, which gives the silhouette the ragged step that says quarried.
+       *
+       * An earlier version varied both and the ring visibly came apart at the
+       * waterline. Varying only the extrados gets the roughness for free
+       * without ever disturbing the geometry that holds the arch together.
+       */
+      const outer = L.rOut * range(rng, 0.9, 1.06)
+      // Each stone also sits at its own depth, so the front face is not one
+      // flat plane. Relief between neighbours is most of what reads as
+      // masonry at distance — far more than any texture on the surface.
+      const d = L.depth * range(rng, 0.82, 1.22)
+
       out.push({
-        geo: arcPlate(L.rIn, L.rOut, a + sweep * joint * 0.5, span, d, 0.05),
+        geo: arcPlate(
+          L.rIn,
+          outer,
+          a + sweep * joint * 0.5,
+          span,
+          d,
+          // A generous chamfer. The dark line down every arris is the joint;
+          // at 0.05 the blocks met with no shadow between them at all.
+          0.1,
+        ),
         mid: a + sweep / 2,
-        // Real ashlar varies far less than intuition says; at +/-0.1 this read
-        // as a checkerboard rather than as one ring.
-        tint: range(rng, -0.03, 0.025),
-        // How far this block travels when the gate opens. Uneven on purpose —
-        // a mechanism that moves in perfect lockstep looks like a screensaver.
+        z: range(rng, -0.07, 0.07) * L.depth,
+        /*
+         * Real variation, not a hint of it.
+         *
+         * These were +/-0.03 and the ring read as one moulded object. That
+         * number came from a bad diagnosis: the blocks once looked like a
+         * checkerboard and the tint got blamed, when the actual cause was a
+         * normal map at 1.8 swinging whole faces between sky and ground. With
+         * that fixed, the stone can vary the way a quarry actually varies.
+         */
+        tint: range(rng, -0.075, 0.06),
+        hue: range(rng, -0.018, 0.018),
         lift: range(rng, 0.65, 1.35),
       })
       a += sweep
@@ -248,17 +331,16 @@ export function Aperture({
         new Vector3(0, 0, L.depth * 0.16),
       ),
     )
-    for (const b of blocks) {
-      if (rng() > 0.38) continue
-      const mid = (L.rIn + L.rOut) / 2
-      parts.push(
-        placed(
-          chamferBox((L.rOut - L.rIn) * 0.7, R * 0.026, L.depth * 0.3, R * 0.006),
-          new Vector3(Math.cos(b.mid) * mid, Math.sin(b.mid) * mid, L.depth * 0.52),
-          b.mid,
-        ),
-      )
-    }
+    /*
+     * NO TRIM ON THE BLOCKS.
+     *
+     * Short gold bars were set into a third of the voussoirs and they read as
+     * slots milled into rock — a machined detail on the face of something that
+     * is supposed to look like it predates machining, which gave the whole
+     * arrival away. The only metal visible at rest is the bead at the lip, and
+     * even that is tarnished. Everything else is inside, and stays inside
+     * until the thing opens.
+     */
     return merge(parts)
   }, [L, R, blocks])
 
@@ -301,7 +383,7 @@ export function Aperture({
        * stays a circle. The small retreat in Z is what makes the gold behind
        * them visible rather than merely edge-lit.
        */
-      g.position.set(Math.cos(b.mid) * d, Math.sin(b.mid) * d, -d * 0.35)
+      g.position.set(Math.cos(b.mid) * d, Math.sin(b.mid) * d, b.z - d * 0.35)
     }
 
     const breath = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 0.6)
@@ -412,8 +494,21 @@ export function Aperture({
         <group key={i} ref={setBlock(i)}>
           <mesh castShadow receiveShadow geometry={b.geo}>
             <meshStandardMaterial
-              color={limestone.clone().offsetHSL(0, 0, b.tint)}
-              roughness={0.93}
+              color={limestone.clone().offsetHSL(b.hue, 0, b.tint)}
+              /*
+               * Roughness only — NOT albedo.
+               *
+               * The same greyscale was briefly used as the colour map too, and
+               * it tiled into a visible square grid across every block while
+               * halving the stone's brightness. An albedo map advertises its
+               * repeat far more loudly than a roughness map does, because the
+               * eye reads lightness pattern directly and specular response
+               * only indirectly. Mottled roughness gives the surface variation
+               * that survives this backlit environment, without printing a
+               * chequerboard on the masonry.
+               */
+              roughnessMap={roughMap}
+              roughness={0.95}
               metalness={0}
               envMapIntensity={0.5}
               normalMap={stoneMap}
@@ -428,12 +523,29 @@ export function Aperture({
         <meshStandardMaterial
           color={GOLD}
           metalness={0.9}
-          roughness={0.33}
-          envMapIntensity={6}
+          /*
+           * Dull bronze until it wakes.
+           *
+           * At envMapIntensity 6 this bead was mirroring the whole dusk sky
+           * and came out as a neon orange hoop in the middle of an otherwise
+           * ancient object — the one detail that made the arrival look like a
+           * toy. Tarnished metal in a ruin is nearly matte; the shine is
+           * something the portal gets back when it turns on.
+           */
+          /*
+           * Properly tarnished at rest.
+           *
+           * Even at roughness 0.62 this bead caught a hot specular off the low
+           * sun and bloomed into a thin red-orange filament running round the
+           * opening — a glowing thread in an object that is meant to be inert,
+           * and the last thing in the resting shot that gave away the machine.
+           * Metal that has sat in salt air for centuries is nearly matte. The
+           * polish is something the portal gets back when it wakes.
+           */
+          envMapIntensity={0.45 + nightLevel * 5.5}
+          roughness={0.88 - nightLevel * 0.55}
           emissive={GOLD}
-          // Dull metal at rest. A gold ring already glowing in the first shot
-          // gives away that there is a machine here before anything has woken.
-          emissiveIntensity={0.04 + nightLevel * 0.5}
+          emissiveIntensity={0.02 + nightLevel * 0.5}
         />
       </mesh>
 
@@ -449,12 +561,20 @@ export function Aperture({
       {/* ---- Scree ---- */}
       <mesh castShadow receiveShadow geometry={scree}>
         <meshStandardMaterial
-          color={limestone.clone().multiplyScalar(0.72)}
+          color={limestone.clone().multiplyScalar(0.78)}
+          /*
+           * No normal map on the scree.
+           *
+           * An icosahedron's UVs are per-face, not world-projected, so the
+           * limestone map stretched across each facet into long parallel
+           * streaks — the rocks came out looking like split driftwood. The
+           * faceting itself is the detail here; these are meant to read as
+           * fractured blocks, and fractured blocks are flat planes meeting at
+           * hard angles.
+           */
           roughness={0.97}
           metalness={0}
           envMapIntensity={0.45}
-          normalMap={stoneMap}
-          normalScale={normalScale}
         />
       </mesh>
 
