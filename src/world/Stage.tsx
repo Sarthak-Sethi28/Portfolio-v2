@@ -149,6 +149,35 @@ export function Stage() {
         ]}
       />
       {/*
+        The galaxy underfoot is a LIGHT, and it lights from below.
+
+        With the sky emptied and the stars moved into the water, the brightest
+        thing in the world is the ground — so this is a hemisphere light turned
+        upside down: black overhead, starlight beneath. It rakes the undersides
+        of the ring and the columns, which is the one direction nothing is ever
+        lit from, and that wrongness is the whole point of the arrival. It is
+        also the honest fix for "the ring is too dark": the ring was a pure
+        silhouette because the only thing that could have lit it had been
+        deleted from the sky, and the answer is to light it from the thing that
+        replaced it rather than to quietly put the sky back.
+
+        Scaled by the blend, so it arrives exactly as the stars do.
+      */}
+      <hemisphereLight args={['#000000', '#7fa8ff', nightLevel * 2.1]} />
+      {/*
+        A floor under the blacks, purely to stop the ring reading as a fault.
+
+        Lit from below alone, the voussoirs came out a blue-and-black
+        checkerboard: each block is set at its own slight angle, and against a
+        single hard source from one direction that tiny difference flips a face
+        between fully lit and fully unlit. The result looked like a broken
+        texture rather than like stone. A weak omnidirectional fill compresses
+        the gap between neighbouring blocks so the ring reads as one carved
+        object, without putting any actual light back in the sky.
+      */}
+      <ambientLight color="#31527e" intensity={nightLevel * 0.7} />
+
+      {/*
         The sun casts now. A shadow map covers a fixed volume, so the frustum
         is sized to the composition rather than to the whole world — spread
         over 1600 units every shadow would be a blurry smear, and tight to the

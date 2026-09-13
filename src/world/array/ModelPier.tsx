@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import { Box3, Color, Plane, Vector3, type Mesh, type MeshStandardMaterial } from 'three'
 import type { Placement } from '../geometry/layout'
@@ -13,6 +14,28 @@ import type { Placement } from '../geometry/layout'
  * arbitrary scale — so the only reliable way to fit one into a world is to
  * read its bounding box and normalise against the height we actually want.
  */
+/**
+ * Clone a mesh's material(s), keeping the ARRAY-ness of the original.
+ *
+ * This mattered more than it looks. Wrapping a single material in an array
+ * and assigning it back does not render at all: three draws array materials
+ * by walking `geometry.groups`, and a glTF primitive has none, so the mesh
+ * silently produces zero draw calls. The night columns were not dark — they
+ * were not being drawn, and every attempt to fix it by raising the glow was
+ * chasing the wrong number.
+ */
+function recolor(mesh: Mesh, edit: (m: MeshStandardMaterial) => void) {
+  const was = mesh.material
+  const list = (Array.isArray(was) ? was : [was]) as MeshStandardMaterial[]
+  const next = list.map((mat) => {
+    const copy = mat.clone()
+    edit(copy)
+    copy.needsUpdate = true
+    return copy
+  })
+  mesh.material = (Array.isArray(was) ? next : next[0]) as unknown as Mesh['material']
+}
+
 export function ModelPier({
   placement,
   variant = 0,
@@ -60,8 +83,20 @@ export function ModelPier({
   const { scene } = useGLTF(src)
   const { position, rotationY, tilt, height, submerge } = placement
 
-  const cloned = useMemo(() => {
+  /*
+   * Whether this pier lights up at all — NOT how brightly.
+   *
+   * The clone below is keyed on this boolean rather than on `glow` itself.
+   * `glow` is the night level, which the frame loop moves in small steps, so
+   * keying the memo on it re-cloned the whole GLB about fifty times over a
+   * single transition. The brightness is animated on the materials instead,
+   * which is what materials are for.
+   */
+  const lit = glow > 0
+
+  const { cloned, litMaterials } = useMemo(() => {
     const c = scene.clone(true)
+    const litMaterials: MeshStandardMaterial[] = []
 
     // Clip whatever the mirror pushes above the waterline. Only ever applied
     // to CLONED materials, never to the shared originals — doing that once
@@ -91,18 +126,13 @@ export function ModelPier({
 
       if (mirrored) {
         const mesh = o as unknown as Mesh
-        const src = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as
-          MeshStandardMaterial[]
-        mesh.material = src.map((mat) => {
-          const copy = mat.clone()
+        recolor(mesh, (copy) => {
           // An image in water: darker, cooler, and never casting anything.
           copy.color?.multiplyScalar(0.42)
           copy.color?.lerp(new Color('#22394f'), 0.45)
           if ('envMapIntensity' in copy) copy.envMapIntensity = 0.15
           copy.clippingPlanes = clip
-          copy.needsUpdate = true
-          return copy
-        }) as unknown as Mesh['material']
+        })
         mesh.castShadow = false
         mesh.receiveShadow = false
         return
@@ -111,24 +141,65 @@ export function ModelPier({
       m.castShadow = true
       m.receiveShadow = true
 
-      if (glow > 0) {
-        const mesh = o as unknown as Mesh
-        const src = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as
-          MeshStandardMaterial[]
-        mesh.material = src.map((mat) => {
-          const copy = mat.clone()
-          copy.emissive = new Color('#ffb877')
-          // Strong. These are the only warm light in the arrival, and against
-          // an emptied sky and a galaxy underfoot they have to carry the frame
-          // — at 0.55 the columns disappeared entirely.
-          copy.emissiveIntensity = glow * 2.6
-          copy.needsUpdate = true
-          return copy
-        }) as unknown as Mesh['material']
+      if (lit) {
+        recolor(o as unknown as Mesh, (copy) => {
+          /*
+           * Darker stone, and a cooler flame inside it.
+           *
+           * The first lit pass came out terracotta — the asset's albedo is
+           * already a warm sandstone, and lighting it with #ffb877 stacked
+           * warm on warm until the columns read as orange plastic against a
+           * blue world. Knocking the base colour down and pulling the
+           * emissive back toward a dim ember keeps them the warm point in the
+           * frame without making them the loudest thing in it. Stone lit from
+           * inside should look like stone with a fire in it, not like a lamp.
+           */
+          copy.color?.multiplyScalar(0.5)
+          /*
+           * Desaturated, not just dimmed.
+           *
+           * Darkening alone kept the hue, so the columns went from orange
+           * plastic to rusted iron — still the most saturated thing in a
+           * frame whose entire palette is blue. The asset's albedo is already
+           * warm sandstone, so the emissive has to be nearly neutral or it
+           * stacks warm on warm. A pale amber reads as stone with light
+           * behind it; a strong one reads as terracotta.
+           */
+          copy.emissive = new Color('#c8a887')
+          /*
+           * Masked by the stone's own texture, not painted flat over it.
+           *
+           * A uniform emissive ignores lighting completely, so the first
+           * version that actually rendered turned each column into a solid
+           * orange cutout — every trace of the muqarnas carving gone, which
+           * is the entire reason for choosing this asset. Reusing the albedo
+           * as the emissive mask means the light comes through where the
+           * stone is pale and stays out of the cut recesses, so the carving
+           * reads BECAUSE it is glowing rather than in spite of it.
+           */
+          copy.emissiveMap = copy.map
+          // Brightness is animated below, not baked here.
+          copy.emissiveIntensity = 0
+          litMaterials.push(copy)
+        })
       }
     })
-    return c
-  }, [scene, mirrored, glow])
+    return { cloned: c, litMaterials }
+  }, [scene, mirrored, lit])
+
+  /*
+   * Fade the lanterns up with the night.
+   *
+   * Enough to read as lit stone, not enough to blow out the carving. The
+   * number that works is far lower than the ones tried before, because the
+   * columns were never under-lit — the array-material bug above meant they
+   * were not drawn at all, and each failed pass answered that by pushing the
+   * intensity higher. Past about 1.2 the stone flattens into a glowing blob
+   * and the muqarnas detail, which is the entire reason for this asset, goes.
+   */
+  useFrame(() => {
+    for (const m of litMaterials) m.emissiveIntensity = glow * 0.5
+  })
 
   // Measure, then fit: read the real bounding box and normalise to the height
   // this placement asks for.
@@ -141,6 +212,24 @@ export function ModelPier({
 
   return (
     <group position={position} rotation={[0, rotationY, tilt]}>
+      {/*
+        A source inside the stone, not just a surface that is bright.
+        
+        Emissive alone cannot light anything around it — the column would glow
+        while the water at its foot stayed black, which reads as a decal laid
+        over the scene. A real point light in the shaft throws the falloff
+        down onto the surface and picks out the columns' near faces, so they
+        occupy the place rather than float on it.
+      */}
+      {lit && (
+        <pointLight
+          position={[0, height * 0.1, 0]}
+          color="#d8b089"
+          intensity={glow * height * height * 0.42}
+          distance={height * 4}
+          decay={2}
+        />
+      )}
       {/*
         Sunk further than a procedural pier needs to be.
 
