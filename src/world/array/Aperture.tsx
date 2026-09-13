@@ -109,10 +109,23 @@ export function Aperture({
      */
     const rng = createRng(0x2b17f3)
     return Array.from({ length: VOUSSOIRS }, (_, i) => {
-      const outer = outerR * range(rng, 0.965, 1.035)
-      const inner = innerR * range(rng, 0.97, 1.02)
-      const d = blockDepth * range(rng, 0.88, 1.14)
-      const shrink = range(rng, 0.94, 1.0)
+      /*
+       * Variation, but not enough to break the arc.
+       *
+       * At +/-3.5% on the radius and +/-14% on the depth, each stone sat at a
+       * visibly different distance from the centre — the outer edge went
+       * ragged and, where the waterline cuts them, the lower blocks read as
+       * scattered rubble rather than as an arch. An arch only holds together
+       * if its stones share a circle.
+       *
+       * So the RADII barely move, which is what preserves the ring, and the
+       * variation goes into depth and arc share, which reads as stones cut by
+       * different hands without disturbing the geometry that matters.
+       */
+      const outer = outerR * range(rng, 0.995, 1.008)
+      const inner = innerR * range(rng, 0.994, 1.006)
+      const d = blockDepth * range(rng, 0.94, 1.1)
+      const shrink = range(rng, 0.97, 1.0)
       return {
         geo: voussoirGeometry(inner, outer, i * step + joint / 2, (step - joint) * shrink, d),
         tint: range(rng, -0.1, 0.08),

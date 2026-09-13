@@ -73,7 +73,13 @@ export function SceneCanvas() {
       // clay: a real object's most recognisable property is that it casts a
       // shadow. PCF soft, because hard-edged shadow maps look worse than none.
       shadows="soft"
-      gl={{ antialias: true, powerPreference: 'high-performance', alpha: false }}
+      gl={{
+        antialias: true,
+        powerPreference: 'high-performance',
+        alpha: false,
+        // Required by the reflection's waterline clip. See array/Mirror.tsx.
+        localClippingEnabled: true,
+      }}
       camera={{ fov: 50, near: 0.35, far: 6000, position: [0, 9, 128] }}
       style={{ position: 'absolute', inset: 0 }}
     >

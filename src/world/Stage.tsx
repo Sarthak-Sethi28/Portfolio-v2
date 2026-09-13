@@ -176,7 +176,7 @@ export function Stage() {
           <>
             {/* Drawn first, so the surface composites over it. */}
             <Mirror>
-              <ArrayWorld palette={palette} />
+              <ArrayWorld palette={palette} mirrored />
             </Mirror>
 
             <Water

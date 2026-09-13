@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
-import { Box3, Vector3 } from 'three'
+import { Box3, Color, Plane, Vector3, type Mesh, type MeshStandardMaterial } from 'three'
 import type { Placement } from '../geometry/layout'
 
 /**
@@ -17,10 +17,24 @@ export function ModelPier({
   placement,
   variant = 0,
   src = '/models/pillar.glb',
+  mirrored = false,
 }: {
   placement: Placement
   /** Which asset to use. See the note in ArrayWorld on mixing them. */
   src?: string
+  /**
+   * Render as a REFLECTION rather than as the object.
+   *
+   * The mirrored copy previously reused this component as-is, which meant it
+   * shared material instances with the real world — so anything done to the
+   * reflection's materials happened to the originals too. A clipping plane
+   * tried that way deleted the entire city.
+   *
+   * With this set, the clone gets its OWN materials: darker, blue-shifted,
+   * and clipped at the waterline. A reflection is an image of a thing, not a
+   * second copy of it, and it has to be treated as one.
+   */
+  mirrored?: boolean
   /**
    * Which part of the asset to show.
    *
@@ -38,6 +52,11 @@ export function ModelPier({
 
   const cloned = useMemo(() => {
     const c = scene.clone(true)
+
+    // Clip whatever the mirror pushes above the waterline. Only ever applied
+    // to CLONED materials, never to the shared originals — doing that once
+    // deleted the entire city.
+    const clip = mirrored ? [new Plane(new Vector3(0, -1, 0), 0)] : null
     /*
      * Strip the scan's display plinth.
      *
@@ -59,11 +78,31 @@ export function ModelPier({
         m.visible = false
         return
       }
+
+      if (mirrored) {
+        const mesh = o as unknown as Mesh
+        const src = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as
+          MeshStandardMaterial[]
+        mesh.material = src.map((mat) => {
+          const copy = mat.clone()
+          // An image in water: darker, cooler, and never casting anything.
+          copy.color?.multiplyScalar(0.42)
+          copy.color?.lerp(new Color('#22394f'), 0.45)
+          if ('envMapIntensity' in copy) copy.envMapIntensity = 0.15
+          copy.clippingPlanes = clip
+          copy.needsUpdate = true
+          return copy
+        }) as unknown as Mesh['material']
+        mesh.castShadow = false
+        mesh.receiveShadow = false
+        return
+      }
+
       m.castShadow = true
       m.receiveShadow = true
     })
     return c
-  }, [scene])
+  }, [scene, mirrored])
 
   // Measure, then fit: read the real bounding box and normalise to the height
   // this placement asks for.
