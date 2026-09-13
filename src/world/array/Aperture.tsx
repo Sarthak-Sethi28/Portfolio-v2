@@ -319,22 +319,28 @@ export function Aperture({
      * structure. A support with a gap between it and the thing it supports is
      * scenery.
      */
-    const OUT = R * 0.78
+    const OUT = R * 0.68
     for (const side of [-1, 1]) {
-      const h = R * 0.7
-      const body = wedge(R * 0.3, R * 0.56, h, R * 0.46, R * 0.014)
+      /*
+       * Tall enough to REACH the ring, wide enough to look like it is taking
+       * the load. The previous mass stopped short and read as a block parked
+       * near the arch; this one runs from well under the waterline up into the
+       * armour band, so the ring lands ON it.
+       */
+      const h = R * 0.65
+      const body = wedge(R * 0.42, R * 0.75, h, R * 0.5, R * 0.014)
       parts.push(
         // Splayed: wide at the base, leaning its foot outward, so the mass
         // spreads into the water instead of balancing on it.
-        placed(body, new Vector3(side * OUT, -R * 1.05, -R * 0.02), side * 0.22),
+        placed(body, new Vector3(side * OUT, -R * 1.35, -R * 0.02), side * 0.22),
       )
       // Vertical gold stripes down the face, as in the reference — kept high
       // on the mass so they stay clear of the waterline.
       for (const k of [-1, 1]) {
         golds.push(
           placed(
-            chamferBox(R * 0.03, h * 0.42, R * 0.03, R * 0.008),
-            new Vector3(side * OUT + k * R * 0.11, -R * 1.05 + h * 0.72, R * 0.22),
+            chamferBox(R * 0.032, h * 0.46, R * 0.032, R * 0.008),
+            new Vector3(side * OUT + k * R * 0.14, -R * 1.35 + h * 0.62, R * 0.24),
             side * 0.22,
           ),
         )
@@ -380,11 +386,20 @@ export function Aperture({
 
   return (
     /*
-     * Roughly a third of the machine is under the water — drowned to about the
-     * springing, so it reads as something that stood while the water rose
-     * rather than as something resting on the surface.
+     * It STANDS on its feet.
+     *
+     * At 0.72R the bottom third of the machine was below the surface, and the
+     * buttresses were drowned with it — so however heavy they were built, you
+     * could not see the ring meeting them, and the whole assembly read as an
+     * arch sunk in water rather than as a structure that was installed here.
+     * A support only does its job visually if you can watch the load arrive.
+     *
+     * Lifted to 1.05R, the lower arc clears the surface and lands on the
+     * masses at either corner, which are now tall enough to come up and take
+     * it. The water still cuts the feet, which is the detail that says the sea
+     * rose around this thing rather than that it was built floating.
      */
-    <group position={[0, R * 0.72, -150]}>
+    <group position={[0, R * 1.05, -150]}>
       {/* ---- L1: outer armour ---- */}
       <mesh castShadow receiveShadow geometry={outer.plates}>
         <meshStandardMaterial
