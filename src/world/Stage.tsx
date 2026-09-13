@@ -14,7 +14,6 @@ import { Birds } from './atmosphere/Birds'
 import { Water } from './array/Water'
 import { ArrayWorld } from './array/ArrayWorld'
 import { UnderWorld } from './under/UnderWorld'
-import { Mirror } from './array/Mirror'
 import { IdleRig } from './camera/IdleRig'
 import { createAnim, type Anim } from './anim'
 import { FlickerProbe } from './FlickerProbe'
@@ -174,10 +173,17 @@ export function Stage() {
           <UnderWorld palette={palette} />
         ) : (
           <>
-            {/* Drawn first, so the surface composites over it. */}
-            <Mirror>
-              <ArrayWorld palette={palette} />
-            </Mirror>
+            {/*
+              No reflection on main.
+
+              The mirrored copy shares material instances with the real world
+              here, so it cannot be clipped at the waterline — each column's
+              submerged portion inverted UPWARD and poked through the surface
+              as a dark shelf at its base. The fix requires the mirror to own
+              its materials, which is being built on the reflection-experiment
+              branch. Until that lands, an absent reflection beats a visible
+              artefact on every pier.
+            */}
 
             <Water
               palette={palette}
