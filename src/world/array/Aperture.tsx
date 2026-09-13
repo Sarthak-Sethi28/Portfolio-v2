@@ -1,28 +1,50 @@
 'use client'
 
-import { useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { DoubleSide, MathUtils, RepeatWrapping, Vector2, type Mesh, type Texture } from 'three'
+import {
+  BackSide,
+  Color,
+  Matrix4,
+  MathUtils,
+  Quaternion,
+  RepeatWrapping,
+  Vector2,
+  Vector3,
+  type InstancedMesh,
+  type MeshStandardMaterial,
+  type Texture,
+} from 'three'
 import type { Palette } from '../atmosphere/palette'
-import { voussoir as voussoirGeometry } from '../geometry/arch'
+import { arcPlate, chamferBox, merge, placed, wedge } from '../geometry/ring'
 import { createRng, range } from '@/lib/rng'
 
 /**
- * The aperture — the threshold to World 2.
+ * THE APERTURE — the threshold to World 2.
  *
- * Built as a real arch, because the previous torus read as a hoop: something
- * bent, not something constructed. What makes masonry legible is seeing HOW it
- * was assembled, so this is built the way an arch actually is:
+ * A monumental engineered machine standing in the water, not a carved arch.
+ * It is built as three CONCENTRIC STRUCTURAL LAYERS, each at its own depth in
+ * Z, with recessed channels between them:
  *
- *  - VOUSSOIRS. A ring of wedge-shaped blocks, each cut to the arc, with a
- *    gap of shadow at every joint. The joints are the detail — a smooth ring
- *    of stone reads as poured, a jointed one as quarried and set.
- *  - CONCENTRIC ORDERS. Inside the outer ring, narrower rings step BACK into
- *    the opening, so the bore has depth and reads as a passage rather than a
- *    hole. This is where the machined character lives: the inner orders are
- *    finer, tighter and darker than the stone around them.
- *  - PLINTHS. Stepped masonry carrying it into the water, so it stands rather
- *    than balances.
+ *   L1  OUTER ARMOUR    segmented plates, the heaviest mass, furthest forward
+ *   --  channel         a deep recess; the shadow line is the detail
+ *   L2  MECHANICAL      set back, crossed by clamps bridging L1 to L3
+ *   --  channel
+ *   L3  INNER FRAME     clean, proud again, carrying the energy channel
+ *
+ * That stack is the whole design. The depth has to be real — layers at
+ * different Z casting into each other's recesses — because the alternative,
+ * a ring with detail applied to its face, reads as a prop the instant the
+ * light moves. This world is lit from BELOW at night, so anything that
+ * depends on a frontal key is worthless here.
+ *
+ * Order of operations, deliberately: large forms first, medium mechanical
+ * detail second, indicator lights last and tiny. Roughly 70% graphite, 20%
+ * muted gold, 8% red emissive, 2% green.
+ *
+ * PERFORMANCE. Every repeated element is built once and merged into a single
+ * buffer per material, and the indicators are instanced — about a dozen draw
+ * calls for the whole assembly rather than one per plate.
  */
 export function Aperture({
   palette,
@@ -38,249 +60,564 @@ export function Aperture({
   charge?: number
 }) {
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
+  const R = radius
 
   /*
-   * The orders need their OWN tiling.
+   * LAYER RADII.
    *
-   * A torus carries 0-1 UVs wrapped around and through it, whereas
-   * ExtrudeGeometry writes world coordinates. One texture instance cannot
-   * serve both — at the blocks' repeat the rings came out glass-smooth, which
-   * is why the bore still looked moulded after the voussoirs stopped.
+   * The brief asked for a band of 14-18% of the radius, which on its own would
+   * have produced a hoop — the reference's structure is a little over 40% of
+   * its outer radius. Read as 14-18% PER LAYER the two agree exactly, so that
+   * is what this is: three bands of roughly 15/15/11%, leaving the opening at
+   * 54% of the outer radius, which measures the reference almost dead on.
    */
-  const ringMap = useMemo(() => {
-    if (!stone) return null
-    const t = stone.clone()
-    t.wrapS = t.wrapT = RepeatWrapping
-    // Many times around the ring, a few times through its section.
-    t.repeat.set(26, 3)
-    t.anisotropy = maxAniso
-    t.needsUpdate = true
-    return t
-  }, [stone, maxAniso])
-
-  const map = useMemo(() => {
-    if (!stone) return null
-    const t = stone.clone()
-    t.wrapS = t.wrapT = RepeatWrapping
-    /*
-     * ExtrudeGeometry writes UVs in WORLD coordinates.
-     *
-     * The shape spans about 84 units across, so a repeat of 2 tiled the stone
-     * roughly eighty times over each block — compressed into invisible noise,
-     * which is why the arch read as smooth grey plastic however good the
-     * texture was. A repeat near 1/9 puts one tile every nine world units,
-     * which is the scale a hand-sized rock face actually is.
-     */
-    t.repeat.set(0.11, 0.11)
-    t.anisotropy = maxAniso
-    t.needsUpdate = true
-    return t
-  }, [stone, maxAniso])
-
-  // Strong relief. On a megalithic block the erosion is centimetres deep, and
-  // a timid normal map is indistinguishable from none.
-  /*
-   * Gentle. This was the checkerboard.
-   *
-   * At 1.8, paired with a repeat of 0.11 that puts one tile every nine world
-   * units, each voussoir received a single huge low-frequency lump of the
-   * normal map — and a hemisphere light is driven by nothing but normal.y, so
-   * those lumps swung entire blocks between full sky colour and full ground
-   * colour. The blue-and-black alternation everyone kept reading as a broken
-   * texture WAS the normal map, amplified past what the geometry could carry.
-   * Tamed, it does what a normal map is for: roughening the surface, not
-   * relighting it.
-   */
-  const normalScale = useMemo(() => new Vector2(0.45, 0.45), [])
-
-  /** Wedge blocks around the outer ring. */
-  // FEWER, BIGGER blocks.
-  //
-  // 26 thin wedges read as gear teeth, not as masonry. A real arch of this
-  // span is built from a modest number of very large stones, and it is their
-  // SIZE — and the black joint beside each one — that says quarried and set.
-  const VOUSSOIRS = 19
-  const blockDepth = radius * 0.34
-  const blockThickness = radius * 0.42
-
-  const voussoirs = useMemo(() => {
-    const step = (Math.PI * 2) / VOUSSOIRS
-    /*
-     * A JOINT, not a gap.
-     *
-     * This was 16% of each block's arc, with another 3% of shrink on top —
-     * nearly a fifth of the ring was empty air. Brightened up, the arch read
-     * as a sawblade: nineteen separate wedges floating at arm's length from
-     * one another, which is the opposite of what a voussoir arch is. The
-     * blocks in a real arch TOUCH; the whole structure stands because each
-     * stone presses on its neighbours, and the mortar line between them is a
-     * couple of percent of the stone, not a fifth of it.
-     *
-     * Thin enough to be a shadow line, thick enough to be seen.
-     */
-    const joint = step * 0.02
-    const innerR = radius - blockThickness / 2
-    const outerR = radius + blockThickness / 2
-    /*
-     * No two stones alike.
-     *
-     * Identical wedges are what made this read as a moulding rather than as
-     * masonry. Each block now takes its own radial thickness, its own depth
-     * and a slightly different share of the arc, seeded per index so the ring
-     * is stable across reloads — a real arch is cut from stones that were
-     * never quite the same size.
-     */
-    const rng = createRng(0x2b17f3)
-    return Array.from({ length: VOUSSOIRS }, (_, i) => {
-      /*
-       * Variation, but not enough to break the arc.
-       *
-       * At +/-3.5% on the radius and +/-14% on the depth, each stone sat at a
-       * visibly different distance from the centre — the outer edge went
-       * ragged and, where the waterline cuts them, the lower blocks read as
-       * scattered rubble rather than as an arch. An arch only holds together
-       * if its stones share a circle.
-       *
-       * So the RADII barely move, which is what preserves the ring, and the
-       * variation goes into depth and arc share, which reads as stones cut by
-       * different hands without disturbing the geometry that matters.
-       */
-      const outer = outerR * range(rng, 0.995, 1.008)
-      const inner = innerR * range(rng, 0.994, 1.006)
-      const d = blockDepth * range(rng, 0.94, 1.1)
-      // Was 0.97, which reopened as much of a gap as the joint itself.
-      const shrink = range(rng, 0.995, 1.0)
-      return {
-        geo: voussoirGeometry(inner, outer, i * step + joint / 2, (step - joint) * shrink, d),
-        /*
-         * Barely any variation at all.
-         *
-         * At ±0.1 the blocks read as a blue-and-black checkerboard rather than
-         * as one carved ring: lit from a single hard angle, a lightness
-         * difference that looks subtle in a material preview becomes the most
-         * obvious thing in the frame, because the eye reads a repeating
-         * light/dark alternation as a broken texture long before it reads it
-         * as quarry variation. Real ashlar varies far less than intuition says.
-         */
-        tint: range(rng, -0.025, 0.02),
-      }
-    })
-  }, [radius, blockThickness, blockDepth])
-
-  /**
-   * Concentric orders stepping back into the bore.
-   *
-   * Each is narrower and set further into the opening than the last, so the
-   * eye reads depth. The innermost are dark and fine — the mechanism.
-   */
-  const orders = useMemo(
-    () =>
-      /*
-       * Orders must recede, not stack.
-       *
-       * Evenly spaced and barely stepped back, these rendered as concentric
-       * circles seen flat on — a bullseye. Depth is the whole point: each
-       * order sits only slightly inside the last but MUCH further back, so
-       * from the front they overlap into a bore you look down rather than
-       * rings you look at.
-       */
-      /*
-       * Nine thin bands, not four thick ones.
-       *
-       * The reference's bore is threaded — a dense stack of fine concentric
-       * rings stepping back into the dark. Four heavy tori read as a few
-       * chunky hoops; many slender ones read as something MACHINED, which is
-       * the whole point of a stone shell with an engineered core.
-       */
-      Array.from({ length: 9 }, (_, i) => {
-        const t = (i + 1) / 9
-        return {
-          r: radius * (1 - t * 0.16),
-          tube: blockThickness * (0.12 - i * 0.007),
-          z: -blockDepth * (0.35 + i * 0.52),
-          machined: i >= 2,
-        }
-      }),
-    [radius, blockThickness, blockDepth],
+  const L = useMemo(
+    () => ({
+      r1o: R, r1i: R * 0.845,
+      r2o: R * 0.825, r2i: R * 0.675,
+      r3o: R * 0.655, r3i: R * 0.545,
+      // Centre-Z per layer. The differences ARE the recessed channels: L2 sits
+      // a seventh of the radius behind L1, so the gap between them is a real
+      // shadowed trench rather than a drawn line.
+      z1: R * 0.01, d1: R * 0.3,
+      z2: -R * 0.09, d2: R * 0.22,
+      z3: -R * 0.03, d3: R * 0.26,
+    }),
+    [R],
   )
 
-  const stoneProps = {
-    color: palette.monolith,
-    roughness: 0.92,
-    metalness: 0,
-    envMapIntensity: 0.35,
-    normalMap: map,
-    normalScale: normalScale,
-  }
+  const graphite = useMemo(
+    // Faintly tinted by the world palette so the machine still belongs to the
+    // same day and night as everything else, without giving up its own colour.
+    /*
+     * Lighter than true graphite, on purpose.
+     *
+     * #23262a is the correct colour for the material and came out as a black
+     * hole: at this metalness the surface has almost no diffuse response, and
+     * the only light in this world comes up off the water. The colour has to
+     * be lifted so that the little diffuse there is actually lands somewhere.
+     */
+    () => new Color('#31363c').lerp(palette.monolith, 0.12),
+    [palette.monolith],
+  )
 
-  /*
-   * Roughly a third of the arch is under the water.
-   *
-   * A sliver under the surface reads as a ring resting on it. Genuinely
-   * drowned — the springing of the arch at about the waterline — reads as
-   * something that has stood while the water rose, which is the story this
-   * world is telling. The opening still clears the surface, so you can see
-   * sky through it.
-   */
+  const armourMap = useMemo(() => {
+    if (!stone) return null
+    const t = stone.clone()
+    t.wrapS = t.wrapT = RepeatWrapping
+    // ExtrudeGeometry writes UVs in world coordinates, so this is one tile per
+    // ~7 units — the scale of rolled plate, not of rock.
+    t.repeat.set(0.14, 0.14)
+    t.anisotropy = maxAniso
+    t.needsUpdate = true
+    return t
+  }, [stone, maxAniso])
+
+  // Gentle: a normal map is here to break up the metal, not to relight it.
+  const normalScale = useMemo(() => new Vector2(0.35, 0.35), [])
+
+  /* ------------------------------------------------------------------ *
+   * L1 — OUTER STRUCTURAL RING
+   * ------------------------------------------------------------------ */
+  const outer = useMemo(() => {
+    /*
+     * Sixteen plates of DIFFERENT widths.
+     *
+     * Equal segments read as a machined cog — the eye picks up the period
+     * instantly and the object turns into a gear. Real armour is panelised
+     * around what is underneath it, so the widths vary. They are weights
+     * normalised to a full turn, which means the ring always closes exactly
+     * however the weights are edited.
+     */
+    const W = [1.25, 0.85, 1.0, 1.18, 0.8, 1.05, 1.3, 0.9, 1.0, 1.22, 0.85, 1.1, 0.95, 1.28, 0.9, 1.05]
+    const total = W.reduce((a, b) => a + b, 0)
+    // The seam. Deep and narrow: this is where the shadow between plates lives.
+    const seam = 0.016
+
+    const rng = createRng(0x5a17c2)
+    const plates: ReturnType<typeof placed>[] = []
+    const trims: ReturnType<typeof placed>[] = []
+
+    let a = 0
+    for (let i = 0; i < W.length; i++) {
+      const sweep = (Math.PI * 2 * W[i]) / total
+      const start = a + seam / 2
+      const span = sweep - seam
+      a += sweep
+
+      // Slight per-plate depth variation: plates sit fractionally proud of one
+      // another, so the ring's front face is not a single flat disc.
+      const d = L.d1 * range(rng, 0.94, 1.06)
+      plates.push(
+        placed(arcPlate(L.r1i, L.r1o, start, span, d, 0.06), new Vector3(0, 0, L.z1)),
+      )
+
+      /*
+       * Gold trim on SELECTED plates only.
+       *
+       * Trimming every plate would make the gold a stripe rather than an
+       * accent, and the reference is very disciplined about this — the metal
+       * marks particular structural members, so it reads as meaning something.
+       */
+      if (rng() < 0.42) {
+        const t = R * 0.012
+        trims.push(
+          placed(
+            arcPlate(L.r1o - t * 2.6, L.r1o - t * 0.6, start, span, d * 0.4, 0.12),
+            new Vector3(0, 0, L.z1 + d * 0.36),
+          ),
+        )
+      }
+      // A radial gold rib across a few plates, at the seam side.
+      if (rng() < 0.3) {
+        const mid = (L.r1i + L.r1o) / 2
+        const ang = start + span * 0.5
+        trims.push(
+          placed(
+            chamferBox((L.r1o - L.r1i) * 0.88, R * 0.022, d * 0.34, R * 0.006),
+            new Vector3(Math.cos(ang) * mid, Math.sin(ang) * mid, L.z1 + d * 0.33),
+            ang,
+          ),
+        )
+      }
+    }
+    return { plates: merge(plates), trims: merge(trims) }
+  }, [L, R])
+
+  /* ------------------------------------------------------------------ *
+   * L2 — MIDDLE MECHANICAL RING
+   * ------------------------------------------------------------------ */
+  const middle = useMemo(() => {
+    const rng = createRng(0x31d0a7)
+
+    // The recessed channel itself: one continuous annulus, set well back.
+    const channel = placed(
+      arcPlate(L.r2i, L.r2o, 0, Math.PI * 2, L.d2, 0.04, 96),
+      new Vector3(0, 0, L.z2),
+    )
+
+    /*
+     * CLAMPS — the bridge pieces.
+     *
+     * Each spans radially from the outer armour across the recessed channel to
+     * the inner frame, sitting proud of both. They are the elements that make
+     * the three layers read as ONE assembled machine instead of three rings
+     * that happen to share a centre, and they are where the reference puts its
+     * heaviest visual weight: the big members at nine, twelve and three.
+     */
+    const span = L.r1i - L.r3o
+    const mid = (L.r1i + L.r3o) / 2
+    const clamps: ReturnType<typeof placed>[] = []
+    const goldModules: ReturnType<typeof placed>[] = []
+    const greens: Matrix4[] = []
+    const reds: Matrix4[] = []
+
+    const majors = [Math.PI / 2, Math.PI, 0]
+    const minors = [0.62, 1.18, 2.05, 2.62, 3.72, 5.6]
+
+    const put = (ang: number, major: boolean) => {
+      const w = span * 1.16
+      const h = R * (major ? 0.13 : 0.075)
+      const d = R * (major ? 0.17 : 0.12)
+      const zc = L.z2 + L.d2 * 0.5 + d * 0.32
+      const pos = new Vector3(Math.cos(ang) * mid, Math.sin(ang) * mid, zc)
+      clamps.push(placed(chamferBox(w, h, d, R * 0.012), pos, ang))
+
+      // A gold module capping some clamps.
+      if (major || rng() < 0.5) {
+        goldModules.push(
+          placed(
+            chamferBox(w * 0.26, h * 0.82, d * 0.5, R * 0.008),
+            new Vector3(
+              Math.cos(ang) * (mid + span * 0.3),
+              Math.sin(ang) * (mid + span * 0.3),
+              zc + d * 0.4,
+            ),
+            ang,
+          ),
+        )
+      }
+
+      /*
+       * Indicators, LAST and tiny.
+       *
+       * Two percent of the object. They only ever sit on a clamp, because a
+       * light that is not attached to a mechanism is decoration — the moment
+       * they scatter over the plates the whole thing looks like a fairground
+       * ride rather than equipment.
+       */
+      const n = major ? 3 : 1
+      for (let k = 0; k < n; k++) {
+        const off = (k - (n - 1) / 2) * h * 0.42
+        const p = new Vector3(
+          Math.cos(ang) * (mid - span * 0.12) - Math.sin(ang) * off,
+          Math.sin(ang) * (mid - span * 0.12) + Math.cos(ang) * off,
+          zc + d * 0.52,
+        )
+        const m = new Matrix4().compose(
+          p,
+          new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), ang),
+          new Vector3(1, 1, 1),
+        )
+        if (major && k === 1 && rng() < 0.5) reds.push(m)
+        else greens.push(m)
+      }
+    }
+
+    majors.forEach((a) => put(a, true))
+    minors.forEach((a) => put(a, false))
+
+    return {
+      channel,
+      clamps: merge(clamps),
+      goldModules: merge(goldModules),
+      greens,
+      reds,
+    }
+  }, [L, R])
+
+  /* ------------------------------------------------------------------ *
+   * L3 — INNER FRAME, plus the parts that give the assembly a back
+   * ------------------------------------------------------------------ */
+  const inner = useMemo(() => {
+    const frame = placed(
+      arcPlate(L.r3i, L.r3o, 0, Math.PI * 2, L.d3, 0.05, 108),
+      new Vector3(0, 0, L.z3),
+    )
+
+    /*
+     * A solid disc behind everything.
+     *
+     * Without it the recessed channels are literal holes: you see the sky
+     * through the gaps between layers, and the whole illusion of depth
+     * collapses into a stencil. The backing is what turns a gap into a recess.
+     */
+    const backing = placed(
+      arcPlate(L.r3i, L.r1o * 0.995, 0, Math.PI * 2, R * 0.05, 0, 96),
+      new Vector3(0, 0, -R * 0.23),
+    )
+    return merge([frame, backing])
+  }, [L, R])
+
+  /* ------------------------------------------------------------------ *
+   * FEET — the ring has to look like it weighs something
+   * ------------------------------------------------------------------ */
+  const feet = useMemo(() => {
+    const parts: ReturnType<typeof placed>[] = []
+    const golds: ReturnType<typeof placed>[] = []
+    // Splayed out from about seven and five o'clock, down past the waterline.
+    for (const side of [-1, 1]) {
+      const h = R * 0.72
+      const body = wedge(R * 0.34, R * 0.62, h, R * 0.44, R * 0.014)
+      parts.push(
+        placed(body, new Vector3(side * R * 0.6, -R * 1.02, -R * 0.02), side * 0.16),
+      )
+      // Vertical gold stripes down the face, as in the reference.
+      for (const k of [-1, 1]) {
+        golds.push(
+          placed(
+            chamferBox(R * 0.03, h * 0.42, R * 0.03, R * 0.008),
+            new Vector3(
+              side * R * 0.6 + k * R * 0.13,
+              // Clear of the waterline. At 0.42 the stripes sat exactly on the
+              // surface, and each one met its own reflection to form a V —
+              // which looked like spikes welded to the base.
+              -R * 1.02 + h * 0.68,
+              R * 0.21,
+            ),
+            side * 0.16,
+          ),
+        )
+      }
+    }
+    return { body: merge(parts), stripes: merge(golds) }
+  }, [R])
+
+  /* ------------------------------------------------------------------ *
+   * Materials and the energy channel
+   * ------------------------------------------------------------------ */
+  const redRef = useRef<MeshStandardMaterial>(null)
+  useFrame(({ clock }) => {
+    const m = redRef.current
+    if (!m) return
+    // Alive, but barely — a slow breath, rising hard only under charge.
+    const breath = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 0.6)
+    m.emissiveIntensity = MathUtils.lerp(
+      m.emissiveIntensity,
+      2.0 + breath * 0.35 + charge * 4.5,
+      0.08,
+    )
+  })
+
+  const setGreens = useCallback(
+    (mesh: InstancedMesh | null) => {
+      if (!mesh) return
+      middle.greens.forEach((m, i) => mesh.setMatrixAt(i, m))
+      mesh.instanceMatrix.needsUpdate = true
+    },
+    [middle.greens],
+  )
+  const setReds = useCallback(
+    (mesh: InstancedMesh | null) => {
+      if (!mesh) return
+      middle.reds.forEach((m, i) => mesh.setMatrixAt(i, m))
+      mesh.instanceMatrix.needsUpdate = true
+    },
+    [middle.reds],
+  )
+
+  const GOLD = '#b98f3e'
+
   return (
-    <group position={[0, radius * 0.72, -150]}>
-      {/* Outer ring of voussoirs — true arc segments, not boxes. */}
-      {voussoirs.map((v, i) => (
-        <mesh castShadow receiveShadow key={i} geometry={v.geo}>
-          <meshStandardMaterial
-            {...stoneProps}
-            color={palette.monolith.clone().offsetHSL(0, 0, v.tint)}
-          />
-        </mesh>
+    /*
+     * Roughly a third of the machine is under the water — drowned to about the
+     * springing, so it reads as something that stood while the water rose
+     * rather than as something resting on the surface.
+     */
+    <group position={[0, R * 0.72, -150]}>
+      {/* ---- L1: outer armour ---- */}
+      <mesh castShadow receiveShadow geometry={outer.plates}>
+        <meshStandardMaterial
+          color={graphite}
+          metalness={0.72}
+          roughness={0.52}
+          /*
+           * Deliberately far above 1.
+           *
+           * envMapIntensity is a per-material multiplier on the environment,
+           * and the scene environment is dimmed to roughly a fifth at night to
+           * keep stone from glowing like a sunset. Metal has nothing BUT the
+           * environment, so the ring has to buy that back or it renders as a
+           * silhouette. This is the honest way to keep the material spec —
+           * metalness stays where a machined alloy belongs, and the thing it
+           * reflects is turned back up to where it can be seen.
+           */
+          envMapIntensity={5.5}
+          normalMap={armourMap}
+          normalScale={normalScale}
+        />
+      </mesh>
+      <mesh castShadow receiveShadow geometry={outer.trims}>
+        <meshStandardMaterial
+          color={GOLD}
+          metalness={0.9}
+          roughness={0.34}
+          envMapIntensity={6.5}
+          /*
+           * Gold has to carry a little of its own light.
+           *
+           * A near-metal surface has almost no diffuse term — everything it
+           * shows you is reflected — and this sky has been emptied, so there is
+           * next to nothing to reflect. Without this the trim reads as dark
+           * brown scratches. It is a floor, not a glow.
+           */
+          emissive={GOLD}
+          emissiveIntensity={0.42}
+        />
+      </mesh>
+
+      {/* ---- L2: the recessed channel and its mechanism ---- */}
+      <mesh receiveShadow geometry={middle.channel}>
+        <meshStandardMaterial
+          // Darker and rougher than the armour: it is in shadow by design, and
+          // the contrast with L1 is what sells the trench.
+          color={graphite.clone().multiplyScalar(0.62)}
+          metalness={0.7}
+          roughness={0.64}
+          envMapIntensity={3.4}
+        />
+      </mesh>
+      <mesh castShadow receiveShadow geometry={middle.clamps}>
+        <meshStandardMaterial
+          color={graphite}
+          metalness={0.8}
+          roughness={0.46}
+          envMapIntensity={5.8}
+        />
+      </mesh>
+      <mesh castShadow geometry={middle.goldModules}>
+        <meshStandardMaterial
+          color={GOLD}
+          metalness={0.9}
+          roughness={0.3}
+          envMapIntensity={6.5}
+          emissive={GOLD}
+          emissiveIntensity={0.45}
+        />
+      </mesh>
+
+      {/* ---- L3: inner frame (and the backing that makes recesses recesses) ---- */}
+      <mesh castShadow receiveShadow geometry={inner}>
+        <meshStandardMaterial
+          color={graphite}
+          metalness={0.78}
+          roughness={0.48}
+          envMapIntensity={5.8}
+        />
+      </mesh>
+
+      {/*
+        THE ENERGY CHANNEL.
+
+        Set at the inner lip and slightly behind the frame's front face, so the
+        frame shades it from directly ahead and you read a channel cut into the
+        machine rather than a neon hoop laid on top of it.
+      */}
+      <mesh position={[0, 0, L.z3 + L.d3 * 0.24]}>
+        <torusGeometry args={[L.r3i * 1.008, R * 0.016, 12, 160]} />
+        <meshStandardMaterial
+          ref={redRef}
+          color="#1a0503"
+          emissive="#ff2a12"
+          emissiveIntensity={2.0}
+          metalness={0}
+          roughness={0.4}
+        />
+      </mesh>
+      {/* A wider, much dimmer halo further back — the channel's spill on its
+          own housing, which is what stops it reading as a drawn line. */}
+      <mesh position={[0, 0, L.z3 - L.d3 * 0.1]}>
+        <torusGeometry args={[L.r3i * 1.02, R * 0.036, 8, 120]} />
+        <meshStandardMaterial
+          color="#120402"
+          emissive="#c01f0c"
+          emissiveIntensity={0.5}
+          metalness={0}
+          roughness={0.7}
+        />
+      </mesh>
+
+      {/*
+        Real red light, so the channel LIGHTS the metal around it.
+
+        Three is enough to wrap the inner frame and reach the water at the
+        bottom of the ring; more would cost far more than it shows.
+      */}
+      {[Math.PI / 2, Math.PI * 1.22, Math.PI * 1.78].map((a, i) => (
+        <pointLight
+          key={`rl-${i}`}
+          position={[Math.cos(a) * L.r3i * 0.92, Math.sin(a) * L.r3i * 0.92, R * 0.1]}
+          color="#ff3a18"
+          /*
+           * Physically-correct falloff means intensity is not a 0-1 dial.
+           *
+           * Lights obey inverse square here, so a value that looks large is
+           * ordinary once it has travelled twenty units to the metal. The
+           * first pass used a twentieth of this and delivered essentially
+           * nothing to the surfaces it was supposed to be lighting.
+           */
+          intensity={R * R * 0.4}
+          distance={R * 1.9}
+          decay={2}
+        />
       ))}
 
-      {/* Concentric orders receding into the opening. */}
-      {orders.map((o, i) => (
-        <mesh castShadow receiveShadow key={`ord-${i}`} position={[0, 0, o.z]}>
-          <torusGeometry args={[o.r, o.tube, o.machined ? 10 : 6, 88]} />
-          <meshStandardMaterial
-            color={palette.monolith}
-            roughness={o.machined ? 0.42 : 0.8}
-            metalness={o.machined ? 0.55 : 0}
-            envMapIntensity={o.machined ? 0.9 : 0.4}
-            normalMap={o.machined ? null : ringMap}
-            normalScale={normalScale}
-          />
-        </mesh>
+      {/*
+        THE MACHINE LIGHTS ITSELF.
+
+        Raising envMapIntensity was the first attempt and it failed, for a
+        reason worth writing down: a metal surface shows you reflections, and
+        this sky has been deliberately emptied, so multiplying almost nothing
+        by five and a half is still almost nothing. There is no light in this
+        world arriving at the front of the ring at all — everything comes up
+        off the water, behind and below.
+
+        So the ring carries its own working lights, which is what a structure
+        this size would actually have. Two cool sources set forward and to
+        either side, grazing the plates so the layers cast into each other's
+        recesses. Kept tight with `distance` so they light the machine and not
+        the sea around it, and cool so the gold still reads as the warm thing.
+      */}
+      {[-1, 1].map((side) => (
+        <pointLight
+          key={`fill-${side}`}
+          position={[side * R * 1.15, R * 0.5, R * 1.25]}
+          color="#a9c6e6"
+          /*
+           * Sized against the distance it has to cross, not by feel.
+           *
+           * These sit about seventy units from the far side of the ring, and
+           * inverse square turns that into a factor of five thousand. The
+           * first value delivered roughly a fifth of a unit of light to the
+           * plates it was aimed at, which is indistinguishable from off.
+           */
+          intensity={R * R * 3.2}
+          distance={R * 3.2}
+          decay={2}
+        />
       ))}
 
       {/*
-        No wet band.
+        One more, low and forward, for the feet and the springing.
 
-        A darker slab across the foot was meant to read as wet stone at the
-        waterline. On a flat face it worked; on a ring it reads as a separate
-        block floating under the arch, because it has edges where the ring has
-        none. Deeper submersion says the same thing without adding geometry.
+        The pair above are set high to rake the crown, which leaves the bottom
+        third of the machine — including the masses actually carrying it —
+        unlit. A structure reads as heavy only if you can see what it stands on.
       */}
+      <pointLight
+        position={[0, -R * 0.55, R * 1.4]}
+        color="#95b4d6"
+        intensity={R * R * 1.6}
+        distance={R * 2.8}
+        decay={2}
+      />
 
       {/*
-        NO MEMBRANE.
-
-        A translucent disc sat deep in the bore, pulsing, meant to read as the
-        gate holding something back. In daylight it was invisible; at night it
-        turned into a flat olive dome plugging the opening — the single most
-        artificial object in the frame, and it killed the one thing the arch
-        is for, which is that you can see THROUGH it. The charge animation will
-        have to announce itself with light on the stone rather than with a lid.
+        The bore. An open cylinder running back from the inner lip, seen from
+        inside, so the opening has DEPTH — you look down a throat rather than
+        through a hole punched in a disc. Left dark and empty.
       */}
+      <mesh position={[0, 0, -R * 0.16]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[L.r3i, L.r3i, R * 0.52, 96, 1, true]} />
+        <meshStandardMaterial
+          color="#0b0d0f"
+          side={BackSide}
+          metalness={0.5}
+          roughness={0.85}
+        />
+      </mesh>
 
-      {/*
-        NO BUTTRESSES.
+      {/* ---- Feet ---- */}
+      <mesh castShadow receiveShadow geometry={feet.body}>
+        <meshStandardMaterial
+          color={graphite.clone().multiplyScalar(0.88)}
+          metalness={0.74}
+          roughness={0.58}
+          envMapIntensity={4.6}
+          normalMap={armourMap}
+          normalScale={normalScale}
+        />
+      </mesh>
+      <mesh castShadow geometry={feet.stripes}>
+        <meshStandardMaterial
+          color={GOLD}
+          metalness={0.9}
+          roughness={0.36}
+          envMapIntensity={6.5}
+          emissive={GOLD}
+          emissiveIntensity={0.4}
+        />
+      </mesh>
 
-        Side supports were built and removed. Structurally they were the right
-        idea — an arch this size needs its thrust taken — but they read as
-        lumps stuck to the ring rather than as anything carrying it, and they
-        broke the one thing the ring has going for it: a clean circle against
-        the sky. The silhouette is the whole object here.
-
-        If the arch ever needs to look supported, the answer is foundations
-        UNDER it rather than masses beside it.
-      */}
+      {/* ---- Indicators: instanced, tiny, last ---- */}
+      <instancedMesh ref={setGreens} args={[undefined, undefined, middle.greens.length]}>
+        <boxGeometry args={[R * 0.012, R * 0.028, R * 0.012]} />
+        <meshStandardMaterial
+          color="#04160b"
+          emissive="#3cff88"
+          emissiveIntensity={3.2}
+          toneMapped={false}
+        />
+      </instancedMesh>
+      <instancedMesh ref={setReds} args={[undefined, undefined, middle.reds.length]}>
+        <boxGeometry args={[R * 0.012, R * 0.028, R * 0.012]} />
+        <meshStandardMaterial
+          color="#180303"
+          emissive="#ff4422"
+          emissiveIntensity={3.0}
+          toneMapped={false}
+        />
+      </instancedMesh>
     </group>
   )
 }
