@@ -14,7 +14,16 @@ import { useScene } from '@/store/scene'
 export function Title() {
   const open = useScene((s) => s.openSection ?? s.openProject)
   const noUi = useScene((s) => s.flags.noUi)
-  const letters = profile.name.toUpperCase().split('')
+  /*
+   * The arrival is titled PROJECTS, not the name.
+   *
+   * The front door announces who this is; the world through the gate
+   * announces what is IN it. Carrying the name through would say the visitor
+   * has changed setting, where the point is that they have arrived somewhere —
+   * and the same wide-tracked type on a different word is what tells them so.
+   */
+  const night = useScene((s) => s.night)
+  const letters = (night ? 'PROJECTS' : profile.name.toUpperCase()).split('')
 
   return (
     <div
