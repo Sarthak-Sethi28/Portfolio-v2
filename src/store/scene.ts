@@ -126,6 +126,8 @@ export const useScene = create<SceneState>((set) => ({
   quality: settingsFor('high'),
   reducedMotion: false,
   flags: {
+    ao: false,
+    noGate: false,
     still: false,
     noBloom: false,
     noMotes: false,

@@ -10,7 +10,7 @@ import { scatterField, sectionRing } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
 import { Pier } from './Pier'
 import { ModelPier } from './ModelPier'
-import { Aperture } from './Aperture'
+import { ModelAperture } from './ModelAperture'
 import { Figure } from './Figure'
 
 /**
@@ -54,6 +54,7 @@ export function ArrayWorld({
     },
   ) as Texture[]
 
+  const flags = useScene((s) => s.flags)
   const config = useScene((s) => s.config)
   const hovered = useScene((s) => s.hovered)
   const setHovered = useScene((s) => s.setHovered)
@@ -137,7 +138,7 @@ export function ArrayWorld({
         />
       ))}
 
-      <Aperture palette={palette} stone={stoneNormal} rough={stoneRough} />
+      {!flags.noGate && <ModelAperture />}
       {/* The telescope, well clear on the right and near enough to approach. */}
       {/*
         Left of the axis, not right.

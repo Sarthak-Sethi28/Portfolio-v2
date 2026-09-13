@@ -7,6 +7,8 @@
  * disables exactly one animated or post-processed subsystem, so whoever is in
  * front of the screen can bisect the cause in a couple of reloads.
  *
+ * ?ao        enable ambient occlusion (costs ~10ms — see Stage)
+ * ?nogate    omit the portal entirely (perf bisection)
  * ?still     freeze the camera completely
  * ?nobloom   disable bloom
  * ?nomotes   disable the drifting dust
@@ -15,6 +17,8 @@
  * ?plain     all of the above at once
  */
 export interface Flags {
+  ao: boolean
+  noGate: boolean
   still: boolean
   noBloom: boolean
   noMotes: boolean
@@ -39,6 +43,8 @@ export interface Flags {
 }
 
 const EMPTY: Flags = {
+  ao: false,
+  noGate: false,
   still: false,
   noBloom: false,
   noMotes: false,
@@ -59,6 +65,8 @@ export function readFlags(): Flags {
   const q = new URLSearchParams(window.location.search)
   const plain = q.has('plain')
   return {
+    ao: q.has('ao'),
+    noGate: q.has('nogate'),
     still: plain || q.has('still'),
     noBloom: plain || q.has('nobloom'),
     noMotes: plain || q.has('nomotes'),

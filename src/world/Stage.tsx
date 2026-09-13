@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Environment } from '@react-three/drei'
-import { EffectComposer, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { EffectComposer, N8AO, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { MathUtils, type DirectionalLight, type FogExp2 } from 'three'
 import { CONFIG_DEFAULTS, useScene, effectiveMoteCount } from '@/store/scene'
@@ -254,6 +254,32 @@ export function Stage() {
             Little is lost: the sun's disc, halo and wide glow are all drawn
             analytically in the sky shader, so the light still blooms. This
             only removed a pass that added a touch more on top. */}
+        {/*
+            AMBIENT OCCLUSION — OPT-IN, because it does not fit.
+
+            It is the right effect for this scene and the largest single reason
+            everything read as plastic: MeshStandardMaterial has no concept of
+            a surface being enclosed, so the joint between two blocks and the
+            gap where rubble meets rubble were lit exactly as brightly as a
+            face pointing at open sky. Contact shadow is most of what the eye
+            uses to decide whether it is looking at stone or at a render of it.
+
+            MEASURED: 16.6ms without, 26.4ms with — on a 16.6ms budget it
+            takes sixty percent of the frame and drops the scene from 60fps to
+            about 38. Tuning did nothing; halfRes and quality="performance"
+            came back at 26.4ms too, so the cost is the depth resolve rather
+            than the sampling, and there is no setting that buys it back.
+
+            This project has blown its frame budget three times on detail that
+            looked worth it, so the effect stays behind ?ao=1 rather than
+            being paid for by default. It also matters much less now that the
+            portal is an authored asset whose maps already carry their own
+            occlusion — the case for AO was strongest when every object in
+            frame was untextured procedural geometry.
+        */}
+        {flags.ao ? (
+          <N8AO aoRadius={2.4} intensity={2.2} distanceFalloff={1} quality="performance" halfRes />
+        ) : <></>}
         {flags.noSmaa ? <></> : <SMAA />}
         <Vignette offset={0.2} darkness={0.78} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
