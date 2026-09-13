@@ -118,3 +118,42 @@ export function voussoir(
   geo.translate(0, 0, -depth / 2)
   return geo
 }
+
+/**
+ * One row of feathers from a winged sun disc.
+ *
+ * Built as a real tapered shape rather than a box, because that is the whole
+ * difference between a wing and a plank. A rectangle repeated four times over
+ * reads as a propeller — the eye needs the section to narrow and the row to
+ * fall away toward the tip before it will accept the shape as something that
+ * could fly. Egyptian relief always carves it this way: deep at the shoulder,
+ * thin at the tip, each row raking further down than the one above it.
+ *
+ * Drawn pointing along +X from the origin at the disc; mirror it for the other
+ * side rather than building a second shape.
+ */
+export function featherRow(
+  len: number,
+  rootH: number,
+  tipH: number,
+  drop: number,
+  thickness: number,
+): ExtrudeGeometry {
+  const s = new Shape()
+  s.moveTo(0, rootH / 2)
+  s.lineTo(len, -drop + tipH / 2)
+  s.lineTo(len, -drop - tipH / 2)
+  s.lineTo(0, -rootH / 2)
+  s.closePath()
+
+  const geo = new ExtrudeGeometry(s, {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelThickness: thickness * 0.3,
+    bevelSize: thickness * 0.3,
+    bevelSegments: 1,
+    curveSegments: 1,
+  })
+  geo.translate(0, 0, -thickness / 2)
+  return geo
+}
