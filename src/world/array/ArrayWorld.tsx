@@ -32,7 +32,7 @@ import { Figure } from './Figure'
  */
 
 
-export function ArrayWorld({ palette }: { palette: Palette }) {
+export function ArrayWorld({ palette, mirrored = false }: { palette: Palette; mirrored?: boolean }) {
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
   const [stoneNormal, stoneRough] = useTexture(
     ['/stone-normal.jpg', '/stone-rough.jpg'],
@@ -97,7 +97,7 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
         // All four are the same order. A colonnade is one column repeated —
         // mixing traditions along a single line would read as an accident.
         const src = '/models/muqarnas.glb'
-        return <ModelPier key={id} placement={placement} variant={0} src={src} />
+        return <ModelPier key={id} placement={placement} variant={0} src={src} mirrored={mirrored} />
         return (
           <Pier
             key={id}
@@ -123,6 +123,7 @@ export function ArrayWorld({ palette }: { palette: Palette }) {
           key={`field-${i}`}
           placement={placement}
           variant={(i + 1) % 3}
+          mirrored={mirrored}
           // Alternating out to the horizon, so the distance is mixed too.
           src={i % 3 === 0 ? '/models/muqarnas.glb' : '/models/pillar.glb'}
         />

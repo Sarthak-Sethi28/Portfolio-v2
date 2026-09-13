@@ -114,7 +114,9 @@ interface SceneState {
 export const useScene = create<SceneState>((set) => ({
   phase: 'booting',
   world: 'array',
-  night: false,
+  // This worktree exists to develop the ARRIVAL, which is at night — so it
+  // opens there rather than needing a keypress. The main instance stays day.
+  night: true,
   rain: false,
   freelook: false,
   muted: true,
