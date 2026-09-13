@@ -305,27 +305,37 @@ export function Aperture({
   const feet = useMemo(() => {
     const parts: ReturnType<typeof placed>[] = []
     const golds: ReturnType<typeof placed>[] = []
-    // Splayed out from about seven and five o'clock, down past the waterline.
+    /*
+     * OUT TO THE SIDES, where a buttress belongs.
+     *
+     * They were at 0.6R, which put both masses under the middle of the ring —
+     * two slabs huddled at the bottom of the opening, propping up the part of
+     * the structure that needs it least. A buttress takes THRUST, and an arch
+     * throws its thrust outward and down, so the feet have to stand where that
+     * force lands: out at the flanks, meeting the ring's lower-outer edge.
+     *
+     * At 0.78R the top of each mass runs up into the outer armour band rather
+     * than stopping short of it, so the ring and its footing read as one
+     * structure. A support with a gap between it and the thing it supports is
+     * scenery.
+     */
+    const OUT = R * 0.78
     for (const side of [-1, 1]) {
-      const h = R * 0.72
-      const body = wedge(R * 0.34, R * 0.62, h, R * 0.44, R * 0.014)
+      const h = R * 0.7
+      const body = wedge(R * 0.3, R * 0.56, h, R * 0.46, R * 0.014)
       parts.push(
-        placed(body, new Vector3(side * R * 0.6, -R * 1.02, -R * 0.02), side * 0.16),
+        // Splayed: wide at the base, leaning its foot outward, so the mass
+        // spreads into the water instead of balancing on it.
+        placed(body, new Vector3(side * OUT, -R * 1.05, -R * 0.02), side * 0.22),
       )
-      // Vertical gold stripes down the face, as in the reference.
+      // Vertical gold stripes down the face, as in the reference — kept high
+      // on the mass so they stay clear of the waterline.
       for (const k of [-1, 1]) {
         golds.push(
           placed(
             chamferBox(R * 0.03, h * 0.42, R * 0.03, R * 0.008),
-            new Vector3(
-              side * R * 0.6 + k * R * 0.13,
-              // Clear of the waterline. At 0.42 the stripes sat exactly on the
-              // surface, and each one met its own reflection to form a V —
-              // which looked like spikes welded to the base.
-              -R * 1.02 + h * 0.68,
-              R * 0.21,
-            ),
-            side * 0.16,
+            new Vector3(side * OUT + k * R * 0.11, -R * 1.05 + h * 0.72, R * 0.22),
+            side * 0.22,
           ),
         )
       }
