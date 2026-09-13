@@ -28,8 +28,16 @@ import { useScene } from '@/store/scene'
  * waterline, and the plain opens out behind them instead of being a sliver at
  * the bottom of frame.
  */
-const REST = new Vector3(0, 34, 132)
-const TARGET = new Vector3(0, 30, -110)
+/*
+ * Near the surface.
+ *
+ * Reflections are strongest at GRAZING angles. From 34 units up you look INTO
+ * water and see almost nothing; from just above it you look OFF it and the
+ * columns become long vertical streaks — which is exactly how the reference
+ * frames get their power, and why their camera sits where it does.
+ */
+const REST = new Vector3(0, 9, 128)
+const TARGET = new Vector3(0, 26, -110)
 
 const POINTER_DEADZONE = 0.08
 const AIM_X = 1.1
