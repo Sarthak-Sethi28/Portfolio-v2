@@ -1,4 +1,13 @@
-import { Euler, ExtrudeGeometry, Matrix4, Quaternion, Shape, Vector3, type BufferGeometry } from 'three'
+import {
+  Euler,
+  ExtrudeGeometry,
+  IcosahedronGeometry,
+  Matrix4,
+  Quaternion,
+  Shape,
+  Vector3,
+  type BufferGeometry,
+} from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 /**
@@ -134,4 +143,43 @@ export function placed(
 /** Collapse many placed parts into one buffer, so they cost one draw call. */
 export function merge(list: BufferGeometry[]): BufferGeometry {
   return mergeGeometries(list, false)
+}
+
+/**
+ * A mound of rubble.
+ *
+ * The reference sets the ring in broken rock rather than on a cast plinth,
+ * and it matters more than it sounds: a clean trapezoid foot says the object
+ * was installed by someone with a crane, while a pile of fractured stone says
+ * the thing has been here long enough for the ground to fail around it. Faceted
+ * low-poly lumps at varied scales and rotations, merged to a single buffer.
+ */
+export function rubble(
+  count: number,
+  spread: number,
+  height: number,
+  size: number,
+  rand: () => number,
+): BufferGeometry {
+  const parts: BufferGeometry[] = []
+  for (let i = 0; i < count; i++) {
+    const t = i / count
+    // Big at the base, tapering upward — a heap settles that way.
+    const s = size * (1.15 - t * 0.55) * (0.6 + rand() * 0.8)
+    const g = new IcosahedronGeometry(s, 0)
+    g.scale(1 + rand() * 0.7, 0.55 + rand() * 0.5, 1 + rand() * 0.6)
+    const m = new Matrix4().compose(
+      new Vector3(
+        (rand() - 0.5) * spread * (1 - t * 0.45),
+        t * height + (rand() - 0.5) * size * 0.4,
+        (rand() - 0.5) * spread * 0.7,
+      ),
+      new Quaternion().setFromEuler(
+        new Euler(rand() * Math.PI, rand() * Math.PI, rand() * Math.PI),
+      ),
+      new Vector3(1, 1, 1),
+    )
+    parts.push(g.applyMatrix4(m))
+  }
+  return mergeGeometries(parts, false)
 }
