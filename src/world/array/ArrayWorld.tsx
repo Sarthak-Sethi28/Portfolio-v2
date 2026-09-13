@@ -137,7 +137,7 @@ export function ArrayWorld({
         />
       ))}
 
-      <Aperture palette={palette} stone={stoneNormal} />
+      <Aperture palette={palette} stone={stoneNormal} rough={stoneRough} />
       {/* The telescope, well clear on the right and near enough to approach. */}
       {/*
         Left of the axis, not right.
