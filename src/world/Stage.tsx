@@ -14,6 +14,7 @@ import { Birds } from './atmosphere/Birds'
 import { Water } from './array/Water'
 import { ArrayWorld } from './array/ArrayWorld'
 import { UnderWorld } from './under/UnderWorld'
+import { Mirror } from './array/Mirror'
 import { IdleRig } from './camera/IdleRig'
 import { createAnim, type Anim } from './anim'
 import { FlickerProbe } from './FlickerProbe'
@@ -173,6 +174,11 @@ export function Stage() {
           <UnderWorld palette={palette} />
         ) : (
           <>
+            {/* Drawn first, so the surface composites over it. */}
+            <Mirror>
+              <ArrayWorld palette={palette} />
+            </Mirror>
+
             <Water
               palette={palette}
               roughness={config.waterRoughness}
