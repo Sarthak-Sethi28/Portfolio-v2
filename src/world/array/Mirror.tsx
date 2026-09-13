@@ -22,6 +22,16 @@ import { type ReactNode } from 'react'
  *
  *  - It sits BELOW the water plane, which is semi-transparent, so what you see
  *    is the reflection through the surface rather than beside it.
+ * A clipping plane at the waterline was tried, to stop submerged parts of the
+ * world inverting UPWARD through the surface. It cannot work this way: the
+ * mirror renders the SAME components as the real world, so the two share
+ * material instances — setting clippingPlanes on the reflection's materials
+ * clipped the originals too, and the entire city disappeared.
+ *
+ * Fixing it properly means the mirror needs its own material instances, which
+ * means ArrayWorld has to accept a material override rather than owning its
+ * materials outright. That is a real refactor, not a flag.
+ *
  *  - Mirroring reverses winding order, so front faces become back faces. The
  *    copy therefore renders with its sides swapped; anything that looks
  *    inside-out down there is a material with an explicit `side`, not a fault
