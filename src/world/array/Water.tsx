@@ -31,15 +31,40 @@ export function Water({
   roughness,
   reflectorResolution,
   distort,
+  night = 0,
 }: {
   palette: Palette
   roughness: number
   reflectorResolution: number
   /** Rain amount. Low but never zero — still water still moves. */
   distort: number
+  /** Day/night blend. At 1 the plain carries the star field. */
+  night?: number
 }) {
   const reflective = reflectorResolution > 0
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
+
+  /*
+   * The galaxy, emitted by the water.
+   *
+   * The night sky panorama is used as the surface's EMISSIVE map, so the
+   * plain glows with stars rather than reflecting them. That is the inversion:
+   * the sky above is emptied and the heavens are underfoot.
+   *
+   * Emissive rather than a reflection because a reflection needs something to
+   * reflect, and there is deliberately nothing up there any more.
+   */
+  const stars = useTexture('/sky/night.jpg') as Texture
+
+  const starMap = useMemo(() => {
+    const t = stars.clone()
+    t.wrapS = t.wrapT = RepeatWrapping
+    // Large, so the galaxy spans the plain rather than tiling across it.
+    t.repeat.set(1.4, 1.4)
+    t.anisotropy = maxAniso
+    t.needsUpdate = true
+    return t
+  }, [stars, maxAniso])
 
   const base = useTexture('/water-normal.jpg', (t) => {
     const tex = (Array.isArray(t) ? t[0] : t) as Texture
@@ -135,6 +160,11 @@ export function Water({
           envMapIntensity={2.1}
           normalMap={coarse}
           normalScale={normalScale}
+          emissiveMap={night > 0.02 ? starMap : null}
+          emissive="#ffffff"
+          // The galaxy has to READ, not hint. It is the only thing in the
+          // upper half of the frame's opposite.
+          emissiveIntensity={night * 5.5}
         />
       )}
     </mesh>

@@ -81,6 +81,9 @@ interface SceneState {
    */
   envIntensity: number
   setEnvIntensity: (v: number) => void
+  /** Day/night blend, mirrored from the frame loop for render-scope readers. */
+  nightLevel: number
+  setNightLevel: (v: number) => void
   /** Peak frame-to-frame luminance delta per probe region. */
   flicker: number[]
   setFlicker: (v: number[]) => void
@@ -139,6 +142,7 @@ export const useScene = create<SceneState>((set) => ({
   },
   flicker: [],
   envIntensity: 1.15,
+  nightLevel: 0,
 
   hovered: null,
   openSection: null,
@@ -157,6 +161,7 @@ export const useScene = create<SceneState>((set) => ({
   applyFlags: () => set({ flags: readFlags() }),
   setFlicker: (flicker) => set({ flicker }),
   setEnvIntensity: (envIntensity) => set({ envIntensity }),
+  setNightLevel: (nightLevel) => set({ nightLevel }),
   setHovered: (hovered) => set({ hovered }),
   openSectionPanel: (openSection) => set({ openSection, openProject: null }),
   openProjectPanel: (openProject) => set({ openProject, openSection: null }),
