@@ -84,8 +84,8 @@ export const NIGHT: Palette = {
   fogDensityScale: 1.35,
   monolith: new Color('#2b3138'),
   waterTint: new Color('#0a1220'),
-  ambient: new Color('#0b1a2e'),
-  ambientIntensity: 0.03,
+  ambient: new Color('#22384f'),
+  ambientIntensity: 0.5,
 }
 
 /** Linear blend between the two palettes. `t` of 0 is day, 1 is night. */

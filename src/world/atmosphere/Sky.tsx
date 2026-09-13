@@ -140,13 +140,25 @@ const fragment = /* glsl */ `
     vec3 stars = texture2D(uNightMap, nightUv).rgb;
     // Lift the plate's faint stars without lifting its black.
     stars = pow(stars, vec3(0.72)) * 1.45;
-    col = mix(col, col * 0.25 + stars * uPlate, uNight * smoothstep(-0.03, 0.14, h));
+    /*
+     * THE SKY IS EMPTIED.
+     *
+     * Stars are suppressed above the horizon at night rather than drawn. The
+     * arrival's whole idea is inversion: the heavens are a void and the galaxy
+     * is in the WATER, so the reflection has nothing to reflect. The eye keeps
+     * trying to reconcile that and cannot, which is the effect.
+     *
+     * The star plate stays in the shader because the transition needs
+     * somewhere to come from — it fades out as night arrives.
+     */
+    col = mix(col, col * 0.06, uNight * smoothstep(-0.03, 0.14, h));
 
     // Milky Way, kept procedural so it can be placed for composition rather
     // than wherever the plate put it.
     float band = exp(-pow(dot(dir, normalize(vec3(0.35, 0.62, 0.70))) * 3.1, 2.0));
     float dust = fbm(vec2(az * 2.4, h * 5.0) * 2.0);
-    col += vec3(0.58, 0.60, 0.80) * band * dust * 0.62 * uNight;
+    // No Milky Way overhead either. It has fallen into the plain.
+    col += vec3(0.58, 0.60, 0.80) * band * dust * 0.0;
 
     // --- sun, composited last so it always sits with the key light ---------
     float cosSun = dot(dir, normalize(uSunDir));

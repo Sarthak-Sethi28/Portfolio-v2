@@ -18,6 +18,7 @@ export function ModelPier({
   variant = 0,
   src = '/models/pillar.glb',
   mirrored = false,
+  glow = 0,
 }: {
   placement: Placement
   /** Which asset to use. See the note in ArrayWorld on mixing them. */
@@ -35,6 +36,15 @@ export function ModelPier({
    * second copy of it, and it has to be treated as one.
    */
   mirrored?: boolean
+  /**
+   * Light bleeding out through the carved stone, 0 to 1.
+   *
+   * Each column IS a project, so the architecture becomes the index — you
+   * read the world rather than a menu laid over it. A lantern made of stone
+   * also gives the arrival its only warmth, against a plain lit by a fallen
+   * galaxy and a sky with nothing in it.
+   */
+  glow?: number
   /**
    * Which part of the asset to show.
    *
@@ -100,9 +110,25 @@ export function ModelPier({
 
       m.castShadow = true
       m.receiveShadow = true
+
+      if (glow > 0) {
+        const mesh = o as unknown as Mesh
+        const src = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as
+          MeshStandardMaterial[]
+        mesh.material = src.map((mat) => {
+          const copy = mat.clone()
+          copy.emissive = new Color('#ffb877')
+          // Strong. These are the only warm light in the arrival, and against
+          // an emptied sky and a galaxy underfoot they have to carry the frame
+          // — at 0.55 the columns disappeared entirely.
+          copy.emissiveIntensity = glow * 2.6
+          copy.needsUpdate = true
+          return copy
+        }) as unknown as Mesh['material']
+      }
     })
     return c
-  }, [scene, mirrored])
+  }, [scene, mirrored, glow])
 
   // Measure, then fit: read the real bounding box and normalise to the height
   // this placement asks for.

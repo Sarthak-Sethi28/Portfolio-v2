@@ -34,6 +34,9 @@ export function Stage() {
   const moteCount = useScene((s) => effectiveMoteCount({ config: s.config, quality: s.quality }))
   const flags = useScene((s) => s.flags)
   const envIntensity = useScene((s) => s.envIntensity)
+  // Mirrors anim.night into render scope. Written by the frame loop below.
+  const nightLevel = useScene((s) => s.nightLevel)
+  const setNightLevel = useScene((s) => s.setNightLevel)
   const setEnvIntensity = useScene((s) => s.setEnvIntensity)
   const setFlicker = useScene((s) => s.setFlicker)
 
@@ -76,6 +79,7 @@ export function Stage() {
     // not cost a render every frame.
     const nextEnv = 1.15 - anim.night * 0.95
     if (Math.abs(nextEnv - envIntensity) > 0.02) setEnvIntensity(nextEnv)
+    if (Math.abs(anim.night - nightLevel) > 0.02) setNightLevel(anim.night)
 
     const fog = fogRef.current
     if (fog) {
@@ -184,6 +188,7 @@ export function Stage() {
               roughness={config.waterRoughness}
               reflectorResolution={flags.noReflect ? 0 : quality.reflectorResolution}
               distort={rain ? 0.75 : 0.32}
+              night={nightLevel}
             />
             <ArrayWorld palette={palette} />
           </>
