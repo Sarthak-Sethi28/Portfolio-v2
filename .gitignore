@@ -46,3 +46,6 @@ next-env.d.ts
 
 # generated bundle for external review
 signal-array-src.zip
+
+# Blender: the bpy venv is ~1GB of binary, rebuilt by scripts/README
+.blender-venv/
