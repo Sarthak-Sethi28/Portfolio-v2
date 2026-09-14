@@ -101,9 +101,6 @@ interface SceneState {
   cinematic: 'idle' | 'playing' | 'complete'
   setCinematic: (v: 'idle' | 'playing' | 'complete') => void
   setNight: (v: boolean) => void
-  /** Day/night blend, mirrored from the frame loop for render-scope readers. */
-  nightLevel: number
-  setNightLevel: (v: number) => void
   /** Peak frame-to-frame luminance delta per probe region. */
   flicker: number[]
   setFlicker: (v: number[]) => void
@@ -174,7 +171,6 @@ export const useScene = create<SceneState>((set) => ({
   envIntensity: 1.15,
   arrivedTitle: false,
   cinematic: 'idle' as const,
-  nightLevel: 0,
 
   hovered: null,
   openSection: null,
@@ -196,7 +192,6 @@ export const useScene = create<SceneState>((set) => ({
   setArrivedTitle: (arrivedTitle) => set({ arrivedTitle }),
   setCinematic: (cinematic) => set({ cinematic }),
   setNight: (night) => set({ night }),
-  setNightLevel: (nightLevel) => set({ nightLevel }),
   setHovered: (hovered) => set({ hovered }),
   openSectionPanel: (openSection) => set({ openSection, openProject: null }),
   openProjectPanel: (openProject) => set({ openProject, openSection: null }),

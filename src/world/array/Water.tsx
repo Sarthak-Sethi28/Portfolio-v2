@@ -1,10 +1,11 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { MeshReflectorMaterial, useTexture } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { RepeatWrapping, Vector2, type Texture } from 'three'
+import { RepeatWrapping, Vector2, type MeshStandardMaterial, type Texture } from 'three'
 import type { Palette } from '../atmosphere/palette'
+import { worldNight } from '../cinematic/cinematicState'
 
 /**
  * The salt plain: a centimetre of standing water over a flat bed.
@@ -31,15 +32,12 @@ export function Water({
   roughness,
   reflectorResolution,
   distort,
-  night = 0,
 }: {
   palette: Palette
   roughness: number
   reflectorResolution: number
   /** Rain amount. Low but never zero — still water still moves. */
   distort: number
-  /** Day/night blend. At 1 the plain carries the star field. */
-  night?: number
 }) {
   const reflective = reflectorResolution > 0
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
@@ -55,6 +53,7 @@ export function Water({
    * reflect, and there is deliberately nothing up there any more.
    */
   const stars = useTexture('/sky/night.jpg') as Texture
+  const nightMat = useRef<MeshStandardMaterial>(null)
 
   const starMap = useMemo(() => {
     const t = stars.clone()
@@ -90,6 +89,10 @@ export function Water({
   const normalScale = useMemo(() => new Vector2(amp, amp), [amp])
 
   useFrame(({ clock }) => {
+    // The galaxy has to READ, not hint — it is the only thing in the frame's
+    // upper half opposite. Driven here rather than through a prop so a
+    // continuously changing value never re-renders the world.
+    if (nightMat.current) nightMat.current.emissiveIntensity = worldNight.value * 5.5
     const t = clock.elapsedTime
     coarse.offset.set(t * 0.0075, t * 0.0046)
   })
@@ -160,11 +163,25 @@ export function Water({
           envMapIntensity={2.1}
           normalMap={coarse}
           normalScale={normalScale}
-          emissiveMap={night > 0.02 ? starMap : null}
+          /*
+           * BOUND FROM THE START, at zero strength.
+           *
+           * This was `night > 0.02 ? starMap : null`, which adds and removes a
+           * texture from the material — and a texture is a shader DEFINE, so
+           * crossing that threshold relinked the program. It happened at about
+           * ten and a half seconds, inside the exact window where the cold run
+           * stalled, and it could never happen on the second run because the
+           * variant was already cached.
+           *
+           * Binding it permanently means the same program exists from the
+           * first frame of the day scene. At zero intensity it costs one
+           * texture fetch that multiplies to nothing, and the day appearance is
+           * unchanged.
+           */
+          emissiveMap={starMap}
           emissive="#ffffff"
-          // The galaxy has to READ, not hint. It is the only thing in the
-          // upper half of the frame's opposite.
-          emissiveIntensity={night * 5.5}
+          emissiveIntensity={0}
+          ref={nightMat}
         />
       )}
     </mesh>

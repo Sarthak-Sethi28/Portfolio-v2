@@ -3,9 +3,9 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
-import { Box3, Color, Plane, Vector3, type Group, type Mesh, type MeshStandardMaterial } from 'three'
+import { Box3, Color, Plane, Vector3, type Group, type Mesh, type MeshStandardMaterial, type PointLight } from 'three'
 import type { Placement } from '../geometry/layout'
-import { cinematicSample } from '../cinematic/cinematicState'
+import { cinematicSample, worldNight } from '../cinematic/cinematicState'
 
 /**
  * A pier from a downloaded model, on trial.
@@ -42,7 +42,6 @@ export function ModelPier({
   variant = 0,
   src = '/models/pillar.glb',
   mirrored = false,
-  glow = 0,
   descentDelay = 0,
 }: {
   placement: Placement
@@ -61,15 +60,6 @@ export function ModelPier({
    * second copy of it, and it has to be treated as one.
    */
   mirrored?: boolean
-  /**
-   * Light bleeding out through the carved stone, 0 to 1.
-   *
-   * Each column IS a project, so the architecture becomes the index — you
-   * read the world rather than a menu laid over it. A lantern made of stone
-   * also gives the arrival its only warmth, against a plain lit by a fallen
-   * galaxy and a sky with nothing in it.
-   */
-  glow?: number
   /**
    * Seconds of delay before this column starts down, from the layout.
    *
@@ -224,6 +214,7 @@ export function ModelPier({
    * and the muqarnas detail, which is the entire reason for this asset, goes.
    */
   const sink = useRef<Group>(null)
+  const lampRef = useRef<PointLight>(null)
   /*
    * Per-frame mutation of three.js objects, which the React Compiler cannot
    * model — it sees memoised values being written to and assumes a
@@ -231,7 +222,17 @@ export function ModelPier({
    */
   /* eslint-disable react-hooks/immutability */
   useFrame(() => {
-    for (const m of litMaterials) m.emissiveIntensity = glow * 0.5
+    /*
+     * Read the night blend here rather than receive it as a prop.
+     *
+     * It arrived as `glow`, a continuously changing React prop, which meant
+     * every step of the blend re-rendered this component — eight times over,
+     * counting the mirrored world — purely to set a number that is written on
+     * the material in this callback anyway.
+     */
+    const night = worldNight.value
+    for (const m of litMaterials) m.emissiveIntensity = night * 0.5
+    if (lampRef.current) lampRef.current.intensity = night * height * height * 0.42
 
     /*
      * THE RESPONSE — the columns descend.
@@ -275,13 +276,25 @@ export function ModelPier({
         down onto the surface and picks out the columns' near faces, so they
         occupy the place rather than float on it.
       */}
-      {lit && (
+      {/*
+        Mounted from the start at zero intensity, and never unmounted.
+        
+        Gating it on the night level changed the NUMBER OF LIGHTS in the scene
+        the moment night began, and light count is a shader define — every
+        material in the world would have relinked its program on that frame,
+        during the transition. Present from the first frame, it costs one dark
+        light in daylight and guarantees the day scene already compiled the
+        variant the night scene needs.
+      */}
+      {!mirrored && (
         <pointLight
+          ref={lampRef}
           position={[0, height * 0.1, 0]}
           color="#d8b089"
-          intensity={glow * height * height * 0.42}
+          intensity={0}
           distance={height * 4}
           decay={2}
+          castShadow={false}
         />
       )}
       {/*
