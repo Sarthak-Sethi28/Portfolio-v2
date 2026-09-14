@@ -35,16 +35,40 @@ export function Title() {
    * So it leaves as soon as the sequence starts and returns on the far side,
    * by which time the word underneath it has changed.
    */
-  const sequence = useScene((s) => s.sequence)
-  const travelling = sequence > 0.001 && sequence < 0.999
-  const letters = (night ? 'PROJECTS' : profile.name.toUpperCase()).split('')
+  const cinematic = useScene((s) => s.cinematic)
+  const seqFlag = useScene((s) => s.flags.seq)
+  // Scrubbing counts as travelling, for the same reason Stage does it.
+  const travelling = cinematic === 'playing' || seqFlag !== null
+  
+  /*
+   * PROJECTS belongs to the destination, not to the night value.
+   *
+   * Switching on `night` alone would print the word the instant the sky
+   * finished turning — around eleven seconds, with three seconds of journey
+   * still to run and the visitor not yet through the portal. The word is the
+   * arrival announcing itself, so it waits for the arrival.
+   */
+  const arrived = cinematic === 'complete' || (cinematic === 'idle' && night)
+  const letters = (arrived ? 'PROJECTS' : profile.name.toUpperCase()).split('')
 
   return (
     <div
       className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
       style={{
         opacity: open || noUi || travelling ? 0 : 1,
-        transition: 'opacity 700ms ease-in-out',
+        /*
+         * The name leaves between 2.8 and 4.0 seconds, expressed as a CSS
+         * delay rather than as a timer or a per-frame opacity.
+         *
+         * A setTimeout would be a second clock that can drift from the master
+         * one and keeps running if the cinematic is interrupted; driving
+         * opacity from the frame loop would mean a React render per frame for
+         * a DOM node that changes once. The transition starts when the status
+         * flips to playing and the browser owns the interpolation from there.
+         */
+        transition: travelling
+          ? 'opacity 1200ms ease-in-out 2800ms'
+          : 'opacity 700ms ease-in-out',
       }}
     >
       <h1

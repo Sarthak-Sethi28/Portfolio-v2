@@ -5,8 +5,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import { Box3, Color, Plane, Vector3, type Group, type Mesh, type MeshStandardMaterial } from 'three'
 import type { Placement } from '../geometry/layout'
-import { sample } from '../sequence'
-import { useScene } from '@/store/scene'
+import { cinematicSample } from '../cinematic/cinematicState'
 
 /**
  * A pier from a downloaded model, on trial.
@@ -44,6 +43,7 @@ export function ModelPier({
   src = '/models/pillar.glb',
   mirrored = false,
   glow = 0,
+  descentDelay = 0,
 }: {
   placement: Placement
   /** Which asset to use. See the note in ArrayWorld on mixing them. */
@@ -71,6 +71,15 @@ export function ModelPier({
    */
   glow?: number
   /**
+   * Seconds of delay before this column starts down, from the layout.
+   *
+   * Passed in rather than derived from an array index: the four primary
+   * columns are identified by where they actually stand, so the order reads
+   * far-left, far-right, near-left, near-right on screen regardless of what
+   * order the layout happens to generate them in.
+   */
+  descentDelay?: number
+  /**
    * Which part of the asset to show.
    *
    * Kitbashing: one mesh used many ways. 0 is the whole tower; 1 crops to the
@@ -83,7 +92,6 @@ export function ModelPier({
   variant?: number
 }) {
   const { scene } = useGLTF(src)
-  const sequence = useScene((st) => st.sequence)
   const { position, rotationY, tilt, height, submerge } = placement
 
   /*
@@ -201,25 +209,35 @@ export function ModelPier({
    * and the muqarnas detail, which is the entire reason for this asset, goes.
    */
   const sink = useRef<Group>(null)
+  /*
+   * Per-frame mutation of three.js objects, which the React Compiler cannot
+   * model — it sees memoised values being written to and assumes a
+   * render-phase mutation. See the fuller note in PortalCinematic.
+   */
+  /* eslint-disable react-hooks/immutability */
   useFrame(() => {
     for (const m of litMaterials) m.emissiveIntensity = glow * 0.5
 
     /*
      * THE RESPONSE — the columns descend.
      *
-     * They sink rather than fade, and they sink FAR: a column that drops a
-     * token amount reads as settling, and the beat is the sea taking them. The
-     * stagger is keyed off each pier's own placement so the four do not go
-     * down together, which would read as one object rather than four answering
-     * the same summons.
+     * Real world-space translation of the real column, not a scale and not a
+     * fade: the sea takes them. They travel far enough that the portal is left
+     * compositionally alone, which is the point of the beat.
+     *
+     * The mirrored copy renders this same component with the same placement
+     * and therefore the same delay, so the reflection tracks its column
+     * exactly — nothing here reaches across to the reflection to keep it in
+     * step, which is what would eventually let them drift apart.
      */
     const g = sink.current
     if (!g) return
-    const s = sample(sequence)
-    const lag = ((Math.abs(position[0]) * 0.013) % 1) * 0.45
-    const d = Math.max(0, Math.min(1, s.descend * 1.5 - lag))
-    g.position.y = -(d * d * (3 - 2 * d)) * height * 1.5
+    // Envelope from the timeline, offset per column. Squared on the way in so
+    // the mass is slow to start and then commits.
+    const d = Math.max(0, Math.min(1, cinematicSample.pillarDescent * 1.45 - descentDelay))
+    g.position.y = -(d * d * (3 - 2 * d)) * height * 1.6
   })
+  /* eslint-enable react-hooks/immutability */
 
   // Measure, then fit: read the real bounding box and normalise to the height
   // this placement asks for.

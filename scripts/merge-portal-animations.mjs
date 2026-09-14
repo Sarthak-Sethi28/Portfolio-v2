@@ -25,12 +25,10 @@ if (anims.length === 0) {
 }
 
 const target = anims[0].setName('Cinematic')
-let moved = 0
 for (const a of anims.slice(1)) {
   for (const ch of a.listChannels()) {
     a.removeChannel(ch)
     target.addChannel(ch)
-    moved++
   }
   for (const s of a.listSamplers()) {
     a.removeSampler(s)

@@ -4,6 +4,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { DoubleSide, Shape, ShapeGeometry, type Group } from 'three'
 import { createRng, range, SEED } from '@/lib/rng'
+import { cinematicSample } from '../cinematic/cinematicState'
 import type { Palette } from './palette'
 
 /**
@@ -26,6 +27,11 @@ interface Bird {
   radius: number
   height: number
   speed: number
+  flee: number
+  fleeOut: number
+  fleeUp: number
+  fleeLag: number
+  fleeSpin: number
   phase: number
   scale: number
   beat: number
@@ -63,6 +69,25 @@ export function Birds({ count = 11, palette }: { count?: number; palette: Palett
       scale: range(rng, 1.6, 3.6),
       beat: range(rng, 2.2, 3.6),
       bob: range(rng, 2.5, 7),
+      /*
+       * THE ESCAPE, precomputed.
+       *
+       * Every bird's flight away from the portal is decided here, once, at
+       * mount: which way it breaks, how hard, how steeply it climbs, how much
+       * sooner than its neighbours it panics. Nothing is drawn inside the
+       * frame loop, because a random number per frame is a different world
+       * every frame — the flock would jitter rather than flee, and scrubbing
+       * back to the same second would produce a different picture each time.
+       *
+       * The flock also has to come APART. Real birds do not leave in
+       * formation; the thing that reads as panic is that they stop agreeing
+       * with each other, so the stagger and the direction are per bird.
+       */
+      flee: range(rng, 0.75, 1.0) * (rng() < 0.5 ? -1 : 1),
+      fleeOut: range(rng, 230, 430),
+      fleeUp: range(rng, 55, 150),
+      fleeLag: range(rng, 0, 0.42),
+      fleeSpin: range(rng, 2.4, 5.2),
     }))
   }, [count])
 
@@ -73,12 +98,24 @@ export function Birds({ count = 11, palette }: { count?: number; palette: Palett
 
     g.children.forEach((child, i) => {
       const b = birds[i]
-      const a = b.phase + t * b.speed
+      /*
+       * Panic, staggered per bird and eased in.
+       *
+       * `scatter` is the flock's alarm; each bird answers it a little later
+       * than the next and then commits. Squared so the break is sudden rather
+       * than a drift outward.
+       */
+      const alarm = Math.min(1, Math.max(0, (cinematicSample.scatter - b.fleeLag) / (1 - b.fleeLag)))
+      const flee = alarm * alarm
+
+      // They fly FASTER as they go — a fleeing bird is not a circling bird
+      // played at the same speed on a wider arc.
+      const a = b.phase + t * b.speed * (1 + flee * b.fleeSpin)
 
       child.position.set(
-        Math.cos(a) * b.radius,
-        b.height + Math.sin(a * 2.3 + b.phase) * b.bob,
-        Math.sin(a) * b.radius - 125,
+        Math.cos(a) * (b.radius + flee * b.fleeOut * b.flee),
+        b.height + Math.sin(a * 2.3 + b.phase) * b.bob + flee * b.fleeUp,
+        Math.sin(a) * (b.radius + flee * b.fleeOut) - 125,
       )
 
       // Heading along the tangent, and BANKED into the turn. A circling bird
@@ -88,7 +125,8 @@ export function Birds({ count = 11, palette }: { count?: number; palette: Palett
 
       // Asymmetric wingbeat: a fast downstroke and a slower recovery, which is
       // what a real beat looks like. A pure sine reads as mechanical.
-      const cycle = (t * b.beat + b.phase) % (Math.PI * 2)
+      // The beat quickens with the panic, which is most of what sells it.
+      const cycle = (t * b.beat * (1 + flee * 1.9) + b.phase) % (Math.PI * 2)
       const raw = Math.sin(cycle)
       const flap = raw > 0 ? Math.pow(raw, 0.55) : -Math.pow(-raw, 1.7)
 
