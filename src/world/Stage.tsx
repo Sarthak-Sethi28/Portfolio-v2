@@ -20,6 +20,7 @@ import { CinematicDirector } from './cinematic/CinematicDirector'
 import { CinematicCamera } from './cinematic/CinematicCamera'
 import { WaterDisturbance } from './cinematic/WaterDisturbance'
 import { WaterShockwave } from './cinematic/WaterShockwave'
+import { PillarWake } from './cinematic/PillarWake'
 import { createAnim, type Anim } from './anim'
 import { cinematicSample, worldNight } from './cinematic/cinematicState'
 import { FlickerProbe } from './FlickerProbe'
@@ -272,6 +273,7 @@ export function Stage() {
       {/* Local water response to the portal. Both are inert at rest. */}
       <WaterDisturbance />
       <WaterShockwave />
+      <PillarWake />
 
       <Motes count={flags.noMotes ? 0 : moteCount} palette={palette} />
       {/* Something in the frame with its own intent. A drifting camera over a

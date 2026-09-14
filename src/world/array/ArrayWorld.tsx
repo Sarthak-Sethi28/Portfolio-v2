@@ -90,7 +90,8 @@ export function ArrayWorld({
       .sort((a, b) => (a.z - b.z) || (a.x - b.x))
     const delays = new Array<number>(sections.length).fill(0)
     order.forEach((entry, rank) => {
-      delays[entry.i] = rank * 0.11
+      // 3.80 / 4.00 / 4.20 / 4.40 against a 1.8s envelope starting at 3.8.
+      delays[entry.i] = rank * (0.2 / 1.8)
     })
     return delays
   }, [sections])
