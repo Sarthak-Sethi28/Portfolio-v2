@@ -139,12 +139,28 @@ export function PortalCinematic({
     const clip = animations.find((c) => c.name === 'Cinematic') ?? animations[0]
     if (!clip) return
     const action = mixer.clipAction(clip)
-    // Clamped and paused: the mixer's time is set explicitly below, so the
-    // action must exist and be enabled without ever advancing itself.
     action.setLoop(LoopOnce, 1)
     action.clampWhenFinished = true
     action.play()
-    action.paused = true
+    /*
+     * NOT paused, and this is the whole bug.
+     *
+     * Pausing looked like the right way to stop the clip free-running while
+     * the mixer's time is set explicitly. It is not: AnimationMixer.setTime
+     * works by resetting to zero and calling update(), and
+     * AnimationAction.update() returns immediately when the action is paused.
+     * So the seek arrived and was discarded, every frame — the portal held
+     * frame zero for the entire fifteen seconds while everything else in the
+     * world moved around it.
+     *
+     * It was invisible for a long time because the parts of the portal that
+     * DID respond — the travelling circuit, the indicators, the red spill —
+     * are all driven from R3F rather than from the clip, so the machine looked
+     * alive while none of its geometry had moved at all.
+     *
+     * setTime alone is sufficient: it rewinds and re-evaluates from zero on
+     * every call, so the action can never accumulate its own progress.
+     */
     return () => {
       mixer.stopAllAction()
       mixer.uncacheRoot(built.root)

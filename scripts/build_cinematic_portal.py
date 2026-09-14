@@ -55,11 +55,17 @@ from mathutils import Vector
 
 # ---------------------------------------------------------------- paths
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC_GLB = os.path.join(HERE, "assets", "blender", "base_basic_pbr.glb")
+# The SPLIT machine: the same asset, the same textures, the same silhouette,
+# recovered into its four structural quadrants by scripts/split-portal.mjs.
+# Nothing about how it looks changes — only that its parts can now be
+# addressed, which is what the unlock needs.
+SRC_GLB = os.path.join(HERE, "assets", "blender", "base_split.glb")
 OUT_GLB = os.path.join(HERE, "public", "models", "portal-cinematic.glb")
 OUT_BLEND = os.path.join(HERE, "assets", "blender", "portal-cinematic.blend")
 
 # ---------------------------------------------------------------- timeline
+# Ring centre height in the model's own space, measured from its bbox.
+CY = 0.9395
 FPS = 30
 F_END = 450
 
@@ -465,72 +471,45 @@ def main():
             o.parent = active
             o.matrix_parent_inverse = active.matrix_world.inverted()
 
+    # THE QUADRANTS, pivoted on themselves.
+    #
+    # Each arrives with its origin at the model's origin, which would make
+    # "rotation" a turn about the ring's axis — that slides a 90-degree
+    # quadrant along the arc instead of tilting it, and at any useful angle the
+    # ring stops being a ring. Moving each origin to its own centroid makes the
+    # same few degrees a tilt in place, which is what a heavy structural member
+    # unseating actually does.
+    quadrants = []
+    for o in meshes:
+        if not o.name.startswith("seg_"):
+            continue
+        c = Vector((0.0, 0.0, 0.0))
+        for v in o.data.vertices:
+            c += v.co
+        c /= max(1, len(o.data.vertices))
+        for v in o.data.vertices:
+            v.co -= c
+        o.location = o.location + c
+        quadrants.append((o, c))
+    log(f"quadrants: {[q[0].name for q in quadrants]}")
+
     # The whole assembly is built about the ring's centre, so rotations happen
     # about the ring and not about the model's feet.
     root.location = centre
     active.location = -centre
 
-    # ---- dormant shell ----
-    shell = ring_plane(empty("SHELL", root))
-
-    # THE SHELL WEARS THE MACHINE'S OWN TEXTURES.
+    # ---- NO DORMANT SHELL ----
     #
-    # It was a flat grey Principled surface, and against a fully mapped asset
-    # it read as white plastic — the single most conspicuous thing in every
-    # preview. The dormant ring is supposed to BE the day homepage's ring, and
-    # that ring is this asset, so the honest fix is to use the same maps rather
-    # than to invent a stone look that would never match.
+    # It was built, textured, animated, and then removed, and the reason is
+    # worth keeping: docs/endpoints/day-home.png is immutable and it shows the
+    # MACHINE. A casing whose entire purpose is to conceal the machine cannot
+    # also be the frame that displays it, so rendering it put a stone donut
+    # where the signed-off portal should be.
     #
-    # Darkened and roughened through the Principled inputs rather than by
-    # editing the images: the shell is the weathered outside of the machine,
-    # not a different material, and multiplying keeps every bit of variation
-    # the texture author put there.
-    stone = clad_material("ShellClad", meshes)
-
-    # Sized against the energy channel at both ends of the move, which is the
-    # only constraint that actually matters here.
-    #
-    # CLOSED, the shell's inner edge must sit inside the arcs so it covers them
-    # completely — at 0.50 against arcs starting at 0.505 the margin was two
-    # tenths of a percent and thin red slivers showed at every seam in the
-    # dormant frame. OPEN, the same edge travels out by SHELL_REVEAL_R and has
-    # to finish OUTSIDE them, or the shell would sit across the channel exactly
-    # when it ignites.
-    #
-    #   closed: 0.49R          < 0.515R  (arcs covered)
-    #   open:   0.49R + 0.072R = 0.562R  > 0.555R  (channel clear)
-    r_in = R * 0.49
-    r_out = R * 1.07
-    depth = THICK * 1.3
-    # NEGATIVE. The sections OVERLAP when closed.
-    #
-    # This went 1.6 degrees -> 0.35 -> overlap, and the last step is the one
-    # that mattered. Even at 0.35 a thin red line showed at every joint in the
-    # dormant frame, and the cause was not the gap but the BEVEL: a 0.033-unit
-    # chamfer taken off both edges of every section opens a 0.066-unit slit
-    # whatever the nominal seam is, and the energy channel sits directly behind
-    # it. No amount of shrinking a positive seam closes a hole the chamfer is
-    # cutting.
-    #
-    # Overlapping the sections closes it properly, and it is what a closed iris
-    # actually does — the leaves lie over one another and part as it opens. The
-    # solids interpenetrate while shut, which costs nothing visually since they
-    # share a material, and the joint lines appear on their own as the shell
-    # withdraws.
-    seam = -math.radians(0.35)
-    step = math.tau / SHELL_SECTIONS
-
-    shell_secs = []
-    for i in range(SHELL_SECTIONS):
-        a0 = i * step + seam
-        a1 = (i + 1) * step - seam
-        ob = arc_solid(f"SHELL_SEG_{i:02d}", r_in, r_out, a0, a1, depth, steps=12)
-        ob.data.materials.append(stone)
-        ob.parent = shell
-        # Each section pivots about the ring centre, which is the origin of this
-        # local space, so no pivot juggling is needed later.
-        shell_secs.append((ob, (a0 + a1) / 2.0))
-    log(f"shell: {len(shell_secs)} sections, r {r_in:.3f}..{r_out:.3f}, depth {depth:.3f}")
+    # The unlock is performed by the machine's OWN four quadrants instead,
+    # which is better anyway: there is no second object to explain, no geometry
+    # swap, and the thing that opens is the thing the visitor has been looking
+    # at since the first frame. Same model, closed configuration to open.
 
     # ---- two concentric mechanical layers, counter-rotating ----
     mech_in = ring_plane(empty("MechanicalRing_A", pulse_node))
@@ -622,69 +601,84 @@ def main():
     # and keep a long deceleration tail, because a mass that is turning has
     # further to shed its momentum than one that is sliding.
 
-    # Sections are grouped by angular distance from the crown, so the unlock
-    # propagates top -> upper -> sides -> lower -> bottom rather than at random.
-    def group_of(mid):
-        d = abs(((math.degrees(mid) - 90.0 + 180.0) % 360.0) - 180.0)
-        return 0 if d < 26 else 1 if d < 58 else 2 if d < 104 else 3 if d < 148 else 4
+    # ---- THE UNLOCK: the machine's own quadrants ----
+    #
+    # Crown first, then the haunches, then the springing. That is the order an
+    # arch actually comes apart in — the keystone is the piece under least
+    # restraint and the bottom carries the load, so releasing the bottom first
+    # would read as the thing collapsing rather than opening. It also happens
+    # to be the order that reads best from the site's fixed camera, because the
+    # crown is the part most clearly in frame.
+    #
+    #   5.95s  top       (crown releases)
+    #   6.08s  left      (haunch)
+    #   6.21s  right     (haunch)
+    #   6.34s  bottom    (springing, last, and it travels least)
+    #
+    # Each quadrant moves out along its OWN radius and back in depth. Moving
+    # them all one way would slide the machine apart; moving each outward opens
+    # every seam at once while the circle stays a circle. Small: enough to
+    # expose the construction behind, not enough to look like debris.
+    ORDER = {"seg_top": 0, "seg_left": 1, "seg_right": 2, "seg_bottom": 3}
+    for ob, _c in quadrants:
+        rank = ORDER.get(ob.name, 0)
+        start = int(round((5.95 + rank * 0.13) * FPS))
+        # Fully open by 7.8s, settled into the final pose by 10.5s and then
+        # held — that pose is what remains on the night endpoint.
+        opened = int(round(7.8 * FPS))
+        settled = int(round(10.5 * FPS))
 
-    for i, (ob, mid) in enumerate(shell_secs):
-        g = group_of(mid)
-        cx, cy = math.cos(mid), math.sin(mid)
-        sign = 1.0 if i % 2 == 0 else -1.0
+        base = Vector(ob.location)
+        # Radial direction in the ring's plane. After the glTF Z-up conversion
+        # the ring lies in XZ, so the axis is Y and "radial" is XZ.
+        d = Vector((base.x, 0.0, base.z - CY))
+        d = d.normalized() if d.length > 1e-5 else Vector((0.0, 0.0, 1.0))
 
-        # Offsets are now relative to the section's resting position, because
-        # its origin sits at its own centroid rather than at the ring centre.
-        base = tuple(ob.location)
+        # SIZED AGAINST THE SCREEN, not against the model.
+        #
+        # At 0.085 of the radius each quadrant travelled about three and a half
+        # world units, which from the site's fixed camera is roughly ten pixels
+        # on a ring some two hundred and thirty across — the machine opened and
+        # nothing visibly happened. The hero beat has to be legible from the
+        # camera that actually exists, so the travel is set by how far it reads
+        # on screen rather than by what sounds restrained in model units.
+        #
+        # Still restrained: a fifth of the radius on a ring this size opens the
+        # seams wide enough to see the mechanism behind and no wider, and every
+        # quadrant stays plainly part of the same circle.
+        # The SPRINGING barely moves. It carries the feet, and pushing it as
+        # far as the crown lifted the base clear of the water — the machine
+        # read as coming apart at its foundations rather than opening. An arch
+        # opens at the crown and the haunches; the part taking the load stays
+        # where it is, which is also why it is released last.
+        travel = {0: 1.0, 1: 0.92, 2: 0.92, 3: 0.3}[rank]
+        out = R * 0.21 * travel
+        # Depth is mostly invisible head-on, so it is small — it exists to open
+        # the seams into shadow rather than to move anything anywhere.
+        depth = THICK * 0.30 * travel * (1.0 if rank % 2 == 0 else -1.0)
+        spin = math.radians(3.0) * travel * (1.0 if rank % 2 == 0 else -1.0)
 
-        def place(frame, rad, dep, deg):
-            key(ob, "location", frame, base[0] + cx * R * rad, 0)
-            key(ob, "location", frame, base[1] + cy * R * rad, 1)
-            key(ob, "location", frame, base[2] - R * dep * sign, 2)
-            key(ob, "rotation_euler", frame, math.radians(deg) * sign, 2)
+        for ax in (0, 1, 2):
+            key(ob, "location", start, base[ax], ax)
+        key(ob, "rotation_euler", start, 0.0, 1)
 
-        # 01 ARRIVAL. Held dead still to frame 30. No idle motion at all —
-        # the stillness is what gives everything after it somewhere to move
-        # from, and an "alive" dormant machine spends that for nothing.
-        place(S01_ARRIVAL[1], 0.0, 0.0, 0.0)
+        key(ob, "location", opened, base.x + d.x * out, 0)
+        key(ob, "location", opened, base.y + depth, 1)
+        key(ob, "location", opened, base.z + d.z * out, 2)
+        key(ob, "rotation_euler", opened, spin, 1)
 
-        # 02 CLOSER LOOK. Internal pressure. Only some sections take it, so the
-        # structure reads as loaded unevenly rather than as uniformly humming.
-        if i % 3 == 0:
-            place(S02_CLOSER[1], SHELL_TENSION_R, 0.0, SHELL_TENSION_DEG)
-        else:
-            place(S02_CLOSER[1], 0.0, 0.0, 0.0)
+        # Settles a fraction further and stops. No idle drift afterwards.
+        key(ob, "location", settled, base.x + d.x * out * 1.06, 0)
+        key(ob, "location", settled, base.y + depth * 1.06, 1)
+        key(ob, "location", settled, base.z + d.z * out * 1.06, 2)
+        key(ob, "rotation_euler", settled, spin * 1.06, 1)
 
-        # 03 DISTURBANCE. First visible response, a few sections only.
-        if i % 3 == 0 or i % 5 == 0:
-            place(S03_DISTURBANCE[1], SHELL_DISTURB_R, 0.003, SHELL_DISTURB_DEG)
-
-        # 04 THE PULL. Engagement spreads around the circumference in order.
-        place(S04_PULL[1] + g * 3, SHELL_PULL_R, 0.004, SHELL_PULL_DEG)
-
-        # 05 RESPONSE. Movement REDUCES. The portal goes quiet while the world
-        # outside it does the work, and relaxing slightly is more alive than
-        # freezing outright.
-        place(S05_RESPONSE[1], SHELL_PULL_R * 0.86, 0.003, SHELL_PULL_DEG * 0.8)
-
-        # 06 ALONE. Frozen 160-175, so the unlock lands into silence.
-        place(160, SHELL_PULL_R * 0.86, 0.003, SHELL_PULL_DEG * 0.8)
-        place(175, SHELL_PULL_R * 0.86, 0.003, SHELL_PULL_DEG * 0.8)
-
-        # 07 UNLOCK. The hero beat, staggered four frames per group.
-        t0 = S07_UNLOCK[0] + g * 4
-        place(t0, SHELL_PULL_R * 0.86, 0.003, SHELL_PULL_DEG * 0.8)
-        place(t0 + 30, SHELL_UNLOCK_R, 0.016, SHELL_UNLOCK_DEG)
-
-        # 08 LAYERS REVEAL. Out to the final open position and no further.
-        place(S08_REVEAL[1], SHELL_REVEAL_R, SHELL_REVEAL_D, SHELL_REVEAL_DEG)
-
-        # 09 IGNITION. Clamps finish; the channel must be clear by now.
-        place(S09_IGNITION[1], SHELL_REVEAL_R * 1.02, SHELL_REVEAL_D, SHELL_REVEAL_DEG)
-
-        # 10-15. Nothing further. A held key at the end keeps the exporter's
-        # sampling flat rather than letting it drift between distant keys.
-        place(F_END, SHELL_REVEAL_R * 1.02, SHELL_REVEAL_D, SHELL_REVEAL_DEG)
+        for ax in (0, 1, 2):
+            key(ob, "location", F_END, ob.location[ax] if False else (
+                base.x + d.x * out * 1.06 if ax == 0 else
+                base.y + depth * 1.06 if ax == 1 else
+                base.z + d.z * out * 1.06), ax)
+        key(ob, "rotation_euler", F_END, spin * 1.06, 1)
         ease(ob)
 
     # ---- the two mechanical rings ----
@@ -720,12 +714,14 @@ def main():
     # than popping into being.
     for grp in (mech_in, mech_out):
         for child in grp.children:
-            key(child, "scale", S07_UNLOCK[0] + 22, 0.001, 0)
-            key(child, "scale", S07_UNLOCK[0] + 22, 0.001, 1)
-            key(child, "scale", S07_UNLOCK[0] + 22, 0.001, 2)
-            key(child, "scale", S08_REVEAL[1], 1.0, 0)
-            key(child, "scale", S08_REVEAL[1], 1.0, 1)
-            key(child, "scale", S08_REVEAL[1], 1.0, 2)
+            # Exposed as the quadrants part, between 6.7 and 7.8 seconds, so
+            # the deeper layers arrive into a gap that has just opened rather
+            # than appearing through solid geometry.
+            t_hidden = int(round(6.7 * FPS))
+            t_shown = int(round(7.8 * FPS))
+            for ax in (0, 1, 2):
+                key(child, "scale", t_hidden, 0.001, ax)
+                key(child, "scale", t_shown, 1.0, ax)
             ease(child)
 
     # ---- 10 FULL POWER: one pressure pulse, on one node ----
