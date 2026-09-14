@@ -92,6 +92,12 @@ interface SceneState {
    * mutable object in `world/cinematic/cinematicState`; React only needs to
    * know whether the thing is running.
    */
+  /**
+   * True once the arrival has reached the point where the destination's title
+   * belongs on screen. Flipped ONCE, while the veil is fully opaque.
+   */
+  arrivedTitle: boolean
+  setArrivedTitle: (v: boolean) => void
   cinematic: 'idle' | 'playing' | 'complete'
   setCinematic: (v: 'idle' | 'playing' | 'complete') => void
   setNight: (v: boolean) => void
@@ -166,6 +172,7 @@ export const useScene = create<SceneState>((set) => ({
   },
   flicker: [],
   envIntensity: 1.15,
+  arrivedTitle: false,
   cinematic: 'idle' as const,
   nightLevel: 0,
 
@@ -186,6 +193,7 @@ export const useScene = create<SceneState>((set) => ({
   applyFlags: () => set({ flags: readFlags() }),
   setFlicker: (flicker) => set({ flicker }),
   setEnvIntensity: (envIntensity) => set({ envIntensity }),
+  setArrivedTitle: (arrivedTitle) => set({ arrivedTitle }),
   setCinematic: (cinematic) => set({ cinematic }),
   setNight: (night) => set({ night }),
   setNightLevel: (nightLevel) => set({ nightLevel }),

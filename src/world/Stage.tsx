@@ -17,6 +17,7 @@ import { UnderWorld } from './under/UnderWorld'
 import { Mirror } from './array/Mirror'
 import { IdleRig } from './camera/IdleRig'
 import { CinematicDirector } from './cinematic/CinematicDirector'
+import { CinematicCamera } from './cinematic/CinematicCamera'
 import { WaterDisturbance } from './cinematic/WaterDisturbance'
 import { WaterShockwave } from './cinematic/WaterShockwave'
 import { createAnim, type Anim } from './anim'
@@ -268,6 +269,7 @@ export function Stage() {
       {/* First, so the clock is written before anything reads it. */}
       <CinematicDirector />
       <IdleRig />
+      <CinematicCamera />
 
       {/* multisampling is NOT optional.
           EffectComposer renders into its own buffer, which silently discards

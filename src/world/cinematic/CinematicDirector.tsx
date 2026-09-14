@@ -23,6 +23,8 @@ export function CinematicDirector() {
   const setNight = useScene((s) => s.setNight)
   const reducedMotion = useScene((s) => s.reducedMotion)
   const seqFlag = useScene((s) => s.flags.seq)
+  const arrivedTitle = useScene((s) => s.arrivedTitle)
+  const setArrivedTitle = useScene((s) => s.setArrivedTitle)
 
   // A scrub is authoritative: nothing may advance the clock behind it.
   useEffect(() => {
@@ -47,14 +49,29 @@ export function CinematicDirector() {
       }
       cinematicClock.elapsed = 0
       cinematicClock.running = true
+      setArrivedTitle(false)
     }
-  }, [status, reducedMotion, setNight, setCinematic])
+  }, [status, reducedMotion, setNight, setCinematic, setArrivedTitle])
 
   useFrame((_, delta) => {
     // Guard against a hitch producing a huge step. A tab restored after a
     // minute in the background reports a minute of delta, which would jump the
     // whole piece in one frame.
     advanceCinematic(Math.min(delta, 1 / 20))
+
+    /*
+     * Swap the title's word while nobody can see it.
+     *
+     * This is a React state write inside a frame loop, which is normally the
+     * thing to avoid — but it happens exactly ONCE, at a moment when the
+     * blackout veil is fully opaque, so the render it causes is invisible and
+     * there is no per-frame cost. The alternative, rendering both words and
+     * cross-fading them, would put the destination's name on screen during the
+     * journey with only an opacity between it and the viewer.
+     */
+    const t = cinematicClock.elapsed
+    if (!arrivedTitle && t >= 14.35) setArrivedTitle(true)
+    else if (arrivedTitle && t < 14.0 && cinematicClock.scrub !== null) setArrivedTitle(false)
 
     if (cinematicClock.running && cinematicClock.elapsed >= DURATION) {
       cinematicClock.running = false

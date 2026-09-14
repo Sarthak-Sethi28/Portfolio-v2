@@ -105,7 +105,17 @@ export function sampleCinematic(t: number, out: CinematicSample): CinematicSampl
 
   // 05. Columns descend, 4.0 to 5.0 with per-pillar stagger applied by the
   // caller — this is the envelope, not the individual timing.
-  out.pillarDescent = heavy(t, 4.0, 5.35)
+  /*
+   * The columns come back while the screen is black.
+   *
+   * They sink at four seconds and must be STANDING again at fifteen, because
+   * the signed-off night endpoint has all four of them — the destination is a
+   * contract, not a consequence of what the journey happened to leave behind.
+   * Restoring them between 14.05 and 14.4 puts the change entirely inside the
+   * blackout, where the camera is also being repositioned, so the world on the
+   * far side is simply the world that was always there.
+   */
+  out.pillarDescent = heavy(t, 4.0, 5.35) * (1 - span(t, 14.05, 14.4))
 
   // 06. ALONE. 1 through the held breath, so systems can damp themselves.
   out.stillness = pulse(t, 5.1, 5.55, 6.05)
