@@ -16,7 +16,9 @@ import { ArrayWorld } from './array/ArrayWorld'
 import { UnderWorld } from './under/UnderWorld'
 import { Mirror } from './array/Mirror'
 import { IdleRig } from './camera/IdleRig'
+import { Sequencer } from './Sequencer'
 import { createAnim, type Anim } from './anim'
+import { sample } from './sequence'
 import { FlickerProbe } from './FlickerProbe'
 
 /**
@@ -36,6 +38,8 @@ export function Stage() {
   const envIntensity = useScene((s) => s.envIntensity)
   // Mirrors anim.night into render scope. Written by the frame loop below.
   const nightLevel = useScene((s) => s.nightLevel)
+  const sequence = useScene((s) => s.sequence)
+  const setSequence = useScene((s) => s.setSequence)
   const setNightLevel = useScene((s) => s.setNightLevel)
   const setEnvIntensity = useScene((s) => s.setEnvIntensity)
   const setFlicker = useScene((s) => s.setFlicker)
@@ -72,7 +76,17 @@ export function Stage() {
     // Ease toward the target rather than snapping — the cross-fade IS the
     // day/night transition, so its duration is the feature.
     const anim = animRef.current
-    anim.night = MathUtils.damp(anim.night, night ? 1 : 0, 1.4, delta)
+    /*
+     * The sequence turns the world over.
+     *
+     * Night is no longer only a toggle: THE SHIFT is a beat, and once the
+     * portal is at full power the world has already changed by the time the
+     * camera goes through it. Taking the larger of the two means the arrival
+     * can drive it forward while the toggle still works for development, and
+     * neither can drag the other backwards mid-move.
+     */
+    const target = Math.max(night ? 1 : 0, sample(sequence).night)
+    anim.night = MathUtils.damp(anim.night, target, 1.4, delta)
     blendPalette(anim.night, palette)
     // Moonlight is a fraction of dusk, not a dimmer version of it. Written to
     // the store only when it has moved enough to see, so a smooth blend does
@@ -80,6 +94,16 @@ export function Stage() {
     const nextEnv = 1.15 - anim.night * 0.95
     if (Math.abs(nextEnv - envIntensity) > 0.02) setEnvIntensity(nextEnv)
     if (Math.abs(anim.night - nightLevel) > 0.02) setNightLevel(anim.night)
+
+    /*
+     * Hold the sequence wherever ?seq says.
+     *
+     * A fifteen-second move cannot be judged by watching it go past — every
+     * beat needs to be stoppable and photographable. Writing it straight into
+     * the store each frame also means a scrub is authoritative: nothing else
+     * can advance the clock behind the flag's back.
+     */
+    if (flags.seq !== null && Math.abs(flags.seq - sequence) > 0.001) setSequence(flags.seq)
 
     const fog = fogRef.current
     if (fog) {
@@ -229,6 +253,7 @@ export function Stage() {
           still world still reads as a photograph. */}
       {!flags.still && <Birds palette={palette} />}
       <IdleRig />
+      <Sequencer />
 
       {/* multisampling is NOT optional.
           EffectComposer renders into its own buffer, which silently discards

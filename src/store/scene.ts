@@ -81,6 +81,18 @@ interface SceneState {
    */
   envIntensity: number
   setEnvIntensity: (v: number) => void
+  /**
+   * Position in the arrival sequence, 0 to 1.
+   *
+   * Lives in the store rather than in a ref because both the frame loop and
+   * render-scope readers need it, and a ref read during render is a React
+   * Compiler violation.
+   */
+  sequence: number
+  setSequence: (v: number) => void
+  /** True while the arrival is playing. */
+  playing: boolean
+  setPlaying: (v: boolean) => void
   /** Day/night blend, mirrored from the frame loop for render-scope readers. */
   nightLevel: number
   setNightLevel: (v: number) => void
@@ -117,9 +129,16 @@ interface SceneState {
 export const useScene = create<SceneState>((set) => ({
   phase: 'booting',
   world: 'array',
-  // This worktree exists to develop the ARRIVAL, which is at night — so it
-  // opens there rather than needing a keypress. The main instance stays day.
-  night: true,
+  /*
+   * The site opens on THE ARRIVAL, in daylight.
+   *
+   * This worktree used to boot straight into night because night was the thing
+   * being built. It is not a separate world any more — it is where the arrival
+   * takes you, and the journey from one to the other is the site. Opening at
+   * the destination would spend the whole reveal before the visitor has
+   * touched anything.
+   */
+  night: false,
   rain: false,
   freelook: false,
   muted: true,
@@ -127,6 +146,7 @@ export const useScene = create<SceneState>((set) => ({
   reducedMotion: false,
   flags: {
     ao: false,
+    seq: null,
     noGate: false,
     still: false,
     noBloom: false,
@@ -144,6 +164,8 @@ export const useScene = create<SceneState>((set) => ({
   },
   flicker: [],
   envIntensity: 1.15,
+  sequence: 0,
+  playing: false,
   nightLevel: 0,
 
   hovered: null,
@@ -163,6 +185,8 @@ export const useScene = create<SceneState>((set) => ({
   applyFlags: () => set({ flags: readFlags() }),
   setFlicker: (flicker) => set({ flicker }),
   setEnvIntensity: (envIntensity) => set({ envIntensity }),
+  setSequence: (sequence) => set({ sequence }),
+  setPlaying: (playing) => set({ playing }),
   setNightLevel: (nightLevel) => set({ nightLevel }),
   setHovered: (hovered) => set({ hovered }),
   openSectionPanel: (openSection) => set({ openSection, openProject: null }),

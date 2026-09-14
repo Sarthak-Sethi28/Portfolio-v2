@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useScene } from '@/store/scene'
 
 /**
- * Keyboard shortcuts for development. No visible controls.
+ * Keyboard input. No visible controls.
  *
  * There is deliberately nothing on screen.
  *
@@ -15,12 +15,20 @@ import { useScene } from '@/store/scene'
  * somewhere. Jace's site can carry a SYS.CONFIG panel because his whole
  * framing is a machine you are operating; ours is a place.
  *
- * The keys stay because building the arrival means looking at night and rain
- * constantly. They are undocumented on purpose.
+ * N and R stay because building the arrival means looking at night and rain
+ * constantly, and they are undocumented on purpose.
+ *
+ * F is different in kind: it plays the arrival, which is the one thing the
+ * visitor is actually meant to do here. It is on a key rather than a button
+ * for now, but it is not a debug shortcut — when this gets its real trigger,
+ * this is the call it makes.
  */
 export function Controls() {
   const toggleNight = useScene((s) => s.toggleNight)
   const toggleRain = useScene((s) => s.toggleRain)
+  const setPlaying = useScene((s) => s.setPlaying)
+  const setSequence = useScene((s) => s.setSequence)
+  const night = useScene((s) => s.night)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -29,10 +37,24 @@ export function Controls() {
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
       if (e.key === 'n' || e.key === 'N') toggleNight()
       if (e.key === 'r' || e.key === 'R') toggleRain()
+      /*
+       * F plays the arrival.
+       *
+       * It always starts from the day side, because the sequence IS the
+       * journey from day to night — running it while already at night would
+       * play fifteen seconds of a world changing into what it already is. So
+       * pressing it at night rewinds to day first and goes again.
+       */
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault()
+        if (night) toggleNight()
+        setSequence(0)
+        setPlaying(true)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [toggleNight, toggleRain])
+  }, [toggleNight, toggleRain, setPlaying, setSequence, night])
 
   return null
 }

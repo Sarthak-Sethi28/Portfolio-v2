@@ -1,10 +1,12 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
-import { Box3, Color, Plane, Vector3, type Mesh, type MeshStandardMaterial } from 'three'
+import { Box3, Color, Plane, Vector3, type Group, type Mesh, type MeshStandardMaterial } from 'three'
 import type { Placement } from '../geometry/layout'
+import { sample } from '../sequence'
+import { useScene } from '@/store/scene'
 
 /**
  * A pier from a downloaded model, on trial.
@@ -81,6 +83,7 @@ export function ModelPier({
   variant?: number
 }) {
   const { scene } = useGLTF(src)
+  const sequence = useScene((st) => st.sequence)
   const { position, rotationY, tilt, height, submerge } = placement
 
   /*
@@ -197,8 +200,25 @@ export function ModelPier({
    * intensity higher. Past about 1.2 the stone flattens into a glowing blob
    * and the muqarnas detail, which is the entire reason for this asset, goes.
    */
+  const sink = useRef<Group>(null)
   useFrame(() => {
     for (const m of litMaterials) m.emissiveIntensity = glow * 0.5
+
+    /*
+     * THE RESPONSE — the columns descend.
+     *
+     * They sink rather than fade, and they sink FAR: a column that drops a
+     * token amount reads as settling, and the beat is the sea taking them. The
+     * stagger is keyed off each pier's own placement so the four do not go
+     * down together, which would read as one object rather than four answering
+     * the same summons.
+     */
+    const g = sink.current
+    if (!g) return
+    const s = sample(sequence)
+    const lag = ((Math.abs(position[0]) * 0.013) % 1) * 0.45
+    const d = Math.max(0, Math.min(1, s.descend * 1.5 - lag))
+    g.position.y = -(d * d * (3 - 2 * d)) * height * 1.5
   })
 
   // Measure, then fit: read the real bounding box and normalise to the height
@@ -212,6 +232,7 @@ export function ModelPier({
 
   return (
     <group position={position} rotation={[0, rotationY, tilt]}>
+      <group ref={sink}>
       {/*
         A source inside the stone, not just a surface that is bright.
         
@@ -259,6 +280,7 @@ export function ModelPier({
           0,
         ]}
       />
+      </group>
     </group>
   )
 }

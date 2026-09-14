@@ -23,13 +23,27 @@ export function Title() {
    * and the same wide-tracked type on a different word is what tells them so.
    */
   const night = useScene((s) => s.night)
+  /*
+   * The type clears out for the journey.
+   *
+   * It sat over every beat of the arrival — the columns going under, the lock
+   * turning, the flight down the throat — where it read as a watermark stuck
+   * to the lens rather than as signage on a landscape. A title belongs to a
+   * held shot. Once the world starts moving it has nothing to label, and by
+   * the tunnel it was literally printed across the vanishing point.
+   *
+   * So it leaves as soon as the sequence starts and returns on the far side,
+   * by which time the word underneath it has changed.
+   */
+  const sequence = useScene((s) => s.sequence)
+  const travelling = sequence > 0.001 && sequence < 0.999
   const letters = (night ? 'PROJECTS' : profile.name.toUpperCase()).split('')
 
   return (
     <div
       className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
       style={{
-        opacity: open || noUi ? 0 : 1,
+        opacity: open || noUi || travelling ? 0 : 1,
         transition: 'opacity 700ms ease-in-out',
       }}
     >
