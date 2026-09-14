@@ -205,6 +205,27 @@ def arc_solid(name, r_in, r_out, a0, a1, depth, steps=10):
     bm.faces.new((front_in[0], front_out[0], back_out[0], back_in[0]))
     bm.faces.new((back_in[steps], back_out[steps], front_out[steps], front_in[steps]))
 
+    # UVs. Without them the shell could only ever be flat colour, which is why
+    # it rendered as white plastic next to a fully textured machine.
+    #
+    # Cylindrical: U runs around the arc, V across the radial width, so the
+    # texture wraps the ring the way rolled plate would rather than being
+    # projected flat and smearing on the returns. Scaled by the real arc length
+    # so the grain is the same size on a wide section as on a narrow one — a
+    # per-section 0..1 unwrap would make every section look like a different
+    # material.
+    uv = bm.loops.layers.uv.new("UVMap")
+    for face in bm.faces:
+        for loop in face.loops:
+            co = loop.vert.co
+            ang = math.atan2(co.y, co.x)
+            rad = math.hypot(co.x, co.y)
+            # Fine tiling on purpose. At 1.6 the map's larger features repeated
+            # about fourteen times around the ring and read as a printed motif;
+            # at this scale the same map is surface grain, which is all a
+            # dormant shell needs from it.
+            loop[uv].uv = (ang * r_out * 5.5, (rad - r_in) * 5.5 + co.z * 2.0)
+
     bm.normal_update()
     bm.to_mesh(me)
     bm.free()
@@ -241,6 +262,97 @@ def arc_solid(name, r_in, r_out, a0, a1, depth, steps=10):
     bev.limit_method = "ANGLE"
     bev.angle_limit = math.radians(35)
     return ob
+
+
+def clad_material(name, source_meshes):
+    """
+    A material built from the imported asset's own image maps.
+
+    Reaches into the imported material's node tree and reuses the actual image
+    datablocks — base colour, normal and roughness — so the shell is made of
+    the same stuff as the machine underneath it. Falls back to plain stone if
+    the asset ever arrives without textures, because a build that dies on a
+    missing map is worse than one that looks wrong.
+    """
+    src = None
+    for ob in source_meshes:
+        for slot in ob.material_slots:
+            if slot.material and slot.material.use_nodes:
+                src = slot.material
+                break
+        if src:
+            break
+    if src is None:
+        return material(name, (0.42, 0.40, 0.37), rough=0.85)
+
+    images = {}
+    for node in src.node_tree.nodes:
+        if node.type == "TEX_IMAGE" and node.image:
+            for out in node.outputs:
+                for link in out.links:
+                    images[link.to_socket.name] = node.image
+
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+
+    def hook(image, socket, non_color=False):
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = image
+        if non_color:
+            tex.image.colorspace_settings.name = "Non-Color"
+        nt.links.new(tex.outputs["Color"], bsdf.inputs[socket])
+        return tex
+
+    base_img = images.get("Base Color")
+    if base_img:
+        # Multiplied down, so the dormant shell is the weathered OUTSIDE of the
+        # machine rather than a second copy of its lit face.
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = base_img
+        # DESATURATE, then darken.
+        #
+        # The asset's base colour has the energy channel painted into it, so
+        # borrowing the map wholesale covered the dormant shell in glowing red
+        # markings — a ring that is meant to read as dead stone wearing the
+        # machine's lit face. Pulling the saturation out keeps everything worth
+        # having from that map (the grain, the panel breaks, the wear) and
+        # removes the one thing that gives the game away. Hue, not level: just
+        # dimming it leaves the red as dark red.
+        hsv = nt.nodes.new("ShaderNodeHueSaturation")
+        hsv.inputs["Saturation"].default_value = 0.12
+        hsv.inputs["Value"].default_value = 0.85
+        nt.links.new(tex.outputs["Color"], hsv.inputs["Color"])
+
+        mix = nt.nodes.new("ShaderNodeMixRGB")
+        mix.blend_type = "MULTIPLY"
+        mix.inputs["Fac"].default_value = 1.0
+        mix.inputs["Color2"].default_value = (0.74, 0.72, 0.68, 1.0)
+        nt.links.new(hsv.outputs["Color"], mix.inputs["Color1"])
+        nt.links.new(mix.outputs["Color"], bsdf.inputs["Base Color"])
+
+    if "Roughness" in images:
+        hook(images["Roughness"], "Roughness", non_color=True)
+    else:
+        bsdf.inputs["Roughness"].default_value = 0.8
+
+    nrm_img = None
+    for node in src.node_tree.nodes:
+        if node.type == "NORMAL_MAP":
+            for link in node.inputs["Color"].links:
+                nrm_img = link.from_node.image
+    if nrm_img:
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = nrm_img
+        tex.image.colorspace_settings.name = "Non-Color"
+        nm = nt.nodes.new("ShaderNodeNormalMap")
+        nm.inputs["Strength"].default_value = 0.8
+        nt.links.new(tex.outputs["Color"], nm.inputs["Color"])
+        nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
+
+    bsdf.inputs["Metallic"].default_value = 0.25
+    return m
 
 
 def material(name, base, rough=0.6, metal=0.0, emit=None, emit_strength=0.0):
@@ -360,7 +472,20 @@ def main():
 
     # ---- dormant shell ----
     shell = ring_plane(empty("SHELL", root))
-    stone = material("ShellStone", (0.44, 0.42, 0.39), rough=0.85)
+
+    # THE SHELL WEARS THE MACHINE'S OWN TEXTURES.
+    #
+    # It was a flat grey Principled surface, and against a fully mapped asset
+    # it read as white plastic — the single most conspicuous thing in every
+    # preview. The dormant ring is supposed to BE the day homepage's ring, and
+    # that ring is this asset, so the honest fix is to use the same maps rather
+    # than to invent a stone look that would never match.
+    #
+    # Darkened and roughened through the Principled inputs rather than by
+    # editing the images: the shell is the weathered outside of the machine,
+    # not a different material, and multiplying keeps every bit of variation
+    # the texture author put there.
+    stone = clad_material("ShellClad", meshes)
 
     # Sized against the energy channel at both ends of the move, which is the
     # only constraint that actually matters here.
@@ -661,6 +786,22 @@ def main():
         capture_output=True, text=True, cwd=HERE,
     )
     log(r.stdout.strip() or r.stderr.strip())
+
+    # COMPRESS. 15MB of uncompressed PNG is not something to ship, and the same
+    # three steps took the source asset from 14.3MB to 503KB. Run as separate
+    # passes rather than through `optimize`, which flattens hierarchies
+    # destructively and would take the named nodes the animation targets.
+    tmp_a, tmp_b = OUT_GLB + ".a", OUT_GLB + ".b"
+    cli = ["npx", "--yes", "@gltf-transform/cli@latest"]
+    for args in (
+        ["resize", OUT_GLB, tmp_a, "--width", "1024", "--height", "1024"],
+        ["webp", tmp_a, tmp_b],
+        ["draco", tmp_b, OUT_GLB],
+    ):
+        subprocess.run(cli + args, capture_output=True, text=True, cwd=HERE)
+    for f in (tmp_a, tmp_b):
+        if os.path.exists(f):
+            os.remove(f)
 
     total = len([o for o in bpy.data.objects])
     animated = len([o for o in bpy.data.objects if o.animation_data and o.animation_data.action])
