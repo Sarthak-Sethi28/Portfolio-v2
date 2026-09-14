@@ -81,9 +81,36 @@ export function WaterShockwave() {
           vec3 lightDir = normalize(vec3(0.35, 0.30, 0.89));
           float spec = pow(max(dot(n, lightDir), 0.0), 7.0);
 
-          // Energy spread around a growing circumference, and gone by the end.
+          /*
+           * Rise, then fall. The rise is not optional.
+           *
+           * With only the falloff term the wave existed at full amplitude on
+           * its very first frame, when its crest is still at radius zero — the
+           * height field is near-vertical there, the gain drives the normal
+           * hard over, and the specular saturated across the entire plane. The
+           * ocean went pure white for a frame. Energy leaving a source starts
+           * at nothing and builds, so the front now grows in over the first
+           * tenth of the wave's life.
+           */
+          /*
+           * GATE ON THE WAVE ITSELF.
+           *
+           * This was the real cause of the foreground washing out, and it is
+           * not obvious: flat water has a normal of (0,0,1), which points
+           * almost directly at the light, so the specular came back high across the
+           * ENTIRE plane and not just on the crest. The gradient tells you how
+           * the surface is tilted; it says nothing about whether there is a
+           * wave there at all. Undisturbed water must contribute nothing, so
+           * the output is masked by the local amplitude.
+           */
+          float amp = abs(height(p, lead));
+          float present = smoothstep(0.02, 0.22, amp);
+
+          float rise = smoothstep(0.0, 0.11, uProgress);
           float falloff = (1.0 - uProgress) * (1.0 - uProgress);
-          float a = spec * falloff * 3.4;
+          // Clamped: additive blending has no natural ceiling, and one bad
+          // frame of unbounded highlight is a flash in the viewer's face.
+          float a = min(spec * present * rise * falloff * 3.0, 0.8);
 
           // A trace of the portal's red carried on the front, no more.
           vec3 col = mix(vec3(0.70, 0.78, 0.90), vec3(1.0, 0.32, 0.16), 0.35);

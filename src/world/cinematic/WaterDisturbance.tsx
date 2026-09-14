@@ -83,8 +83,21 @@ export function WaterDisturbance() {
           float spec = pow(max(dot(n, lightDir), 0.0), 8.0);
 
           // Fades to nothing at the rim, so the patch has no edge.
+          // Same gate as the shockwave: flat water points its normal at the
+          // light and would otherwise be specular everywhere.
+          float present = smoothstep(0.015, 0.2, abs(height(p)));
           float edge = 1.0 - smoothstep(0.55, 1.0, r);
-          float a = spec * edge * uAmount * 1.8;
+          /*
+           * Clamped, and gentler.
+           *
+           * Additive blending has no ceiling, so a specular that saturates
+           * simply keeps adding — the patch stopped reading as agitated water
+           * and washed the whole foreground to pale grey, which also destroyed
+           * the sunset reflection it was sitting on top of. This is meant to
+           * be a disturbance ON the ocean, so it must never be brighter than
+           * the ocean it disturbs.
+           */
+          float a = min(spec * present * edge * uAmount * 1.1, 0.4);
           gl_FragColor = vec4(vec3(0.62, 0.72, 0.86) * a, a);
         }
       `,
