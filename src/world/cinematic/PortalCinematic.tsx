@@ -4,9 +4,12 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import {
+  AdditiveBlending,
   AnimationMixer,
+  Color,
   Box3,
   LoopOnce,
+  MeshBasicMaterial,
   Vector3,
   type Mesh,
   type MeshStandardMaterial,
@@ -59,6 +62,7 @@ export function PortalCinematic({
      */
     const centre = new Box3().setFromObject(root).getCenter(new Vector3())
     const emits: { obj: Object3D; mat: MeshStandardMaterial; turn: number }[] = []
+    const halos: MeshBasicMaterial[] = []
     const indicators: { mat: MeshStandardMaterial; order: number }[] = []
 
     root.traverse((o) => {
@@ -110,7 +114,39 @@ export function PortalCinematic({
       const src = mesh.material as MeshStandardMaterial
       const mat = src.clone()
       mat.emissiveIntensity = 0
+      if (isEmit) {
+        // Deep saturated red, well below the point where ACES desaturates it.
+        mat.emissive = new Color('#ff1a0d')
+        mat.color = new Color('#1a0402')
+        mat.toneMapped = true
+      }
       mesh.material = mat
+
+      /*
+       * A HALO of real geometry around each energy section.
+       *
+       * Bloom is not available here — it was removed after being measured
+       * taking frame-to-frame variance from 1.05x to 61x — and it is not
+       * wanted anyway, because a bloom pass blows the core out to white, which
+       * is the exact failure being fixed. A slightly larger transparent shell
+       * of the same arc gives the channel the soft falloff of something
+       * genuinely bright while the core keeps its colour.
+       */
+      if (isEmit) {
+        const halo = mesh.clone() as Mesh
+        halo.material = new MeshBasicMaterial({
+          color: new Color('#c2140a'),
+          transparent: true,
+          opacity: 0,
+          blending: AdditiveBlending,
+          depthWrite: false,
+          toneMapped: false,
+        })
+        halo.scale.multiplyScalar(1.035)
+        halo.renderOrder = 5
+        mesh.parent?.add(halo)
+        halos.push(halo.material as MeshBasicMaterial)
+      }
 
       const p = new Vector3()
       o.getWorldPosition(p)
@@ -130,7 +166,7 @@ export function PortalCinematic({
     const size = new Box3().setFromObject(root).getSize(new Vector3())
     const scale = size.y > 0 ? height / size.y : 1
 
-    return { root, emits, indicators, scale, centre, radius: (size.x / 2) * scale }
+    return { root, emits, indicators, halos, scale, centre, radius: (size.x / 2) * scale }
   }, [scene, height])
 
   const mixer = useMemo(() => new AnimationMixer(built.root), [built.root])
@@ -227,7 +263,18 @@ export function PortalCinematic({
      * frame-to-frame variance from 1.05x to 61x.
      */
     for (const e of built.emits) {
-      const local = (s.ignition - e.turn * 0.92) / 0.1
+      /*
+       * TWO WAVEFRONTS, from bottom centre, meeting at the top.
+       *
+       * A single circuit round the ring reads as an LED chase. The charge
+       * enters at the foot and splits, so two fronts climb the ring against
+       * each other and CLOSE at the crown — which is what makes the full-power
+       * beat feel earned rather than merely reached. `turn` is 0 at the bottom
+       * and 1 after a full turn, so the distance either front has to travel is
+       * whichever way round is shorter.
+       */
+      const reach = Math.min(e.turn, 1 - e.turn) * 2
+      const local = (s.ignition - reach * 0.86) / 0.11
       const lit = Math.min(1, Math.max(0, local))
       const front = Math.max(0, 1 - Math.abs(local - 1) * 1.6)
       /*
@@ -240,7 +287,17 @@ export function PortalCinematic({
        * while it travels, so the front is a smaller lift over a dimmer trail
        * rather than a brighter one over a bright one.
        */
-      e.mat.emissiveIntensity = lit * (1.15 + s.power * 0.85) + front * 0.9
+      /*
+       * EXPOSURE-SAFE. The colour is the point.
+       *
+       * Under ACES any channel pushed far enough past 1 tops out on all three
+       * and arrives white, so the previous values turned a deep red circuit
+       * into peach and then cream — the brightest thing in the frame was also
+       * the least red. Power is communicated by the halo, by the spill onto
+       * the water and by the world going dark around it, NOT by overdriving
+       * the emissive until it loses its hue.
+       */
+      e.mat.emissiveIntensity = lit * (0.85 + s.power * 0.4) + front * 0.45
     }
 
     /*
@@ -254,6 +311,10 @@ export function PortalCinematic({
       const on = Math.min(1, Math.max(0, (s.power - 0.15 - ind.order * 0.35) * 3.2))
       ind.mat.emissiveIntensity = on * 0.9
     }
+
+    // The halo carries the sense of brightness the core deliberately does not.
+    const haloOn = Math.min(1, s.ignition * 1.1) * (0.1 + s.power * 0.08)
+    for (const h of built.halos) h.opacity = haloOn
 
     // The spill follows the circuit as it completes, then holds at power.
     const level = Math.max(s.ignition * 0.75, s.power)
