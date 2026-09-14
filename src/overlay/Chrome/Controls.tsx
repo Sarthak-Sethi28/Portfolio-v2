@@ -26,8 +26,8 @@ import { useScene } from '@/store/scene'
 export function Controls() {
   const toggleNight = useScene((s) => s.toggleNight)
   const toggleRain = useScene((s) => s.toggleRain)
-  const setPlaying = useScene((s) => s.setPlaying)
-  const setSequence = useScene((s) => s.setSequence)
+  const setCinematic = useScene((s) => s.setCinematic)
+  const cinematic = useScene((s) => s.cinematic)
   const night = useScene((s) => s.night)
 
   useEffect(() => {
@@ -47,14 +47,22 @@ export function Controls() {
        */
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault()
-        if (night) toggleNight()
-        setSequence(0)
-        setPlaying(true)
+        /*
+         * Once, from the day side, and not interruptible.
+         *
+         * Restarting or reversing mid-transition would put the world in a
+         * state no beat describes — pillars half-sunk while the sky runs
+         * backwards — and every system here derives its value from one clock
+         * on the assumption that the clock only moves forward through a piece
+         * that was authored in one direction.
+         */
+        if (cinematic !== 'idle' || night) return
+        setCinematic('playing')
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [toggleNight, toggleRain, setPlaying, setSequence, night])
+  }, [toggleNight, toggleRain, setCinematic, cinematic, night])
 
   return null
 }

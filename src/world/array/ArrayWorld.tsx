@@ -10,7 +10,7 @@ import { scatterField, sectionRing } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
 import { Pier } from './Pier'
 import { ModelPier } from './ModelPier'
-import { ModelAperture } from './ModelAperture'
+import { PortalCinematic } from '../cinematic/PortalCinematic'
 import { Figure } from './Figure'
 
 /**
@@ -71,6 +71,30 @@ export function ArrayWorld({
     () => sectionRing(SECTIONS.length, config.arraySpacing),
     [config.arraySpacing],
   )
+
+  /*
+   * Which column goes down when, decided by where each one STANDS.
+   *
+   * The brief asks for far-left, far-right, near-left, near-right at a sixth
+   * of a second apart, and that is a statement about the picture rather than
+   * about the layout's internal ordering. Sorting by depth and then by side
+   * means the wave reads correctly on screen even if sectionRing is later
+   * changed to emit its placements in another order — keying off array indices
+   * would look right today and silently scramble the moment it is.
+   *
+   * Delays are expressed against the descent envelope rather than in seconds,
+   * so retiming the beat in the timeline retimes the stagger with it.
+   */
+  const descentDelays = useMemo(() => {
+    const order = sections
+      .map((p, i) => ({ i, x: p.position[0], z: p.position[2] }))
+      .sort((a, b) => (a.z - b.z) || (a.x - b.x))
+    const delays = new Array<number>(sections.length).fill(0)
+    order.forEach((entry, rank) => {
+      delays[entry.i] = rank * 0.11
+    })
+    return delays
+  }, [sections])
   const field = useMemo(
     () => scatterField(config.fieldDensity, config.arraySpacing),
     [config.fieldDensity, config.arraySpacing],
@@ -106,7 +130,7 @@ export function ArrayWorld({
         // All four are the same order. A colonnade is one column repeated —
         // mixing traditions along a single line would read as an accident.
         const src = '/models/muqarnas.glb'
-        return <ModelPier key={id} placement={placement} variant={0} src={src} mirrored={mirrored} glow={mirrored ? 0 : nightLevel} />
+        return <ModelPier key={id} placement={placement} variant={0} src={src} mirrored={mirrored} glow={mirrored ? 0 : nightLevel} descentDelay={descentDelays[i]} />
         return (
           <Pier
             key={id}
@@ -138,7 +162,7 @@ export function ArrayWorld({
         />
       ))}
 
-      {!flags.noGate && <ModelAperture />}
+      {!flags.noGate && <PortalCinematic />}
       {/* The telescope, well clear on the right and near enough to approach. */}
       {/*
         Left of the axis, not right.

@@ -16,9 +16,11 @@ import { ArrayWorld } from './array/ArrayWorld'
 import { UnderWorld } from './under/UnderWorld'
 import { Mirror } from './array/Mirror'
 import { IdleRig } from './camera/IdleRig'
-import { Sequencer } from './Sequencer'
+import { CinematicDirector } from './cinematic/CinematicDirector'
+import { WaterDisturbance } from './cinematic/WaterDisturbance'
+import { WaterShockwave } from './cinematic/WaterShockwave'
 import { createAnim, type Anim } from './anim'
-import { sample } from './sequence'
+import { cinematicSample } from './cinematic/cinematicState'
 import { FlickerProbe } from './FlickerProbe'
 
 /**
@@ -38,8 +40,7 @@ export function Stage() {
   const envIntensity = useScene((s) => s.envIntensity)
   // Mirrors anim.night into render scope. Written by the frame loop below.
   const nightLevel = useScene((s) => s.nightLevel)
-  const sequence = useScene((s) => s.sequence)
-  const setSequence = useScene((s) => s.setSequence)
+  const cinematic = useScene((s) => s.cinematic)
   const setNightLevel = useScene((s) => s.setNightLevel)
   const setEnvIntensity = useScene((s) => s.setEnvIntensity)
   const setFlicker = useScene((s) => s.setFlicker)
@@ -77,16 +78,33 @@ export function Stage() {
     // day/night transition, so its duration is the feature.
     const anim = animRef.current
     /*
-     * The sequence turns the world over.
+     * NIGHT HANDOFF. One authority at a time.
      *
-     * Night is no longer only a toggle: THE SHIFT is a beat, and once the
-     * portal is at full power the world has already changed by the time the
-     * camera goes through it. Taking the larger of the two means the arrival
-     * can drive it forward while the toggle still works for development, and
-     * neither can drag the other backwards mid-move.
+     * While the cinematic runs, the timeline's night value is taken ABSOLUTELY
+     * — no damping. Damping toward it as well would leave two systems easing
+     * the same number at different rates, and the visible result is the sky
+     * lagging behind the water and the portal for the whole transition.
+     *
+     * The handover is silent because the timeline reaches exactly 1 before the
+     * clock runs out, so by the time the store's night flag flips, the damped
+     * path is already sitting on the value it would have damped toward. There
+     * is nothing left to move.
      */
-    const target = Math.max(night ? 1 : 0, sample(sequence).night)
-    anim.night = MathUtils.damp(anim.night, target, 1.4, delta)
+    /*
+     * "Engaged" means playing OR scrubbed, not playing alone.
+     *
+     * Keying this on the status alone meant a scrub was checked against a
+     * world that was still damping toward day: at ?seq=0.8 the timeline said
+     * full night and the sky rendered full daylight, so every verification
+     * frame after the shift was a lie about what playback would do. A
+     * deterministic scrub is only worth having if it drives exactly what
+     * playback drives.
+     */
+    if (cinematic === 'playing' || flags.seq !== null) {
+      anim.night = cinematicSample.night
+    } else {
+      anim.night = MathUtils.damp(anim.night, night ? 1 : 0, 1.4, delta)
+    }
     blendPalette(anim.night, palette)
     // Moonlight is a fraction of dusk, not a dimmer version of it. Written to
     // the store only when it has moved enough to see, so a smooth blend does
@@ -95,15 +113,6 @@ export function Stage() {
     if (Math.abs(nextEnv - envIntensity) > 0.02) setEnvIntensity(nextEnv)
     if (Math.abs(anim.night - nightLevel) > 0.02) setNightLevel(anim.night)
 
-    /*
-     * Hold the sequence wherever ?seq says.
-     *
-     * A fifteen-second move cannot be judged by watching it go past — every
-     * beat needs to be stoppable and photographable. Writing it straight into
-     * the store each frame also means a scrub is authoritative: nothing else
-     * can advance the clock behind the flag's back.
-     */
-    if (flags.seq !== null && Math.abs(flags.seq - sequence) > 0.001) setSequence(flags.seq)
 
     const fog = fogRef.current
     if (fog) {
@@ -248,12 +257,17 @@ export function Stage() {
         )}
       </Suspense>
 
+      {/* Local water response to the portal. Both are inert at rest. */}
+      <WaterDisturbance />
+      <WaterShockwave />
+
       <Motes count={flags.noMotes ? 0 : moteCount} palette={palette} />
       {/* Something in the frame with its own intent. A drifting camera over a
           still world still reads as a photograph. */}
       {!flags.still && <Birds palette={palette} />}
+      {/* First, so the clock is written before anything reads it. */}
+      <CinematicDirector />
       <IdleRig />
-      <Sequencer />
 
       {/* multisampling is NOT optional.
           EffectComposer renders into its own buffer, which silently discards

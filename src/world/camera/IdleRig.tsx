@@ -4,7 +4,6 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useRef } from 'react'
 import { MathUtils, Vector3 } from 'three'
 import { useScene } from '@/store/scene'
-import { sample } from '../sequence'
 
 /**
  * Pixel-stable resting camera.
@@ -38,14 +37,7 @@ import { sample } from '../sequence'
  * frames get their power, and why their camera sits where it does.
  */
 const REST = new Vector3(0, 9, 128)
-/*
- * The height of the portal's opening, so the camera can pass THROUGH it.
- *
- * Derived from how ModelAperture is placed: it sits at y = -10 and stands 84
- * units tall, so the centre of the ring is 32 above the water. Aiming anywhere
- * else and the last move clips the structure instead of threading it.
- */
-const GATE_Y = 32
+
 const TARGET = new Vector3(0, 26, -110)
 
 const POINTER_DEADZONE = 0.08
@@ -72,7 +64,6 @@ export function IdleRig() {
   const still = useScene((s) => s.flags.still)
   const closeup = useScene((s) => s.flags.closeup)
   const under = useScene((s) => s.flags.under)
-  const sequence = useScene((s) => s.sequence)
 
   const aim = useRef(TARGET.clone())
   const desired = useRef(TARGET.clone())
@@ -106,71 +97,13 @@ export function IdleRig() {
      * membrane above them.
      */
     /*
-     * THE SEQUENCE OWNS THE CAMERA.
+     * The camera stays at rest for now.
      *
-     * Checked before every resting behaviour, including `still` and reduced
-     * motion, because those exist to stop IDLE drift — the thing that was
-     * making hard edges cross sub-pixel boundaries forever — and not to
-     * forbid deliberate movement. Freezing the camera through the one move
-     * the whole site is built around would be obeying the letter of that fix
-     * and losing the reason for it.
-     *
-     * Two travels with a long hold between them. The first pushes in from the
-     * wide arrival to a station where the ring fills the frame, and then STOPS
-     * — every mechanical beat, the unlock and the ignition, plays from a
-     * locked-off camera, because a shot that keeps creeping while something is
-     * happening tells the viewer the movement is the point when the mechanism
-     * is. The second travel is the one that goes through.
-     *
-     * It flies to z = -230, well past the ring at -150, so the camera is
-     * genuinely through the aperture rather than stopping inside it.
+     * Step 4 is the world; step 5 owns the fly-through. The previous
+     * sequence-driven path has been removed rather than left half-wired,
+     * because a camera that moves on a clock nothing else reads any more is a
+     * second authority waiting to disagree with the first.
      */
-    if (sequence > 0.001) {
-      const s = sample(sequence)
-      /*
-       * Distances are chosen against the ring at z = -150, not by feel.
-       *
-       * 30 leaves the whole structure in frame with room around it. -66 is
-       * about eighty units off the ring, which crops it — that is the point,
-       * because the unlock is detail and detail needs to be close enough to
-       * read. -14 opens back out for full power, where the subject is the
-       * whole object rather than its mechanism. -230 is well past the ring,
-       * so the last move goes THROUGH rather than stopping inside it.
-       */
-      const z =
-        MathUtils.lerp(REST.z, 30, s.approach) +
-        (-96 * s.closeIn) +
-        (52 * s.standBack) +
-        (-150 * s.approachGate) +
-        /*
-         * Into the tunnel, not merely past the ring.
-         *
-         * The first version flew to -230 and the camera ended up level with
-         * the structure and then out the other side into open sea — it sailed
-         * PAST the portal instead of entering it. The ring plane is at -150
-         * and the throat runs back from there, so the travel has to carry on
-         * well beyond it for the passage to be something the viewer is inside
-         * of rather than something they clipped through.
-         */
-        (-260 * s.through)
-
-      /*
-       * The eye line rises to the centre of the opening as it closes in.
-       *
-       * Held at the resting height, the tight beats looked up at the ring from
-       * below the waterline and the camera could never have threaded it.
-       */
-      const y = MathUtils.lerp(
-        REST.y,
-        GATE_Y,
-        Math.max(s.approach * 0.4, s.closeIn * 0.9, s.approachGate),
-      )
-
-      camera.position.set(0, y, z)
-      camera.lookAt(0, GATE_Y, -520)
-      return
-    }
-
     if (under) {
       camera.position.set(0, -46, 96)
       camera.lookAt(0, -14, -120)

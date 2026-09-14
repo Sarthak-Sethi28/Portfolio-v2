@@ -82,17 +82,19 @@ interface SceneState {
   envIntensity: number
   setEnvIntensity: (v: number) => void
   /**
-   * Position in the arrival sequence, 0 to 1.
+   * COARSE cinematic status — three values in fifteen seconds.
    *
-   * Lives in the store rather than in a ref because both the frame loop and
-   * render-scope readers need it, and a ref read during render is a React
-   * Compiler violation.
+   * The continuous position deliberately does NOT live here. It used to, as a
+   * `sequence` float quantised to twenty steps, and both halves of that were
+   * wrong: a store write re-renders every subscriber, so a smooth value cost a
+   * render of the whole world tree each frame, and quantising it to afford
+   * that made the transition advance in visible stairs. The clock is a plain
+   * mutable object in `world/cinematic/cinematicState`; React only needs to
+   * know whether the thing is running.
    */
-  sequence: number
-  setSequence: (v: number) => void
-  /** True while the arrival is playing. */
-  playing: boolean
-  setPlaying: (v: boolean) => void
+  cinematic: 'idle' | 'playing' | 'complete'
+  setCinematic: (v: 'idle' | 'playing' | 'complete') => void
+  setNight: (v: boolean) => void
   /** Day/night blend, mirrored from the frame loop for render-scope readers. */
   nightLevel: number
   setNightLevel: (v: number) => void
@@ -164,8 +166,7 @@ export const useScene = create<SceneState>((set) => ({
   },
   flicker: [],
   envIntensity: 1.15,
-  sequence: 0,
-  playing: false,
+  cinematic: 'idle' as const,
   nightLevel: 0,
 
   hovered: null,
@@ -185,8 +186,8 @@ export const useScene = create<SceneState>((set) => ({
   applyFlags: () => set({ flags: readFlags() }),
   setFlicker: (flicker) => set({ flicker }),
   setEnvIntensity: (envIntensity) => set({ envIntensity }),
-  setSequence: (sequence) => set({ sequence }),
-  setPlaying: (playing) => set({ playing }),
+  setCinematic: (cinematic) => set({ cinematic }),
+  setNight: (night) => set({ night }),
   setNightLevel: (nightLevel) => set({ nightLevel }),
   setHovered: (hovered) => set({ hovered }),
   openSectionPanel: (openSection) => set({ openSection, openProject: null }),
