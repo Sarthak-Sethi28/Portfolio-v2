@@ -4,6 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useRef } from 'react'
 import { MathUtils, Vector3 } from 'three'
 import { useScene } from '@/store/scene'
+import { cameraOwnedByCinematic } from '../cinematic/cinematicState'
 
 /**
  * Pixel-stable resting camera.
@@ -97,7 +98,21 @@ export function IdleRig() {
      * membrane above them.
      */
     /*
-     * The camera stays at rest for now.
+     * OWNERSHIP IS EXPLICIT.
+     *
+     * While the cinematic owns the camera this rig writes nothing at all — not
+     * position, not quaternion, not fov. Two controllers both writing and
+     * hoping mount order decides the winner is exactly how a one-frame pop
+     * gets in and then survives every attempt to find it, because it only
+     * appears on the frames where the order happened to flip.
+     */
+    if (cameraOwnedByCinematic.value) {
+      initialized.current = false
+      return
+    }
+
+    /*
+     * The camera stays at rest otherwise.
      *
      * Step 4 is the world; step 5 owns the fly-through. The previous
      * sequence-driven path has been removed rather than left half-wired,

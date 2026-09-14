@@ -48,14 +48,15 @@ export function Title() {
    * still to run and the visitor not yet through the portal. The word is the
    * arrival announcing itself, so it waits for the arrival.
    */
-  const arrived = cinematic === 'complete' || (cinematic === 'idle' && night)
+  const arrivedTitle = useScene((s) => s.arrivedTitle)
+  const arrived = arrivedTitle || cinematic === 'complete' || (cinematic === 'idle' && night)
   const letters = (arrived ? 'PROJECTS' : profile.name.toUpperCase()).split('')
 
   return (
     <div
       className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
       style={{
-        opacity: open || noUi || travelling ? 0 : 1,
+        opacity: open || noUi || (travelling && !arrivedTitle) ? 0 : 1,
         /*
          * The name leaves between 2.8 and 4.0 seconds, expressed as a CSS
          * delay rather than as a timer or a per-frame opacity.
@@ -66,9 +67,22 @@ export function Title() {
          * a DOM node that changes once. The transition starts when the status
          * flips to playing and the browser owns the interpolation from there.
          */
-        transition: travelling
-          ? 'opacity 1200ms ease-in-out 2800ms'
-          : 'opacity 700ms ease-in-out',
+        /*
+         * Three behaviours, no timers.
+         *
+         * Leaving: a delayed CSS transition so the name clears between 2.8 and
+         * 4.0 seconds without a setTimeout that could drift from the master
+         * clock or outlive an interrupted run.
+         *
+         * Arriving: the word has already been swapped under full black, so
+         * this only has to bring it up over the last third of a second as the
+         * veil clears — first readable around 14.65, settled by 15.0.
+         */
+        transition: arrivedTitle
+          ? 'opacity 340ms ease-out 300ms'
+          : travelling
+            ? 'opacity 1200ms ease-in-out 2800ms'
+            : 'opacity 700ms ease-in-out',
       }}
     >
       <h1

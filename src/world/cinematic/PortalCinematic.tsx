@@ -13,7 +13,7 @@ import {
   type Object3D,
   type PointLight,
 } from 'three'
-import { cinematicSample } from './cinematicState'
+import { cinematicSample, portalFrame } from './cinematicState'
 
 /**
  * THE PORTAL — Blender's animation, driven by our clock.
@@ -247,6 +247,20 @@ export function PortalCinematic({
     }
   })
   /* eslint-enable react-hooks/immutability */
+
+  /*
+   * Publish the portal's real frame for the camera.
+   *
+   * Done in an effect rather than during render because it writes to a shared
+   * module, and measured from the built root so it follows the asset rather
+   * than a constant that has to be kept in step by hand.
+   */
+  useEffect(() => {
+    portalFrame.centre.set(position[0], position[1] + height / 2, position[2])
+    portalFrame.axis.set(0, 0, 1)
+    portalFrame.radius = built.radius
+    portalFrame.measured = true
+  }, [position, height, built.radius])
 
   return (
     <group position={position}>
