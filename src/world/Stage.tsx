@@ -5,7 +5,7 @@ import { useFrame } from '@react-three/fiber'
 import { Environment } from '@react-three/drei'
 import { EffectComposer, N8AO, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
-import { MathUtils, type DirectionalLight, type FogExp2 } from 'three'
+import { MathUtils, type AmbientLight, type DirectionalLight, type FogExp2, type HemisphereLight } from 'three'
 import { CONFIG_DEFAULTS, useScene, effectiveMoteCount } from '@/store/scene'
 import { blendPalette, createPalette } from './atmosphere/palette'
 import { Sky } from './atmosphere/Sky'
@@ -21,7 +21,7 @@ import { CinematicCamera } from './cinematic/CinematicCamera'
 import { WaterDisturbance } from './cinematic/WaterDisturbance'
 import { WaterShockwave } from './cinematic/WaterShockwave'
 import { createAnim, type Anim } from './anim'
-import { cinematicSample } from './cinematic/cinematicState'
+import { cinematicSample, worldNight } from './cinematic/cinematicState'
 import { FlickerProbe } from './FlickerProbe'
 
 /**
@@ -40,9 +40,7 @@ export function Stage() {
   const flags = useScene((s) => s.flags)
   const envIntensity = useScene((s) => s.envIntensity)
   // Mirrors anim.night into render scope. Written by the frame loop below.
-  const nightLevel = useScene((s) => s.nightLevel)
   const cinematic = useScene((s) => s.cinematic)
-  const setNightLevel = useScene((s) => s.setNightLevel)
   const setEnvIntensity = useScene((s) => s.setEnvIntensity)
   const setFlicker = useScene((s) => s.setFlicker)
 
@@ -57,6 +55,11 @@ export function Stage() {
   const sunRef = useRef<DirectionalLight>(null)
 
   const fogRef = useRef<FogExp2>(null)
+  // Lights whose intensity follows the night blend. Held by ref and written in
+  // the frame loop, because animating them through JSX props means a React
+  // render per step of a continuous value.
+  const groundUpRef = useRef<HemisphereLight>(null)
+  const nightFillRef = useRef<AmbientLight>(null)
 
   /**
    * Image-based lighting comes from <Environment> below.
@@ -112,7 +115,16 @@ export function Stage() {
     // not cost a render every frame.
     const nextEnv = 1.15 - anim.night * 0.95
     if (Math.abs(nextEnv - envIntensity) > 0.02) setEnvIntensity(nextEnv)
-    if (Math.abs(anim.night - nightLevel) > 0.02) setNightLevel(anim.night)
+    /*
+     * Published to a plain object, not to the store.
+     *
+     * Every consumer of this reads it inside its own frame callback to set a
+     * property on an object that already exists, so there is nothing React
+     * needs to know about it. See the note on `worldNight`.
+     */
+    worldNight.value = anim.night
+    if (groundUpRef.current) groundUpRef.current.intensity = anim.night * 2.1
+    if (nightFillRef.current) nightFillRef.current.intensity = anim.night * 0.7
 
 
     const fog = fogRef.current
@@ -197,7 +209,7 @@ export function Stage() {
 
         Scaled by the blend, so it arrives exactly as the stars do.
       */}
-      <hemisphereLight args={['#000000', '#7fa8ff', nightLevel * 2.1]} />
+      <hemisphereLight ref={groundUpRef} args={['#000000', '#7fa8ff', 0]} />
       {/*
         A floor under the blacks, purely to stop the ring reading as a fault.
 
@@ -209,7 +221,7 @@ export function Stage() {
         the gap between neighbouring blocks so the ring reads as one carved
         object, without putting any actual light back in the sky.
       */}
-      <ambientLight color="#31527e" intensity={nightLevel * 0.7} />
+      <ambientLight ref={nightFillRef} color="#31527e" intensity={0} />
 
       {/*
         The sun casts now. A shadow map covers a fixed volume, so the frustum
@@ -251,7 +263,6 @@ export function Stage() {
               roughness={config.waterRoughness}
               reflectorResolution={flags.noReflect ? 0 : quality.reflectorResolution}
               distort={rain ? 0.75 : 0.32}
-              night={nightLevel}
             />
             <ArrayWorld palette={palette} />
           </>

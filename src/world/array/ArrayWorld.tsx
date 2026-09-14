@@ -40,7 +40,6 @@ export function ArrayWorld({
   mirrored?: boolean
 }) {
   // Columns light from within as night arrives — see ModelPier's glow note.
-  const nightLevel = useScene((s) => s.nightLevel)
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
   const [stoneNormal, stoneRough] = useTexture(
     ['/stone-normal.jpg', '/stone-rough.jpg'],
@@ -130,7 +129,7 @@ export function ArrayWorld({
         // All four are the same order. A colonnade is one column repeated —
         // mixing traditions along a single line would read as an accident.
         const src = '/models/muqarnas.glb'
-        return <ModelPier key={id} placement={placement} variant={0} src={src} mirrored={mirrored} glow={mirrored ? 0 : nightLevel} descentDelay={descentDelays[i]} />
+        return <ModelPier key={id} placement={placement} variant={0} src={src} mirrored={mirrored} descentDelay={descentDelays[i]} />
         return (
           <Pier
             key={id}

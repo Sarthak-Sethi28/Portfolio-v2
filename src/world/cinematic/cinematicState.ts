@@ -45,6 +45,23 @@ export const portalFrame = {
  */
 export const cameraOwnedByCinematic = { value: false }
 
+/**
+ * The world's day/night blend, 0 to 1, OUTSIDE React.
+ *
+ * This lived in the store and was written whenever it moved by more than 0.02
+ * — about fifty writes concentrated into the second and a half where the sky
+ * turns. Each one re-rendered every subscriber: Stage, ArrayWorld, and
+ * ArrayWorld again for the mirrored copy, and through them eight columns. The
+ * measured cold-run stall sat exactly in that interval, and it was React
+ * commit work, not anything on the GPU.
+ *
+ * Nothing about the value needed to be React state. It is read only inside
+ * frame callbacks, to set material and light properties on objects that
+ * already exist. Zustand keeps the coarse facts — whether it is night, whether
+ * the cinematic is running — and this carries the continuous one.
+ */
+export const worldNight = { value: 0 }
+
 export const cinematicClock = {
   /** Seconds since the cinematic began. The single source of truth. */
   elapsed: 0,
