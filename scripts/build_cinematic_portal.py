@@ -651,12 +651,24 @@ def main():
         # read as coming apart at its foundations rather than opening. An arch
         # opens at the crown and the haunches; the part taking the load stays
         # where it is, which is also why it is released last.
-        travel = {0: 1.0, 1: 0.92, 2: 0.92, 3: 0.3}[rank]
-        out = R * 0.21 * travel
+        # RADIAL TRAVEL IS NOW TINY. DEPTH DOES THE WORK.
+        #
+        # At 0.21 of the radius the four quadrants read as detached petals — a
+        # flower opening, not a machine unlocking. The ring has to stay one
+        # enormous coherent object the whole way through, and the way a real
+        # mechanism exposes its interior is by sliding its armour BACK off the
+        # core, not by flinging it outward.
+        #
+        # crown +3%, haunches +3%, springing under 1% and effectively planted.
+        travel = {0: 1.0, 1: 0.95, 2: 0.95, 3: 0.22}[rank]
+        out = R * 0.030 * travel
         # Depth is mostly invisible head-on, so it is small — it exists to open
         # the seams into shadow rather than to move anything anywhere.
-        depth = THICK * 0.30 * travel * (1.0 if rank % 2 == 0 else -1.0)
-        spin = math.radians(3.0) * travel * (1.0 if rank % 2 == 0 else -1.0)
+        # Depth is now the dominant motion: the armour withdraws along the
+        # portal's axis, which opens the seams into shadow and exposes the
+        # layers behind without the ring ever losing its silhouette.
+        depth = THICK * 0.62 * travel * (1.0 if rank % 2 == 0 else -1.0)
+        spin = math.radians(2.4) * travel * (1.0 if rank % 2 == 0 else -1.0)
 
         for ax in (0, 1, 2):
             key(ob, "location", start, base[ax], ax)
@@ -702,26 +714,26 @@ def main():
         key(ob, "rotation_euler", F_END, math.radians(final), 2)
         ease(ob)
 
-    # The rings are hidden until the shell lets go of them.
+    # ---- the inner layers are ALREADY THERE ----
     #
-    # A DEVIATION, stated plainly: the brief forbids substituting scale for
-    # emissive on the EMIT arcs, and that is respected below. This is a
-    # different problem — an annulus set back in the throat is still visible
-    # through an open aperture, so at rest the gold layer showed in the middle
-    # of a ring that is meant to look like dead stone. Scale is the only
-    # channel glTF carries that can remove geometry from frame entirely. It is
-    # timed to the reveal and eased, so the layers grow into alignment rather
-    # than popping into being.
-    for grp in (mech_in, mech_out):
+    # They used to scale from 0.001, which made the machinery look like it
+    # spawned into existence the moment the armour moved — the single most
+    # artificial thing in the reveal. A machine's interior does not grow; it
+    # was always inside, and you simply could not see it.
+    #
+    # So they sit at full size from frame zero and are revealed the way a real
+    # interior is: by the armour in front of them moving out of the way, plus a
+    # small forward shift of their own so they catch light as they are exposed.
+    # A little scale is kept purely to help them settle, nowhere near zero.
+    for grp, push, lo in ((mech_in, THICK * 0.30, 0.94), (mech_out, THICK * 0.16, 0.96)):
         for child in grp.children:
-            # Exposed as the quadrants part, between 6.7 and 7.8 seconds, so
-            # the deeper layers arrive into a gap that has just opened rather
-            # than appearing through solid geometry.
-            t_hidden = int(round(6.7 * FPS))
-            t_shown = int(round(7.8 * FPS))
+            base_y = child.location.y
+            key(child, "location", int(round(6.0 * FPS)), base_y, 1)
+            key(child, "location", int(round(7.9 * FPS)), base_y - push, 1)
+            key(child, "location", F_END, base_y - push, 1)
             for ax in (0, 1, 2):
-                key(child, "scale", t_hidden, 0.001, ax)
-                key(child, "scale", t_shown, 1.0, ax)
+                key(child, "scale", int(round(6.0 * FPS)), lo, ax)
+                key(child, "scale", int(round(7.9 * FPS)), 1.0, ax)
             ease(child)
 
     # ---- 10 FULL POWER: one pressure pulse, on one node ----

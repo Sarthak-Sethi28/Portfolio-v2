@@ -68,12 +68,27 @@ export function WaterShockwave() {
 
         float height(vec2 p, float lead) {
           float r = length(p);
-          // Primary crest, and one much weaker ring trailing it.
-          float a = band(r, lead, 0.045) * 1.0;
-          float b = band(r, lead - 0.085, 0.05) * 0.28;
-          // Fine chop riding on the crest, so the front is not a clean arc.
-          float detail = sin(r * 210.0 - uTime * 9.0) * 0.12 * band(r, lead, 0.07);
-          return a + b + detail;
+          /*
+           * ONE BROAD PRESSURE CREST, not a drawn ring.
+           *
+           * The crest was 0.045 wide and read as a clean white circle inked
+           * onto the sea — the exact CGI look this has to avoid. Real displaced
+           * water is a long low swell: the band is four times wider now, so the
+           * lighting catches a slope rather than an edge, and the trailing wave
+           * is wider still and much weaker.
+           */
+          float a = band(r, lead, 0.175) * 1.0;
+          float b = band(r, lead - 0.20, 0.16) * 0.30;
+          /*
+           * Irregularity, so the front is not a perfect circle. Angular
+           * variation as well as radial: a pressure wave crossing open water
+           * does not stay a textbook annulus.
+           */
+          float ang = atan(p.y, p.x);
+          float wobble = sin(ang * 7.0 + uTime * 0.6) * 0.035 + sin(ang * 13.0) * 0.02;
+          float a2 = band(r, lead + wobble, 0.175) * 0.55;
+          float detail = sin(r * 90.0 - uTime * 5.0) * 0.10 * band(r, lead, 0.22);
+          return a + a2 + b + detail;
         }
 
         void main() {
@@ -92,10 +107,12 @@ export function WaterShockwave() {
           // zero and the wave was invisible against a lit sky. Scaling the
           // gradient is the difference between a surface that is disturbed and
           // one that merely has small numbers in it.
-          vec3 n = normalize(vec3(-hx * 26.0, -hy * 26.0, 0.35));
+          // Gentler gain to match the wider, lower crest — a broad swell has a
+          // shallow slope, and driving it hard again would just re-draw a line.
+          vec3 n = normalize(vec3(-hx * 11.0, -hy * 11.0, 0.42));
 
           vec3 lightDir = normalize(vec3(0.35, 0.30, 0.89));
-          float spec = pow(max(dot(n, lightDir), 0.0), 7.0);
+          float spec = pow(max(dot(n, lightDir), 0.0), 4.0);
 
           /*
            * Rise, then fall. The rise is not optional.
@@ -120,16 +137,17 @@ export function WaterShockwave() {
            * the output is masked by the local amplitude.
            */
           float amp = abs(height(p, lead));
-          float present = smoothstep(0.02, 0.22, amp);
+          float present = smoothstep(0.015, 0.30, amp);
 
           float rise = smoothstep(0.0, 0.11, uProgress);
           float falloff = (1.0 - uProgress) * (1.0 - uProgress);
           // Clamped: additive blending has no natural ceiling, and one bad
           // frame of unbounded highlight is a flash in the viewer's face.
-          float a = min(spec * present * rise * falloff * 3.0, 0.8);
+          float a = min(spec * present * rise * falloff * 2.2, 0.55);
 
           // A trace of the portal's red carried on the front, no more.
-          vec3 col = mix(vec3(0.70, 0.78, 0.90), vec3(1.0, 0.32, 0.16), 0.35);
+          // Tinted toward the portal's own light rather than white foam.
+          vec3 col = mix(vec3(0.62, 0.68, 0.80), vec3(1.0, 0.22, 0.10), 0.45);
           gl_FragColor = vec4(col * a, a);
         }
       `,
