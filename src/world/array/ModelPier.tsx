@@ -6,6 +6,7 @@ import { useGLTF } from '@react-three/drei'
 import { Box3, Color, Plane, Vector3, type Group, type Mesh, type MeshStandardMaterial, type PointLight } from 'three'
 import type { Placement } from '../geometry/layout'
 import { cinematicSample, worldNight } from '../cinematic/cinematicState'
+import { waterline } from '../cinematic/waterline'
 
 /**
  * A pier from a downloaded model, on trial.
@@ -213,6 +214,7 @@ export function ModelPier({
    * intensity higher. Past about 1.2 the stone flattens into a glowing blob
    * and the muqarnas detail, which is the entire reason for this asset, goes.
    */
+  const name = `${position[0].toFixed(1)}_${position[2].toFixed(1)}`
   const sink = useRef<Group>(null)
   const lampRef = useRef<PointLight>(null)
   /*
@@ -250,8 +252,26 @@ export function ModelPier({
     if (!g) return
     // Envelope from the timeline, offset per column. Squared on the way in so
     // the mass is slow to start and then commits.
-    const d = Math.max(0, Math.min(1, cinematicSample.pillarDescent * 1.45 - descentDelay))
-    g.position.y = -(d * d * (3 - 2 * d)) * height * 1.6
+    /*
+     * RESIST, COMMIT, SETTLE.
+     *
+     * A smoothstep is symmetrical and reads as a light object being eased.
+     * Something this heavy fights the first quarter of the move, gives way
+     * through the middle, and slows again as the crown goes under. The curve
+     * below is deliberately asymmetric: slow start, long committed middle,
+     * gentle arrival — and monotonic, so there is never a bounce.
+     */
+    const raw = Math.max(0, Math.min(1, (cinematicSample.pillarDescent - descentDelay) / 0.55))
+    const d = raw < 0.25
+      ? raw * raw * 2.4                                   // resisting
+      : raw < 0.75
+        ? 0.15 + (raw - 0.25) * 1.5                       // committed
+        : 0.9 + (1 - Math.pow(1 - (raw - 0.75) * 4, 2)) * 0.1  // settling
+    g.position.y = -d * height * 1.6
+    // Published so the water knows where this column currently cuts the
+    // surface — the interaction has to follow the real waterline, not sit at
+    // a fixed point and hope.
+    waterline.set(name, { x: position[0], z: position[2], depth: d, height })
   })
   /* eslint-enable react-hooks/immutability */
 

@@ -101,7 +101,15 @@ export function sampleCinematic(t: number, out: CinematicSample): CinematicSampl
    * blackout, where the camera is also being repositioned, so the world on the
    * far side is simply the world that was always there.
    */
-  out.pillarDescent = heavy(t, 4.0, 5.35) * (1 - span(t, 14.05, 14.4))
+  /*
+   * A LONGER window, so four separate descents can overlap.
+   *
+   * The envelope ran 4.0-5.35 and every column was gone almost together,
+   * which emptied the frame in an instant. Starts are staggered by the caller
+   * from 3.80 to 4.40 and each takes about a second, so the last crown is
+   * still going under while the first is already only foam.
+   */
+  out.pillarDescent = span(t, 3.8, 5.6) * (1 - span(t, 14.05, 14.4))
 
   // The Blender clip is authored against the same clock, one second per
   // second, so this is the identity. It exists as a channel anyway: if the
