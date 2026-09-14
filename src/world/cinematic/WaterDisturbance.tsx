@@ -2,7 +2,7 @@
 
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { AdditiveBlending, DoubleSide, type ShaderMaterial } from 'three'
+import { AdditiveBlending, DoubleSide, type Mesh, type ShaderMaterial } from 'three'
 import { cinematicSample } from './cinematicState'
 
 /** Where the portal meets the water. */
@@ -30,6 +30,23 @@ const PORTAL = [0, -150] as const
  */
 export function WaterDisturbance() {
   const mat = useRef<ShaderMaterial>(null)
+  const mesh = useRef<Mesh>(null)
+  /*
+   * WARM-UP FRAMES.
+   *
+   * This shader compiles the first time its mesh is actually drawn, and a
+   * shader compile is a synchronous stall — measured at up to 179ms in a
+   * production build, landing squarely in the beat where the effect first
+   * appears. WebGLRenderer.compile() cannot pre-empt it either, because that
+   * walks the scene with traverseVisible and skips anything hidden.
+   *
+   * So the mesh is drawn for a few frames while the page is still settling,
+   * with its amount at zero — the fragment shader resolves to nothing, so
+   * there is no visual change whatsoever, but the program is built and linked
+   * long before the visitor presses anything.
+   */
+  const warm = useRef(0)
+
 
   const shader = useMemo(
     () => ({
@@ -107,17 +124,31 @@ export function WaterDisturbance() {
 
   useFrame((_, delta) => {
     const m = mat.current
-    if (!m) return
+    const g = mesh.current
+    if (!m || !g) return
     m.uniforms.uTime.value += delta
     m.uniforms.uAmount.value = cinematicSample.disturbance
     m.uniforms.uPull.value = cinematicSample.pull
+    /*
+     * Visibility belongs in the FRAME LOOP, not in JSX.
+     *
+     * This was `visible={cinematicSample.disturbance > 0.001}` on the element,
+     * which reads the shared mutable sample during render — and this component
+     * renders perhaps twice in its life, so the test ran at mount, found zero,
+     * and the patch stayed hidden for the entire cinematic. The water-reacts
+     * beat has never once been on screen. Anything derived from the clock has
+     * to be evaluated on every frame, which is what a frame callback is for.
+     */
+    if (warm.current < 4) { warm.current++; g.visible = true; return }
+    g.visible = cinematicSample.disturbance > 0.001
   })
 
   return (
     <mesh
+      ref={mesh}
       position={[PORTAL[0], 0.28, PORTAL[1]]}
       rotation={[-Math.PI / 2, 0, 0]}
-      visible={cinematicSample.disturbance > 0.001}
+      visible={false}
     >
       <planeGeometry args={[420, 420]} />
       <shaderMaterial ref={mat} args={[shader]} />

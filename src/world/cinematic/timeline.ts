@@ -43,8 +43,6 @@ export function heavy(t: number, a: number, b: number): number {
 }
 
 export interface CinematicSample {
-  /** 0..1 across the whole piece. */
-  progress: number
   /** Local water agitation around the portal. */
   disturbance: number
   /** Birds break formation and flee. */
@@ -53,8 +51,6 @@ export interface CinematicSample {
   pull: number
   /** Columns sink. 1 is fully submerged. */
   pillarDescent: number
-  /** The held breath before the machine wakes. 1 means hold everything. */
-  stillness: number
   /** Time to drive the Blender mixer with, in seconds. */
   portalTime: number
   /** How far the ignition has travelled the ring, 0..1. */
@@ -63,26 +59,18 @@ export interface CinematicSample {
   power: number
   /** The single water shockwave. */
   shockwave: number
-  /** Warmth collapsing out of the sky. */
-  twilight: number
   /** Authoritative night level during the cinematic. */
   night: number
-  /** Camera approach (Step 5 owns the path; this is the value it will read). */
-  approach: number
-  /** Passing through the aperture. */
-  through: number
   /** The near-black interstitial. */
   blackout: number
-  /** Landed. */
-  destination: number
 }
 
 /** A single shared sample object, mutated in place. */
 export function createSample(): CinematicSample {
   return {
-    progress: 0, disturbance: 0, scatter: 0, pull: 0, pillarDescent: 0,
-    stillness: 0, portalTime: 0, ignition: 0, power: 0, shockwave: 0,
-    twilight: 0, night: 0, approach: 0, through: 0, blackout: 0, destination: 0,
+    disturbance: 0, scatter: 0, pull: 0, pillarDescent: 0,
+    portalTime: 0, ignition: 0, power: 0, shockwave: 0,
+    night: 0, blackout: 0,
   }
 }
 
@@ -94,8 +82,6 @@ export function createSample(): CinematicSample {
  * consumer reads it and discards it within the same frame.
  */
 export function sampleCinematic(t: number, out: CinematicSample): CinematicSample {
-  out.progress = Math.min(1, Math.max(0, t / DURATION))
-
   // 02-04. Local water only. The whole ocean must not change speed.
   out.disturbance = span(t, 1.15, 3.2) * (1 - span(t, 11.5, 13.5) * 0.55)
   out.pull = span(t, 3.0, 4.1)
@@ -117,9 +103,6 @@ export function sampleCinematic(t: number, out: CinematicSample): CinematicSampl
    */
   out.pillarDescent = heavy(t, 4.0, 5.35) * (1 - span(t, 14.05, 14.4))
 
-  // 06. ALONE. 1 through the held breath, so systems can damp themselves.
-  out.stillness = pulse(t, 5.1, 5.55, 6.05)
-
   // The Blender clip is authored against the same clock, one second per
   // second, so this is the identity. It exists as a channel anyway: if the
   // machine's beats ever need to slip against the world's, this is the only
@@ -133,17 +116,24 @@ export function sampleCinematic(t: number, out: CinematicSample): CinematicSampl
   // 10. Exactly one shockwave, leaving at full power.
   out.shockwave = t < 9.15 ? 0 : Math.min(1, (t - 9.15) / 1.0)
 
-  // 11-12. Daylight collapses, then night settles. Deliberately overlapping:
-  // warmth leaves before darkness arrives, which is what stops the change
-  // reading as a cross-fade between two photographs.
-  out.twilight = span(t, 9.9, 11.1)
+  /*
+   * 11-12. Daylight collapses, then night settles.
+   *
+   * One channel, not two. A separate `twilight` value existed alongside this
+   * and nothing ever read it: the warmth leaving the sky is already carried by
+   * the palette blend this drives, so the second channel was describing the
+   * same event twice and could only ever disagree with itself.
+   */
   out.night = span(t, 10.2, 11.85)
 
-  // 12-15. Step 5 owns the camera; these are the channels it will read.
-  out.approach = span(t, 11.9, 13.0)
-  out.through = span(t, 12.9, 14.0)
+  /*
+   * 12-15. The camera's own path is authored as control points in
+   * CinematicCamera rather than as channels here — `approach`, `through` and
+   * `destination` were reserved for it and went unused, so they are gone. Only
+   * the blackout is shared, because the veil and the hidden reposition both
+   * have to agree on exactly when the screen is opaque.
+   */
   out.blackout = pulse(t, 13.7, 14.25, 14.75)
-  out.destination = span(t, 14.5, 15.0)
 
   return out
 }

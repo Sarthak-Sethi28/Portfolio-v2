@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useScene } from '@/store/scene'
+import { portalFrame } from '@/world/cinematic/cinematicState'
 
 /**
  * Keyboard input. No visible controls.
@@ -57,6 +58,17 @@ export function Controls() {
          * that was authored in one direction.
          */
         if (cinematic !== 'idle' || night) return
+        /*
+         * Never fly through fallback coordinates.
+         *
+         * The camera derives its whole approach from the portal's measured
+         * bounds, and those are published by the model only once it has
+         * loaded. Pressing F during that window would have aimed the traversal
+         * at the default centre — which is close enough to the real one that
+         * the failure would not look like a bug, just an approach that misses
+         * slightly. Silent near-misses are worse than loud ones.
+         */
+        if (!portalFrame.measured) return
         setCinematic('playing')
       }
     }

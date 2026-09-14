@@ -142,6 +142,21 @@ export function PortalCinematic({
     action.setLoop(LoopOnce, 1)
     action.clampWhenFinished = true
     action.play()
+
+    /*
+     * BIND NOW, not on the first press.
+     *
+     * The first call to setTime is not free: the mixer has to resolve every
+     * track name against the hierarchy, build a PropertyBinding for each, and
+     * touch the keyframe buffers for the first time. With thirty-three tracks
+     * over a sixty-node graph and twenty-five thousand samples, that landed as
+     * a stall of well over a tenth of a second — and it landed on the very
+     * frame the visitor pressed F, which is the worst possible moment for it.
+     *
+     * Doing it once here moves all of that into page load, where nothing is
+     * moving and nobody is waiting on a frame.
+     */
+    mixer.setTime(0)
     /*
      * NOT paused, and this is the whole bug.
      *

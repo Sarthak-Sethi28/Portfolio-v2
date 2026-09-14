@@ -103,7 +103,22 @@ export function ModelPier({
    * single transition. The brightness is animated on the materials instead,
    * which is what materials are for.
    */
-  const lit = glow > 0
+  /*
+   * ALWAYS build the lit materials, even in daylight.
+   *
+   * This was `glow > 0`, and the clone below is keyed on it — so the instant
+   * night began the boolean flipped and the entire GLB was re-cloned with
+   * fresh materials, for four columns and their four mirrored copies, on one
+   * frame in the middle of the day-to-night crossing. Measured in a production
+   * build it was a run of thirty-to-forty millisecond frames right through the
+   * beat where the sky is supposed to be changing smoothly.
+   *
+   * Cloning unconditionally costs one extra material per mesh at load, when
+   * nothing is moving, and the emissive is driven to zero every frame in
+   * daylight anyway — so the daytime appearance is identical and the
+   * transition no longer has to pay for itself.
+   */
+  const lit = true
 
   const { cloned, litMaterials } = useMemo(() => {
     const c = scene.clone(true)
