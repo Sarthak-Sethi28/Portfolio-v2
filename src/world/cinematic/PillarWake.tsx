@@ -173,6 +173,14 @@ export function PillarWake() {
     [],
   )
 
+  /*
+   * Per-frame mutation of three.js objects — uniforms, visibility, transforms
+   * — inside a frame callback. The compiler sees values that came out of a
+   * useMemo being written to and assumes a render-phase mutation; it cannot
+   * model an imperative renderer driven from React. See the fuller note in
+   * PortalCinematic.
+   */
+  /* eslint-disable react-hooks/immutability */
   useFrame((_, delta) => {
     // Reading a Map's values allocates an iterator, so the entries are pulled
     // by index into fixed slots instead — this runs every frame.
@@ -203,6 +211,7 @@ export function PillarWake() {
       g.scale.set(span, span, 1)
     }
   })
+  /* eslint-enable react-hooks/immutability */
 
   return (
     <>
