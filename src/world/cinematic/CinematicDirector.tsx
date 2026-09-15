@@ -3,18 +3,27 @@
 import { useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useScene } from '@/store/scene'
-import { advanceCinematic, cinematicClock, resetCinematic, DURATION } from './cinematicState'
+import {
+  advanceCinematic,
+  cinematicClock,
+  cinematicDirection,
+  resetCinematic,
+  DURATION,
+} from './cinematicState'
 import { PortalGatewayLighting } from './PortalGatewayLighting'
 import { TunnelAperture } from './TunnelAperture'
 import { OceanChaos } from './OceanChaos'
+import { OceanWhitewater } from './OceanWhitewater'
 
 /**
- * Advances the one clock, then mounts the visual systems that depend on it.
+ * One deterministic journey in either direction.
  *
- * The entire piece is one event now: ocean rupture -> red charge -> water
- * discharge -> sinking columns -> gateway pull -> Blender tunnel traversal.
- * These systems overlap on the same clock instead of handing off with visible
- * pauses.
+ * Forward: day -> storm -> portal -> Blender tunnel -> night.
+ * Reverse: night -> tunnel -> portal -> storm unwinds -> day.
+ *
+ * The same timeline is sampled backward rather than inventing a second set of
+ * effects, so pillars, red charge, whitewater and daylight all return through
+ * the exact values they used on the way in.
  */
 export function CinematicDirector() {
   const status = useScene((s) => s.cinematic)
@@ -31,17 +40,33 @@ export function CinematicDirector() {
   }, [seqFlag])
 
   useEffect(() => {
-    if (status === 'playing') {
-      if (reducedMotion) {
-        resetCinematic()
+    if (status !== 'playing') return
+
+    const direction = cinematicDirection.value
+
+    if (reducedMotion) {
+      if (direction > 0) {
+        cinematicClock.elapsed = DURATION
+        cinematicClock.running = false
         setNight(true)
+        setArrivedTitle(true)
         setCinematic('complete')
-        return
+      } else {
+        resetCinematic()
+        setNight(false)
+        setArrivedTitle(false)
+        setCinematic('idle')
       }
-      cinematicClock.elapsed = 0
-      cinematicClock.running = true
-      setArrivedTitle(false)
+      return
     }
+
+    // Start from the endpoint we are physically standing at.
+    cinematicClock.elapsed = direction > 0 ? 0 : DURATION
+    cinematicClock.running = true
+
+    // The destination word belongs only to the held night shot. It clears the
+    // instant a return trip begins and is raised again only on forward arrival.
+    setArrivedTitle(false)
   }, [status, reducedMotion, setNight, setCinematic, setArrivedTitle])
 
   useFrame((_, delta) => {
@@ -49,36 +74,36 @@ export function CinematicDirector() {
     advanceCinematic(Math.min(delta, 1 / 20))
 
     const t = cinematicClock.elapsed
+    const direction = cinematicDirection.value
 
-    /*
-     * PROJECTS is raised by BlenderTunnelTransition only after the actual night
-     * destination is resolving. Keeping that authority out of the master clock
-     * prevents the word from becoming a black title card between the tunnel and
-     * the night world.
-     */
-    if (arrivedTitle && t < 14.30 && cinematicClock.scrub !== null) setArrivedTitle(false)
+    if (arrivedTitle && t < 14.30 && cinematicClock.scrub !== null) {
+      setArrivedTitle(false)
+    }
 
-    if (cinematicClock.running && cinematicClock.elapsed >= DURATION) {
+    if (!cinematicClock.running) return
+
+    if (direction > 0 && t >= DURATION) {
       cinematicClock.running = false
       setNight(true)
       setCinematic('complete')
+      return
+    }
+
+    if (direction < 0 && t <= 0) {
+      cinematicClock.running = false
+      setNight(false)
+      setArrivedTitle(false)
+      setCinematic('idle')
     }
   })
 
   return (
     <>
+      {/* Full-ocean rough whitewater first, then the stronger local gate event. */}
+      <OceanWhitewater />
       <OceanChaos />
       <PortalGatewayLighting />
-      {/*
-       * No procedural RedCorridor here.
-       *
-       * final-run(9) exposed why: the Blender video ends while the old corridor's
-       * black shell/cap is still active on the master timeline. As soon as the
-       * DOM video clears, that shell becomes visible for a few frames, producing
-       * the black wedge + red streaks before the night destination. The authored
-       * Blender tunnel now owns the passage completely, so a second corridor is
-       * both redundant and visually wrong.
-       */}
+      {/* Blender owns the transit completely; no procedural corridor stacked on it. */}
       <TunnelAperture />
     </>
   )
