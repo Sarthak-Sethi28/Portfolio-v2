@@ -1,23 +1,25 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Vector3 } from 'three'
 import type { PerspectiveCamera } from 'three'
-import { cinematicClock, portalFrame } from './cinematicState'
+import {
+  cinematicClock,
+  cinematicDirection,
+  DURATION,
+  portalFrame,
+} from './cinematicState'
 import { tunnelVideo } from './tunnelVideo'
 
-/** Start the SAME fullscreen video while it is still only visible through the portal hole. */
+/** Forward trip: tunnel starts resolving through the real opening here. */
 const APERTURE_ON = 11.55
-/**
- * Give the eye time to discover detail inside the black aperture instead of
- * watching a rendered movie suddenly switch on. The exterior itself never fades.
- */
 const APERTURE_FADE = 0.82
-/**
- * Measured from portal_final.glb: inner opening radius / authored outer radius.
- * Keeping a tiny inset prevents the DOM layer from painting over the metal lip.
- */
+/** Reverse trip: expand the night portal into the tunnel over this beat. */
+const REVERSE_ENTER = 0.78
+const REVERSE_REVEAL = 0.34
+
+/** Measured inner opening / authored outer radius. */
 const INNER_RADIUS_RATIO = 0.555
 const MASK_INSET = 0.985
 const RIGHT = new Vector3(1, 0, 0)
@@ -50,18 +52,52 @@ function ellipseCoversViewport(
   })
 }
 
+function coverScale(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  width: number,
+  height: number,
+): number {
+  const corners: [number, number][] = [
+    [0, 0],
+    [width, 0],
+    [0, height],
+    [width, height],
+  ]
+  let need = 1
+  for (const [x, y] of corners) {
+    const dx = (x - cx) / Math.max(rx, 1)
+    const dy = (y - cy) / Math.max(ry, 1)
+    need = Math.max(need, Math.sqrt(dx * dx + dy * dy))
+  }
+  return need * 1.025
+}
+
 /**
- * ONE-IMAGE portal entry.
+ * ONE VIDEO, ONE MASK, BOTH DIRECTIONS.
  *
- * There is no 3D video plane. The one fixed tunnel video exists for the whole
- * passage and is clipped to the real portal opening while the camera is outside.
- * As the camera advances, the mask grows with the projected aperture. Only after
- * the ellipse already covers every viewport corner is the mask removed, so the
- * handoff cannot expose even a single new pixel.
+ * Day -> night uses the real projected opening, exactly as the locked forward
+ * transition does now.
+ *
+ * Night -> day starts from the held night composition, latches that portal's
+ * on-screen ellipse, then expands ONLY THE MASK until it covers the viewport.
+ * The video itself never scales or restarts. This hides the reverse camera's
+ * internal handback while still reading as physically entering the same ring.
  */
 export function TunnelAperture() {
   const camera = useThree((s) => s.camera) as PerspectiveCamera
   const size = useThree((s) => s.size)
+
+  const reverseMask = useRef<{
+    cx: number
+    cy: number
+    rx: number
+    ry: number
+    cover: number
+  } | null>(null)
+  const lastDirection = useRef<1 | -1>(1)
 
   const scratch = useMemo(
     () => ({
@@ -80,18 +116,13 @@ export function TunnelAperture() {
     if (!el || !portalFrame.measured) return
 
     const t = cinematicClock.elapsed
+    const direction = cinematicDirection.value
 
-    if (t < APERTURE_ON) {
-      if (!tunnelVideo.fullscreen) {
-        tunnelVideo.aperture = false
-        el.style.opacity = '0'
-        el.style.clipPath = 'ellipse(0px 0px at 50% 50%)'
-      }
-      return
+    if (lastDirection.current !== direction) {
+      lastDirection.current = direction
+      reverseMask.current = null
     }
 
-    // Once the mask has been removed, never touch opacity again. The transition
-    // component owns the final fade into the night destination after `ended`.
     if (tunnelVideo.fullscreen) return
 
     const c = portalFrame.centre
@@ -109,37 +140,66 @@ export function TunnelAperture() {
     const rightX = (scratch.right.x * 0.5 + 0.5) * size.width
     const upY = (0.5 - scratch.up.y * 0.5) * size.height
     const downY = (0.5 - scratch.down.y * 0.5) * size.height
-
     const rx = Math.max(Math.abs(cx - leftX), Math.abs(rightX - cx))
     const ry = Math.max(Math.abs(cy - upY), Math.abs(downY - cy))
 
     if (![cx, cy, rx, ry].every(Number.isFinite) || rx < 1 || ry < 1) return
 
-    /*
-     * Slower at the beginning than an ordinary smoothstep. Tiny high-frequency
-     * tunnel details therefore rise out of the portal black instead of popping
-     * into it, while the last half of the reveal still reaches full strength
-     * comfortably before the camera crosses the ring.
-     */
-    const reveal = smooth01((t - APERTURE_ON) / APERTURE_FADE)
-    const alpha = Math.pow(reveal, 1.35)
+    if (direction > 0) {
+      if (t < APERTURE_ON) {
+        tunnelVideo.aperture = false
+        el.style.opacity = '0'
+        el.style.clipPath = 'ellipse(0px 0px at 50% 50%)'
+        return
+      }
+
+      const reveal = smooth01((t - APERTURE_ON) / APERTURE_FADE)
+      const alpha = Math.pow(reveal, 1.35)
+      tunnelVideo.aperture = true
+      el.style.opacity = String(alpha)
+      el.style.clipPath = `ellipse(${rx.toFixed(2)}px ${ry.toFixed(2)}px at ${cx.toFixed(2)}px ${cy.toFixed(2)}px)`
+
+      if (ellipseCoversViewport(cx, cy, rx, ry, size.width, size.height)) {
+        tunnelVideo.aperture = false
+        tunnelVideo.fullscreen = true
+        el.style.clipPath = 'none'
+        el.style.opacity = '1'
+        console.log('TUNNEL MASK CLEARED forward  currentTime=', el.currentTime.toFixed(3))
+      }
+      return
+    }
+
+    // NIGHT -> DAY. Latch the night portal before the hidden reverse camera
+    // starts retracing the forward rig. From here the mask has its own clean,
+    // monotonic expansion; the underlying camera is free to move invisibly.
+    if (!reverseMask.current) {
+      reverseMask.current = {
+        cx,
+        cy,
+        rx,
+        ry,
+        cover: coverScale(cx, cy, rx, ry, size.width, size.height),
+      }
+    }
+
+    const m = reverseMask.current
+    const elapsedBack = DURATION - t
+    const open = smooth01(elapsedBack / REVERSE_ENTER)
+    const alpha = smooth01(elapsedBack / REVERSE_REVEAL)
+    const scale = 1 + (m.cover - 1) * open
+    const erx = m.rx * scale
+    const ery = m.ry * scale
+
     tunnelVideo.aperture = true
     el.style.opacity = String(alpha)
-    el.style.clipPath = `ellipse(${rx.toFixed(2)}px ${ry.toFixed(2)}px at ${cx.toFixed(2)}px ${cy.toFixed(2)}px)`
+    el.style.clipPath = `ellipse(${erx.toFixed(2)}px ${ery.toFixed(2)}px at ${m.cx.toFixed(2)}px ${m.cy.toFixed(2)}px)`
 
-    /*
-     * Do NOT use the portal-plane crossing as a fallback. In final-run(8) that
-     * could clear the mask a few frames before the opening covered the screen,
-     * revealing the corners and making the grade change read like a cut. We wait
-     * for the projected opening itself to cover every corner; clearing clip-path
-     * on that frame changes zero visible pixels.
-     */
-    if (ellipseCoversViewport(cx, cy, rx, ry, size.width, size.height)) {
+    if (open >= 0.999 || ellipseCoversViewport(m.cx, m.cy, erx, ery, size.width, size.height)) {
       tunnelVideo.aperture = false
       tunnelVideo.fullscreen = true
       el.style.clipPath = 'none'
       el.style.opacity = '1'
-      console.log('TUNNEL MASK CLEARED  currentTime=', el.currentTime.toFixed(3))
+      console.log('TUNNEL MASK CLEARED reverse  currentTime=', el.currentTime.toFixed(3))
     }
   })
   /* eslint-enable react-hooks/immutability */
