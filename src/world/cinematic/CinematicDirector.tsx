@@ -6,6 +6,7 @@ import { useScene } from '@/store/scene'
 import { advanceCinematic, cinematicClock, resetCinematic, DURATION } from './cinematicState'
 import { PortalGatewayLighting } from './PortalGatewayLighting'
 import { RedCorridor } from './RedCorridor'
+import { TunnelAperture } from './TunnelAperture'
 import { OceanChaos } from './OceanChaos'
 
 /**
@@ -50,8 +51,16 @@ export function CinematicDirector() {
     // Swap the title only when the red/black travel layer is already covering
     // the destination handback.
     const t = cinematicClock.elapsed
-    if (!arrivedTitle && t >= 14.50) setArrivedTitle(true)
-    else if (arrivedTitle && t < 14.30 && cinematicClock.scrub !== null) setArrivedTitle(false)
+    /*
+     * The title is NOT raised here any more.
+     *
+     * Firing it on the master clock put PROJECTS on screen while the tunnel's
+     * black core was still covering everything, which produced a black title
+     * card sitting between the tunnel and the night world. The word belongs
+     * over the completed night composition, so the transition raises it once
+     * that composition is actually readable — see BlenderTunnelTransition.
+     */
+    if (arrivedTitle && t < 14.30 && cinematicClock.scrub !== null) setArrivedTitle(false)
 
     if (cinematicClock.running && cinematicClock.elapsed >= DURATION) {
       cinematicClock.running = false
@@ -65,6 +74,7 @@ export function CinematicDirector() {
       <OceanChaos />
       <PortalGatewayLighting />
       <RedCorridor />
+      <TunnelAperture />
     </>
   )
 }

@@ -3,6 +3,7 @@ import { Title } from '@/overlay/Title'
 import { Stats } from '@/overlay/Stats'
 import { HoverLabel } from '@/overlay/HoverLabel'
 import { Controls } from '@/overlay/Chrome/Controls'
+import { BlenderTunnelTransition } from '@/world/cinematic/BlenderTunnelTransition'
 
 export default function Home() {
   return (
@@ -11,6 +12,8 @@ export default function Home() {
       <Title />
       <HoverLabel />
       <Controls />
+      {/* Preview layer: the real Blender tunnel render, over the live scene. */}
+      <BlenderTunnelTransition />
       <Stats />
     </main>
   )

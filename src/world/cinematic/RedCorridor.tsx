@@ -13,7 +13,7 @@ import {
   Quaternion,
   Vector3,
 } from 'three'
-import { cinematicClock, portalFrame } from './cinematicState'
+import { blenderTunnelActive, cinematicClock, portalFrame } from './cinematicState'
 
 const NEAR_END = -72
 const FAR_END = -250
@@ -177,7 +177,15 @@ export function RedCorridor() {
      */
     const inAmount = span(t, 13.72, 13.96)
     const outAmount = 1 - span(t, 14.24, 14.58)
-    const amount = inAmount * outAmount
+    /*
+     * Suppressed entirely while the Blender render is on screen.
+     *
+     * Multiplied to zero rather than early-returned so every uniform, opacity
+     * and visibility flag below still runs and settles at its off state — an
+     * early return would leave whatever values happened to be set on the last
+     * frame before the handoff, and they would reappear when the clip ends.
+     */
+    const amount = inAmount * outAmount * (blenderTunnelActive.value ? 0 : 1)
 
     dark.position.set(c.x, c.y, c.z)
     hot.position.set(c.x, c.y, c.z)
