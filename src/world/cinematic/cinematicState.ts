@@ -3,30 +3,15 @@
 /**
  * The master clock, deliberately OUTSIDE React.
  *
- * The previous system wrote the transition's progress into the store, rounded
- * to twenty steps to make that affordable. Both halves of that were wrong: a
- * store write is a render of every subscriber, so a continuous value cost a
- * re-render of the whole world tree sixty times a second, and quantising to
- * twenty steps to afford it meant the animation advanced in visible stairs.
- *
- * So the clock is a plain mutable object. React holds only the coarse state —
- * whether the thing is playing — which changes three times in fifteen seconds.
- * Every frame-rate-sensitive consumer reads this object directly inside its own
- * frame callback, where mutation is free and legal.
+ * React owns only the coarse cinematic status. The continuous playhead lives in
+ * this mutable object so every visual system can sample the exact same value
+ * without forcing the entire scene tree to re-render every frame.
  */
 
 import { Vector3 } from 'three'
 import { createSample, sampleCinematic, DURATION, type CinematicSample } from './timeline'
 
-/**
- * Where the portal actually is, measured from the loaded asset.
- *
- * Written once by PortalCinematic from the model's own bounding box and read
- * by the camera. The camera has to fly through the real aperture, and a centre
- * copied out of a screenshot would be right only until the portal is moved,
- * resized or re-exported — at which point the camera would thread thin air and
- * nothing would report an error.
- */
+/** Where the real portal aperture is, measured from the loaded GLB. */
 export const portalFrame = {
   centre: new Vector3(0, 32, -150),
   /** Unit vector out of the aperture toward the viewer. */
@@ -38,58 +23,36 @@ export const portalFrame = {
   measured: false,
 }
 
-/**
- * Explicit camera ownership.
- *
- * Two controllers writing the same camera and hoping mount order settles it is
- * how a one-frame pop gets in and stays in. While this is true, IdleRig does
- * not touch the camera at all.
- */
+/** Explicit camera ownership so IdleRig never fights the cinematic. */
 export const cameraOwnedByCinematic = { value: false }
 
-/**
- * True while the Blender tunnel render is covering the screen.
- *
- * PREVIEW ONLY. The procedural corridor is suppressed while this is set, so
- * the two never stack — the whole point of the test is to see the Blender move
- * on its own, with the live world running underneath it rather than a second
- * tunnel showing through.
- */
+/** True while the authored Blender tunnel is the transit visual. */
 export const blenderTunnelActive = { value: false }
 
-/**
- * True only during the flight through the portal, frames 12 to 15.
- *
- * Separate from `cameraOwnedByCinematic` on purpose: that says the cinematic
- * owns the camera at all, this says a specific rig is flying it. IdleRig
- * returns immediately on either, so there is never a frame where two systems
- * both write the camera and the result depends on which ran last.
- */
+/** True while the dedicated portal flight rig owns the camera. */
 export const portalTransitionActive = { value: false }
 
-/**
- * The world's day/night blend, 0 to 1, OUTSIDE React.
- *
- * This lived in the store and was written whenever it moved by more than 0.02
- * — about fifty writes concentrated into the second and a half where the sky
- * turns. Each one re-rendered every subscriber: Stage, ArrayWorld, and
- * ArrayWorld again for the mirrored copy, and through them eight columns. The
- * measured cold-run stall sat exactly in that interval, and it was React
- * commit work, not anything on the GPU.
- *
- * Nothing about the value needed to be React state. It is read only inside
- * frame callbacks, to set material and light properties on objects that
- * already exist. Zustand keeps the coarse facts — whether it is night, whether
- * the cinematic is running — and this carries the continuous one.
- */
+/** Continuous day/night blend published for render-only consumers. */
 export const worldNight = { value: 0 }
 
+/**
+ * Which way the journey is currently travelling.
+ *
+ * +1 = day -> night
+ * -1 = night -> day
+ *
+ * Keeping direction beside the clock lets EVERY existing timeline envelope run
+ * backward automatically: pillars rise, red power falls, whitewater settles and
+ * the sky returns to day from the exact same authored values.
+ */
+export const cinematicDirection = { value: 1 as 1 | -1 }
+
 export const cinematicClock = {
-  /** Seconds since the cinematic began. The single source of truth. */
+  /** Timeline position in seconds. */
   elapsed: 0,
   /** Frozen position from ?seq=, or null to let it run. */
   scrub: null as number | null,
-  /** True while advancing. */
+  /** True while advancing in either direction. */
   running: false,
 }
 
@@ -101,12 +64,16 @@ export function advanceCinematic(delta: number): void {
   if (cinematicClock.scrub !== null) {
     cinematicClock.elapsed = cinematicClock.scrub
   } else if (cinematicClock.running) {
-    cinematicClock.elapsed = Math.min(DURATION, cinematicClock.elapsed + delta)
+    cinematicClock.elapsed = Math.max(
+      0,
+      Math.min(DURATION, cinematicClock.elapsed + delta * cinematicDirection.value),
+    )
   }
   sampleCinematic(cinematicClock.elapsed, cinematicSample)
 }
 
 export function resetCinematic(): void {
+  cinematicDirection.value = 1
   cinematicClock.elapsed = 0
   cinematicClock.running = false
   sampleCinematic(0, cinematicSample)
