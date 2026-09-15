@@ -5,7 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Mesh, MeshBasicMaterial, PerspectiveCamera as ProxyCamera, PlaneGeometry, Quaternion, Vector3 } from 'three'
 import type { PerspectiveCamera } from 'three'
 import { useScene } from '@/store/scene'
-import { cameraOwnedByCinematic, cinematicClock, cinematicSample, portalFrame } from './cinematicState'
+import { cameraOwnedByCinematic, cinematicClock, cinematicSample, portalFrame, portalTransitionActive } from './cinematicState'
 import { DURATION } from './timeline'
 
 /** The stable pose both endpoints share, and the pose the cinematic returns to. */
@@ -223,6 +223,19 @@ export function CinematicCamera() {
 
     const t = cinematicClock.elapsed
     const s = cinematicSample
+
+    /*
+     * From 11.9 the flight rig owns the camera outright.
+     *
+     * This rig's path ended by teleporting to the destination under a black
+     * veil, which is exactly what the new bore makes unnecessary: there is
+     * real geometry to travel through now, so the journey is no longer
+     * something to hide. It still runs the veil for the final darkness.
+     */
+    if (portalTransitionActive.value) {
+      mat.opacity = s.blackout
+      return
+    }
 
     /*
      * THE HIDDEN REPOSITION.

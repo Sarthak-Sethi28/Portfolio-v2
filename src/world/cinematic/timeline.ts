@@ -141,7 +141,18 @@ export function sampleCinematic(t: number, out: CinematicSample): CinematicSampl
    * the blackout is shared, because the veil and the hidden reposition both
    * have to agree on exactly when the screen is opaque.
    */
-  out.blackout = pulse(t, 13.7, 14.25, 14.75)
+  /*
+   * Retimed around the real traversal.
+   *
+   * It used to peak at 14.25 and clear by 14.75, which was built for a camera
+   * that crossed a thin ring and then teleported. With a bore to fly down the
+   * camera is still inside the machine at 14.25, and the veil was clearing
+   * just as it came out the far side — so the shot showed open night water
+   * beyond the portal instead of darkness. Darkness now arrives as the
+   * machinery passes behind, holds while the camera is returned, and lifts on
+   * the destination.
+   */
+  out.blackout = pulse(t, 14.15, 14.7, 15.0)
 
   return out
 }
