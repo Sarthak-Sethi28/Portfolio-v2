@@ -1,21 +1,17 @@
 /**
- * The single <video> element behind both tunnel presentations.
+ * Shared imperative state for the single tunnel <video> element.
  *
- * The clip is shown two ways — mapped onto a plane inside the portal's
- * aperture while the camera is still outside, then fullscreen once it has
- * crossed the ring. Both read THIS element, so the playback clock is shared by
- * construction rather than by synchronisation: there is only one currentTime in
- * existence, and a restart at the crossing is not something that can happen by
- * accident.
- *
- * Two separate elements kept in step would be the obvious alternative and the
- * wrong one — every frame of drift between them shows up exactly at the cut,
- * which is the one moment this has to be invisible.
+ * The video now has exactly one visual presentation: a fixed, full-viewport DOM
+ * element. Before the camera crosses the portal, TunnelAperture clips that same
+ * element to the portal opening projected into screen space. When the opening
+ * covers the viewport the clip-path is removed. Nothing restarts, rescales or
+ * swaps renderers at the threshold, so currentTime, crop and pixels remain
+ * continuous by construction.
  */
 export const tunnelVideo = {
   el: null as HTMLVideoElement | null,
-  /** True once the fullscreen layer has taken over from the aperture plane. */
+  /** True once the aperture mask has been removed. */
   fullscreen: false,
-  /** True while the aperture plane should be drawing the clip. */
+  /** True while the fixed video is being revealed through the projected opening. */
   aperture: false,
 }
