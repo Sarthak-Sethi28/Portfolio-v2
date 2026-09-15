@@ -107,7 +107,8 @@ export function BlenderTunnelTransition() {
       if (after.current >= CLIP_CLEAR) {
         el.style.opacity = '0'
         el.style.clipPath = 'none'
-        tunnelVideo.fullscreen = false
+        // Keep fullscreen latched until the next run so TunnelAperture cannot
+        // re-arm itself on the ended frame while the master clock is still > 11.55.
         tunnelVideo.aperture = false
         blenderTunnelActive.value = false
       }
