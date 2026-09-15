@@ -66,15 +66,15 @@ export function PortalFinal({
       mesh.material = src.userData.clone as MeshStandardMaterial
 
       /*
-       * The long internal rails are intentionally much dimmer than the front
-       * channel. When the camera is physically inside the bore those strips are
-       * centimetres from the lens; even a moderate value turns the tunnel into
-       * a pink pipe. Frame 14 is supposed to be mostly graphite and black with
-       * red fragments, not a second glowing portal.
+       * The long internal rails are only physical fragments in the real bore.
+       * The previous pass let them carry too much of the red transition, which
+       * made the camera feel as if it had entered a cheap neon pipe. The real
+       * high-speed red field now lives BEHIND the Blender bore in world space,
+       * so these rails can stay almost dark and simply flash past the lens.
        */
       if (o.name.startsWith('PORTAL_AUTO_TunnelRail') && name === 'PORTAL_AUTO_EnergyRed') {
         const deep = (src.userData.clone as MeshStandardMaterial).clone()
-        deep.emissive = new Color('#a90d06')
+        deep.emissive = new Color('#7d0804')
         deep.emissiveIntensity = 0
         mesh.material = deep
         rails.push(deep)
@@ -86,8 +86,6 @@ export function PortalFinal({
     box.getSize(size)
     const scale = size.y > 0 ? height / size.y : 1
 
-    // Front aperture plane, not bounding-box centre: the bore is almost as deep
-    // as the ring is wide, so the box centre would point the flight at the back.
     const apertureLocal = new Vector3(0, (box.min.y + box.max.y) / 2, box.max.z)
     const depth = (box.max.z - box.min.z) * scale
 
@@ -128,19 +126,12 @@ export function PortalFinal({
     for (const [name, action] of Object.entries(actions)) {
       if (!action || !name.startsWith('PORTAL_AUTO_MechanicalRing')) continue
       action.paused = alive < 0.01
-      // Heavy machinery: it wakes during charge and never becomes a turbine.
       action.timeScale = 0.18 + alive * 0.42
     }
 
-    /*
-     * The front channel carries the red gateway. The deeper rails are only
-     * fragments seen during the pass-through. The new PortalGatewayLighting
-     * component is responsible for spill/reflection on the world; these values
-     * are only what the portal itself emits.
-     */
     const lit = Math.max(s.ignition * 0.9, s.power, s.night * 0.96)
     if (built.energy) built.energy.emissiveIntensity = lit * 1.45
-    for (const r of built.rails) r.emissiveIntensity = lit * 0.13
+    for (const r of built.rails) r.emissiveIntensity = lit * 0.075
 
     const ind = Math.max(0, Math.min(1, (s.power - 0.18) * 2.5))
     for (const g of built.indicators) g.emissiveIntensity = ind * 0.55
