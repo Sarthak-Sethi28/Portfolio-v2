@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Mesh, PlaneGeometry, ShaderMaterial } from 'three'
 import type { PerspectiveCamera } from 'three'
@@ -17,17 +17,14 @@ function span(t: number, a: number, b: number): number {
 }
 
 /**
- * Frame 15 — not a plain fade to black.
+ * The camera does not enter a second portal. It enters the real Blender bore,
+ * and speed turns the SAME red gateway into smeared light around the lens.
  *
- * Once the real Blender bore has rushed past the lens, the machinery is gone
- * but its light is still travelling with us for a fraction of a second. This
- * full-screen plane is therefore intentionally abstract: almost pure black,
- * with a handful of thin red streaks that live at the edges and converge into
- * darkness. There is no circle, no second portal, no vortex and no explosion.
+ * Colour stays in one family: black -> oxblood -> crimson -> scarlet -> a few
+ * ember-hot highlights. No rainbow tunnel, no blue hyperspace, no new circle.
  */
 export function PortalTransitionOverlay() {
   const camera = useThree((s) => s.camera) as PerspectiveCamera
-  const mat = useRef<ShaderMaterial>(null)
 
   const overlay = useMemo(() => {
     const material = new ShaderMaterial({
@@ -36,8 +33,8 @@ export function PortalTransitionOverlay() {
       depthWrite: false,
       toneMapped: false,
       uniforms: {
+        uWarp: { value: 0 },
         uBlack: { value: 0 },
-        uStreaks: { value: 0 },
         uTime: { value: 0 },
       },
       vertexShader: `
@@ -49,47 +46,79 @@ export function PortalTransitionOverlay() {
       `,
       fragmentShader: `
         varying vec2 vUv;
+        uniform float uWarp;
         uniform float uBlack;
-        uniform float uStreaks;
         uniform float uTime;
 
-        float line(float y, float centre, float width) {
-          return exp(-pow((y - centre) / width, 2.0));
+        float hash(float n) {
+          return fract(sin(n) * 43758.5453123);
+        }
+
+        float beam(float a, float centre, float width) {
+          float d = abs(atan(sin(a - centre), cos(a - centre)));
+          return exp(-pow(d / width, 2.0));
         }
 
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
-          float ax = abs(p.x);
+          // Keep the radial field visually circular on widescreen without an
+          // explicit ring. The slight x stretch is intentionally cinematic.
+          p.x *= 1.18;
+          float r = length(p);
+          float a = atan(p.y, p.x);
 
-          // Nothing bright lives in the middle. The streaks are remnants of
-          // machinery that just passed the lens, so they enter from the edges
-          // and die before reaching centre.
-          float edge = smoothstep(0.18, 0.96, ax);
-          float taper = smoothstep(0.0, 0.28, ax) * (1.0 - smoothstep(0.96, 1.0, ax));
+          // The centre remains dark: we are looking INTO somewhere, not at a
+          // glowing disc pasted over the opening.
+          float centreVoid = 1.0 - smoothstep(0.08, 0.36, r);
+          float edgeGate = smoothstep(0.16, 0.42, r);
 
-          // Very small motion: enough to carry forward momentum, never enough
-          // to become a hyperspace effect.
-          float drift = (uTime - 13.8) * 0.035;
-          float bend = (1.0 - ax) * 0.12;
+          // Directional light dragged by forward speed. Irregular beam angles
+          // stop this becoming a symmetric starburst.
+          float b = 0.0;
+          b += beam(a, -2.72, 0.020) * 0.70;
+          b += beam(a, -2.13, 0.013) * 0.92;
+          b += beam(a, -1.36, 0.024) * 0.52;
+          b += beam(a, -0.62, 0.011) * 1.00;
+          b += beam(a,  0.18, 0.018) * 0.58;
+          b += beam(a,  0.87, 0.012) * 0.82;
+          b += beam(a,  1.62, 0.021) * 0.46;
+          b += beam(a,  2.38, 0.014) * 0.76;
 
-          float s = 0.0;
-          s += line(p.y, -0.46 + bend + drift, 0.012) * 0.78;
-          s += line(p.y, -0.20 + bend * 0.55 - drift * 0.4, 0.010) * 1.00;
-          s += line(p.y,  0.08 - bend * 0.35 + drift * 0.2, 0.009) * 0.56;
-          s += line(p.y,  0.31 - bend * 0.75 - drift * 0.3, 0.012) * 0.88;
-          s += line(p.y,  0.53 - bend + drift * 0.25, 0.008) * 0.43;
+          // Longitudinal segmentation moving rapidly toward the viewer. It
+          // turns each beam into fragments of stretched light rather than a
+          // static spoke.
+          float travel = fract(r * 4.3 - uTime * (1.25 + uWarp * 4.8));
+          float streak = pow(smoothstep(0.02, 0.48, travel) * (1.0 - smoothstep(0.72, 0.98, travel)), 0.72);
 
-          // Break the lines so there are light fragments rather than perfect
-          // rulers drawn across the screen.
-          float broken = 0.72 + 0.28 * sin(p.x * 31.0 + p.y * 19.0 + uTime * 1.7);
-          s *= max(0.0, broken) * edge * taper * uStreaks;
+          // Fine moving breakup gives the sense that physical detail is being
+          // pulled into light as the lens accelerates through the machinery.
+          float grain = 0.62 + 0.38 * sin(a * 23.0 + r * 51.0 - uTime * 5.7);
+          float intensity = b * streak * max(0.0, grain) * edgeGate * uWarp;
 
-          vec3 red = vec3(1.0, 0.025, 0.008) * min(s, 0.95);
-          vec3 colour = red;
+          // A broad red smear lives at the extreme edges once speed is high.
+          float edgeSmear = smoothstep(0.52, 1.18, r) * uWarp * (0.16 + 0.22 * sin(a * 5.0 + uTime));
+          intensity += max(0.0, edgeSmear);
 
-          // A black plate, with the red carried inside the same render so the
-          // streaks survive even when the scene underneath is fully obscured.
-          float alpha = max(uBlack, min(0.9, s * 0.72));
+          // Red family only. The hottest fragments may approach ember-orange,
+          // but the gateway remains unmistakably red.
+          vec3 oxblood = vec3(0.12, 0.001, 0.003);
+          vec3 crimson = vec3(0.82, 0.006, 0.008);
+          vec3 scarlet = vec3(1.0, 0.035, 0.012);
+          vec3 ember = vec3(1.0, 0.17, 0.035);
+
+          float hot = smoothstep(0.42, 0.88, intensity);
+          vec3 red = mix(oxblood, crimson, min(1.0, intensity * 1.9));
+          red = mix(red, scarlet, smoothstep(0.18, 0.56, intensity));
+          red = mix(red, ember, hot * 0.18);
+
+          // As the physical bore disappears behind us, black takes over while
+          // a few moving red remnants remain. centreVoid pushes the middle
+          // darker sooner, preserving depth throughout the transition.
+          float localBlack = uBlack * (0.82 + centreVoid * 0.18);
+          float redAlpha = min(0.82, intensity * 0.72);
+          float alpha = max(localBlack, redAlpha);
+          vec3 colour = red * (1.0 - localBlack * 0.36);
+
           gl_FragColor = vec4(colour, alpha);
         }
       `,
@@ -113,24 +142,26 @@ export function PortalTransitionOverlay() {
 
   /* eslint-disable react-hooks/immutability */
   useFrame(() => {
-    const m = mat.current ?? (overlay.material as ShaderMaterial)
+    const m = overlay.material as ShaderMaterial
     const t = cinematicClock.elapsed
 
-    // Machinery is still physically visible until roughly 13.75. Then the
-    // abstract between-worlds beat takes over, holds through the hidden camera
-    // handback, and dissolves into the Projects world by 15.0.
-    const blackIn = span(t, 13.72, 13.96)
-    const blackOut = 1 - span(t, 14.52, 15.0)
+    // The red-speed layer begins BEFORE the front face crosses the lens, so the
+    // approach, threshold and bore read as one action. It strengthens while the
+    // real geometry is still visible beneath it rather than replacing it in a cut.
+    const warpIn = span(t, 12.42, 13.30)
+    const warpOut = 1 - span(t, 14.32, 14.82)
+    const warp = warpIn * warpOut
+
+    // Darkness grows naturally after the machinery has rushed past. The hidden
+    // handback sits inside the peak, then Projects emerges from the same motion.
+    const blackIn = span(t, 13.72, 14.34)
+    const blackOut = 1 - span(t, 14.56, 15.0)
     const black = blackIn * blackOut
 
-    const streakIn = span(t, 13.78, 13.98)
-    const streakOut = 1 - span(t, 14.26, 14.62)
-    const streaks = streakIn * streakOut
-
     m.uniforms.uTime.value = t
+    m.uniforms.uWarp.value = warp
     m.uniforms.uBlack.value = black
-    m.uniforms.uStreaks.value = streaks
-    overlay.visible = black > 0.001 || streaks > 0.001
+    overlay.visible = warp > 0.001 || black > 0.001
   })
   /* eslint-enable react-hooks/immutability */
 
