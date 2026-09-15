@@ -5,15 +5,16 @@ import { useFrame } from '@react-three/fiber'
 import { useScene } from '@/store/scene'
 import { advanceCinematic, cinematicClock, resetCinematic, DURATION } from './cinematicState'
 import { PortalGatewayLighting } from './PortalGatewayLighting'
-import { PortalTransitionOverlay } from './PortalTransitionOverlay'
-import { OceanRupture } from './OceanRupture'
+import { OceanSplashSurge } from './OceanSplashSurge'
+import { PortalTransitVolume } from './PortalTransitVolume'
 
 /**
  * Advances the one clock, then mounts the visual systems that depend on it.
  *
- * The entire piece is one event now: ocean rupture -> red charge -> water
- * discharge -> sinking columns -> gateway pull -> bore traversal. These systems
- * overlap on the same clock instead of handing off with visible pauses.
+ * This pass removes the two things that made the previous render feel fake:
+ * the elevated circular "ocean rupture" patch and the fullscreen radial red
+ * warp. Water now breaks out of the actual surface, and the portal transition
+ * is a real 3D volume the camera flies through.
  */
 export function CinematicDirector() {
   const status = useScene((s) => s.cinematic)
@@ -24,7 +25,6 @@ export function CinematicDirector() {
   const arrivedTitle = useScene((s) => s.arrivedTitle)
   const setArrivedTitle = useScene((s) => s.setArrivedTitle)
 
-  // A scrub is authoritative: nothing may advance the clock behind it.
   useEffect(() => {
     cinematicClock.scrub = seqFlag === null ? null : seqFlag * DURATION
   }, [seqFlag])
@@ -44,11 +44,8 @@ export function CinematicDirector() {
   }, [status, reducedMotion, setNight, setCinematic, setArrivedTitle])
 
   useFrame((_, delta) => {
-    // A restored/background tab must not jump the entire piece in one update.
     advanceCinematic(Math.min(delta, 1 / 20))
 
-    // Swap the title only when the red/black travel layer is already covering
-    // the destination handback.
     const t = cinematicClock.elapsed
     if (!arrivedTitle && t >= 14.50) setArrivedTitle(true)
     else if (arrivedTitle && t < 14.30 && cinematicClock.scrub !== null) setArrivedTitle(false)
@@ -62,9 +59,9 @@ export function CinematicDirector() {
 
   return (
     <>
-      <OceanRupture />
+      <OceanSplashSurge />
       <PortalGatewayLighting />
-      <PortalTransitionOverlay />
+      <PortalTransitVolume />
     </>
   )
 }
