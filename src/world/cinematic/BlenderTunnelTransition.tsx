@@ -1,32 +1,29 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { blenderTunnelActive, cinematicClock } from './cinematicState'
+import {
+  blenderTunnelActive,
+  cinematicClock,
+  cinematicDirection,
+} from './cinematicState'
 import { tunnelVideo } from './tunnelVideo'
 import { useScene } from '@/store/scene'
 
-/** Same moment used by TunnelAperture. Playback starts before the portal crossing. */
+/** Forward trip starts revealing through the aperture at this timeline point. */
 const APERTURE_ON = 11.55
-/** The render ends in black; clear it quickly onto the timeline's own blackout. */
+/** The render ends in black; clear it quickly onto the live world. */
 const CLIP_CLEAR = 0.12
-/**
- * Wait until the real night composition is readable before Title.tsx begins its
- * own delayed reveal. final-run(9) showed PROJECTS while the destination was
- * still mostly black; this pushes the word onto the actual scene instead.
- */
+/** Forward-only: wait until the night composition is readable before PROJECTS. */
 const TITLE_TRIGGER = 0.30
 
 /**
- * The single tunnel video element for the entire journey.
+ * One tunnel movie for both journeys.
  *
- * Entry continuity is one image: TunnelAperture clips this exact element to the
- * projected portal opening, then removes only that mask once the aperture covers
- * the viewport. There is no second player, crop, scale, restart or crossfade.
- *
- * Exit continuity uses the R3F blackout that already hides the destination
- * camera handback. The Blender core and that blackout overlap briefly, then the
- * actual night ocean resolves underneath. No procedural corridor is allowed to
- * appear between those two states.
+ * We deliberately play the authored clip FORWARD in both directions. Going
+ * night -> day is still travelling forward through a gateway from the opposite
+ * side; reversing the H.264 frames would make rings unnaturally suck backward
+ * toward the viewer. The live world timeline reverses, but the passage itself
+ * retains forward momentum.
  */
 export function BlenderTunnelTransition() {
   const setArrivedTitle = useScene((s) => s.setArrivedTitle)
@@ -35,6 +32,7 @@ export function BlenderTunnelTransition() {
   const ended = useRef(false)
   const after = useRef(0)
   const titled = useRef(false)
+  const lastDirection = useRef<1 | -1>(1)
 
   useEffect(() => {
     const el = video.current
@@ -47,11 +45,16 @@ export function BlenderTunnelTransition() {
     const onEnded = () => {
       ended.current = true
       after.current = 0
-      console.log('TUNNEL END  currentTime=', el.currentTime.toFixed(3))
+      console.log(
+        'TUNNEL END direction=',
+        cinematicDirection.value,
+        ' currentTime=',
+        el.currentTime.toFixed(3),
+      )
     }
     el.addEventListener('ended', onEnded)
 
-    const reset = () => {
+    const resetForDirection = () => {
       started.current = false
       ended.current = false
       after.current = 0
@@ -70,16 +73,20 @@ export function BlenderTunnelTransition() {
       const now = performance.now()
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
-      const t = cinematicClock.elapsed
 
-      // A fresh F run rewinds the same element and the same mask state.
-      if (t < APERTURE_ON - 0.5 && started.current) {
-        reset()
-        return
+      const t = cinematicClock.elapsed
+      const direction = cinematicDirection.value
+
+      // A new trip in the opposite direction is the only time the player is
+      // rewound. It is never restarted at the portal threshold itself.
+      if (lastDirection.current !== direction) {
+        lastDirection.current = direction
+        resetForDirection()
       }
 
       if (!started.current) {
-        if (t < APERTURE_ON) return
+        const shouldStart = direction > 0 ? t >= APERTURE_ON : cinematicClock.running
+        if (!shouldStart) return
 
         started.current = true
         blenderTunnelActive.value = true
@@ -88,20 +95,19 @@ export function BlenderTunnelTransition() {
         el.currentTime = 0
         el.style.opacity = '0'
         el.style.clipPath = 'ellipse(0px 0px at 50% 50%)'
-        console.log('TUNNEL APERTURE START')
+        console.log('TUNNEL APERTURE START direction=', direction)
 
         void el.play().then(
-          () => console.log('TUNNEL PLAYING'),
+          () => console.log('TUNNEL PLAYING direction=', direction),
           (err) => {
             console.log('TUNNEL BLOCKED', String(err))
-            reset()
+            resetForDirection()
           },
         )
         return
       }
 
-      // TunnelAperture owns the live mask/opacity until the clip ends. Once the
-      // render has ended, this component alone owns the fade into the night.
+      // TunnelAperture owns the mask/opacity until the authored render ends.
       if (!ended.current) return
 
       after.current += dt
@@ -110,13 +116,19 @@ export function BlenderTunnelTransition() {
       if (after.current >= CLIP_CLEAR) {
         el.style.opacity = '0'
         el.style.clipPath = 'none'
-        // Keep fullscreen latched until the next run so TunnelAperture cannot
-        // re-arm itself while the master clock is still past the entry window.
+        // Leave fullscreen latched for the rest of this trip. Otherwise the
+        // aperture component could re-arm against the same timeline window.
         tunnelVideo.aperture = false
         blenderTunnelActive.value = false
       }
 
-      if (after.current >= TITLE_TRIGGER && !titled.current) {
+      // PROJECTS belongs only to the day -> night arrival. On the return trip
+      // the title stays gone and the user's name returns naturally at day idle.
+      if (
+        direction > 0 &&
+        after.current >= TITLE_TRIGGER &&
+        !titled.current
+      ) {
         titled.current = true
         setArrivedTitle(true)
         console.log('PROJECTS SHOWN')
@@ -154,10 +166,6 @@ export function BlenderTunnelTransition() {
         pointerEvents: 'none',
         zIndex: 9999,
         background: '#000',
-        /*
-         * Transit-only grade: pull the warmer Blender render toward the live
-         * portal's deeper crimson without changing the signed-off site grade.
-         */
         filter: 'hue-rotate(-12deg) saturate(1.05) brightness(0.86) contrast(1.08)',
         willChange: 'clip-path, opacity',
       }}
