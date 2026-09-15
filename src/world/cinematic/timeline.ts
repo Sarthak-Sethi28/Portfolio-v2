@@ -1,20 +1,12 @@
 /**
- * THE CINEMATIC TIMELINE — a pure function of elapsed seconds.
+ * THE CINEMATIC TIMELINE — one deterministic clock for the whole sequence.
  *
- * Fifteen seconds, day to night. Every system in the world reads its own value
- * out of one sample, so there is exactly one place that decides what moment it
- * is and no two systems can disagree about it.
- *
- * PURE, and that is the whole design. No component accumulates its own
- * animation state, nothing integrates a velocity, nothing eases toward a
- * target. Scrubbing from second 11 back to second 3 has to render precisely
- * the frame that playing forwards produced, and anything that accumulates
- * breaks that the moment you seek. It also means a dropped frame costs
- * nothing: the next frame asks for the time it actually is and gets the right
- * answer, rather than being one integration step behind forever.
+ * The important rule in this pass is CAUSALITY. The ocean reacts first, the
+ * portal charges second, full charge releases one low red front across the
+ * water, that front is what makes the columns yield, and only after the world
+ * has settled does the camera enter the gateway. Nothing later explodes again.
  */
 
-/** Total running time, seconds. Matches the Blender clip exactly. */
 export const DURATION = 15
 
 /** 0 before `a`, 1 after `b`, smoothstepped between. */
@@ -24,19 +16,12 @@ export function span(t: number, a: number, b: number): number {
   return x * x * (3 - 2 * x)
 }
 
-/** Rises to 1 at `peak`, falls back to 0 by `b`. For one-off events. */
+/** Rises to 1 at `peak`, falls back to 0 by `b`. */
 export function pulse(t: number, a: number, peak: number, b: number): number {
   return t < peak ? span(t, a, peak) : 1 - span(t, peak, b)
 }
 
-/**
- * Heavier than a smoothstep: slow to start, then committed.
- *
- * Used where something with real mass begins to move. A smoothstep is
- * symmetrical and reads as a machine easing a light object; this holds still
- * noticeably longer before it goes, which is how something that weighs a great
- * deal announces that it has started.
- */
+/** A weighty ease used by systems that want a slow start before committing. */
 export function heavy(t: number, a: number, b: number): number {
   const x = span(t, a, b)
   return x * x * (3 - 2 * x)
@@ -47,112 +32,98 @@ export interface CinematicSample {
   disturbance: number
   /** Birds break formation and flee. */
   scatter: number
-  /** The ocean draws inward. */
+  /** The ocean draws inward toward the machine. */
   pull: number
   /** Columns sink. 1 is fully submerged. */
   pillarDescent: number
-  /** Time to drive the Blender mixer with, in seconds. */
+  /** Time available to Blender-driven portal animation. */
   portalTime: number
-  /** How far the ignition has travelled the ring, 0..1. */
+  /** How far the red circuit has travelled, 0..1. */
   ignition: number
-  /** Steady-state power once lit. */
+  /** Steady-state portal power once the circuit closes. */
   power: number
-  /** The single water shockwave. */
+  /** The ONE low red water-surface discharge, 0..1 radius. */
   shockwave: number
   /** Authoritative night level during the cinematic. */
   night: number
-  /** The near-black interstitial. */
+  /** Final safety veil used only for the hidden destination handback. */
   blackout: number
 }
 
-/** A single shared sample object, mutated in place. */
 export function createSample(): CinematicSample {
   return {
-    disturbance: 0, scatter: 0, pull: 0, pillarDescent: 0,
-    portalTime: 0, ignition: 0, power: 0, shockwave: 0,
-    night: 0, blackout: 0,
+    disturbance: 0,
+    scatter: 0,
+    pull: 0,
+    pillarDescent: 0,
+    portalTime: 0,
+    ignition: 0,
+    power: 0,
+    shockwave: 0,
+    night: 0,
+    blackout: 0,
   }
 }
 
-/**
- * Write the state of the world at `t` seconds into `out`.
- *
- * Mutates rather than allocating: this runs every frame, and a fresh object
- * per frame is sixty new allocations a second for no benefit when every
- * consumer reads it and discards it within the same frame.
- */
 export function sampleCinematic(t: number, out: CinematicSample): CinematicSample {
-  // 02-04. Local water only. The whole ocean must not change speed.
-  out.disturbance = span(t, 1.15, 3.2) * (1 - span(t, 11.5, 13.5) * 0.55)
-  out.pull = span(t, 3.0, 4.1)
+  /*
+   * 01-04 — THE WATER NOTICES FIRST.
+   *
+   * Only the local patch around the portal changes. It begins as a disturbance,
+   * then the flow acquires an inward bias. This is the first hint that the
+   * machine is doing something to the world rather than the world merely
+   * changing weather.
+   */
+  out.disturbance = span(t, 1.15, 2.75) * (1 - span(t, 10.9, 11.7) * 0.7)
+  out.pull = span(t, 2.65, 4.25)
 
-  // 03. Birds flee. Gone from the composition by about 3.3.
+  // Birds leave before the machine gets loud, so they do not clutter the hero beat.
   out.scatter = span(t, 2.0, 3.3)
 
-  // 05. Columns descend, 4.0 to 5.0 with per-pillar stagger applied by the
-  // caller — this is the envelope, not the individual timing.
   /*
-   * The columns come back while the screen is black.
+   * 07-09 — THE MACHINE CHARGES.
    *
-   * They sink at four seconds and must be STANDING again at fifteen, because
-   * the signed-off night endpoint has all four of them — the destination is a
-   * contract, not a consequence of what the journey happened to leave behind.
-   * Restoring them between 14.05 and 14.4 puts the change entirely inside the
-   * blackout, where the camera is also being repositioned, so the world on the
-   * far side is simply the world that was always there.
+   * The red circuit completes BEFORE anything major is discharged into the
+   * environment. That ordering is the visual logic of the whole sequence.
    */
-  /*
-   * A LONGER window, so four separate descents can overlap.
-   *
-   * The envelope ran 4.0-5.35 and every column was gone almost together,
-   * which emptied the frame in an instant. Starts are staggered by the caller
-   * from 3.80 to 4.40 and each takes about a second, so the last crown is
-   * still going under while the first is already only foam.
-   */
-  out.pillarDescent = span(t, 3.8, 5.6) * (1 - span(t, 14.05, 14.4))
+  out.ignition = span(t, 6.95, 8.20)
+  out.power = span(t, 8.20, 8.65)
 
-  // The Blender clip is authored against the same clock, one second per
-  // second, so this is the identity. It exists as a channel anyway: if the
-  // machine's beats ever need to slip against the world's, this is the only
-  // line that changes.
+  /*
+   * ONE discharge only.
+   *
+   * It starts exactly when full power is reached and travels across the water.
+   * WaterShockwave renders this as a thin, low pressure/energy front — never a
+   * sphere, fireball or screen flash.
+   */
+  out.shockwave = t < 8.65 ? 0 : Math.min(1, (t - 8.65) / 1.15)
+
+  /*
+   * 09-11 — THE WAVE MAKES THE COLUMNS YIELD.
+   *
+   * The per-column stagger is applied by ArrayWorld/ModelPier. The envelope is
+   * deliberately the same 1.8 seconds the existing stagger was authored for,
+   * so each pillar begins roughly two tenths after the previous one. They are
+   * restored only under the final black transition for the signed-off Projects
+   * endpoint.
+   */
+  out.pillarDescent = span(t, 8.95, 10.75) * (1 - span(t, 14.34, 14.52))
+
+  // The mechanical clip can still use absolute cinematic time if needed.
   out.portalTime = Math.min(DURATION, Math.max(0, t))
 
-  // 09. The travelling circuit. The caller distributes this around the ring.
-  out.ignition = span(t, 8.0, 9.05)
-  out.power = span(t, 8.9, 9.8)
-
-  // 10. Exactly one shockwave, leaving at full power.
-  out.shockwave = t < 9.15 ? 0 : Math.min(1, (t - 9.15) / 1.0)
-
   /*
-   * 11-12. Daylight collapses, then night settles.
-   *
-   * One channel, not two. A separate `twilight` value existed alongside this
-   * and nothing ever read it: the warmth leaving the sky is already carried by
-   * the palette blend this drives, so the second channel was describing the
-   * same event twice and could only ever disagree with itself.
+   * Night arrives WITH the consequences of the discharge, not before it. The
+   * last pillar is still going under as the warm world collapses into blue-black.
    */
-  out.night = span(t, 10.2, 11.85)
+  out.night = span(t, 9.35, 11.45)
 
   /*
-   * 12-15. The camera's own path is authored as control points in
-   * CinematicCamera rather than as channels here — `approach`, `through` and
-   * `destination` were reserved for it and went unused, so they are gone. Only
-   * the blackout is shared, because the veil and the hidden reposition both
-   * have to agree on exactly when the screen is opaque.
+   * The black/red Frame-15 look is rendered by PortalTransitionOverlay. This
+   * veil exists only to make the hidden camera handback completely safe near
+   * 14.5 seconds, then it clears into Projects by 15.0.
    */
-  /*
-   * Retimed around the real traversal.
-   *
-   * It used to peak at 14.25 and clear by 14.75, which was built for a camera
-   * that crossed a thin ring and then teleported. With a bore to fly down the
-   * camera is still inside the machine at 14.25, and the veil was clearing
-   * just as it came out the far side — so the shot showed open night water
-   * beyond the portal instead of darkness. Darkness now arrives as the
-   * machinery passes behind, holds while the camera is returned, and lifts on
-   * the destination.
-   */
-  out.blackout = pulse(t, 14.15, 14.7, 15.0)
+  out.blackout = pulse(t, 14.28, 14.48, 15.0)
 
   return out
 }
