@@ -5,8 +5,8 @@ import { useFrame } from '@react-three/fiber'
 import { useScene } from '@/store/scene'
 import { advanceCinematic, cinematicClock, resetCinematic, DURATION } from './cinematicState'
 import { PortalGatewayLighting } from './PortalGatewayLighting'
-import { PortalTransitionOverlay } from './PortalTransitionOverlay'
-import { OceanRupture } from './OceanRupture'
+import { RedCorridor } from './RedCorridor'
+import { OceanChaos } from './OceanChaos'
 
 /**
  * Advances the one clock, then mounts the visual systems that depend on it.
@@ -62,9 +62,9 @@ export function CinematicDirector() {
 
   return (
     <>
-      <OceanRupture />
+      <OceanChaos />
       <PortalGatewayLighting />
-      <PortalTransitionOverlay />
+      <RedCorridor />
     </>
   )
 }
