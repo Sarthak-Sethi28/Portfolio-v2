@@ -2,27 +2,21 @@
 
 import { useEffect } from 'react'
 import { useScene } from '@/store/scene'
-import { portalFrame } from '@/world/cinematic/cinematicState'
+import {
+  cinematicDirection,
+  portalFrame,
+} from '@/world/cinematic/cinematicState'
 
 /**
  * Keyboard input. No visible controls.
  *
- * There is deliberately nothing on screen.
+ * F is the journey trigger in BOTH directions:
+ * - from day, it runs day -> night
+ * - from the completed night destination, it runs night -> day
  *
- * Night was a toggle and is not any more: night is where the gate TAKES you,
- * and a control that flips it spends the reveal before the visitor has earned
- * it. Rain followed it out — a weather switch is a toy, and a toy in the
- * corner tells the viewer they are looking at a demo rather than standing
- * somewhere. Jace's site can carry a SYS.CONFIG panel because his whole
- * framing is a machine you are operating; ours is a place.
- *
- * N and R stay because building the arrival means looking at night and rain
- * constantly, and they are undocumented on purpose.
- *
- * F is different in kind: it plays the arrival, which is the one thing the
- * visitor is actually meant to do here. It is on a key rather than a button
- * for now, but it is not a debug shortcut — when this gets its real trigger,
- * this is the call it makes.
+ * Mid-flight reversal is intentionally blocked. Every visual system samples one
+ * deterministic clock, so the user always completes the current trip before a
+ * new one can begin.
  */
 export function Controls() {
   const toggleNight = useScene((s) => s.toggleNight)
@@ -36,42 +30,21 @@ export function Controls() {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
+
       if (e.key === 'n' || e.key === 'N') toggleNight()
       if (e.key === 'r' || e.key === 'R') toggleRain()
-      /*
-       * F plays the arrival.
-       *
-       * It always starts from the day side, because the sequence IS the
-       * journey from day to night — running it while already at night would
-       * play fifteen seconds of a world changing into what it already is. So
-       * pressing it at night rewinds to day first and goes again.
-       */
+
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault()
-        /*
-         * Once, from the day side, and not interruptible.
-         *
-         * Restarting or reversing mid-transition would put the world in a
-         * state no beat describes — pillars half-sunk while the sky runs
-         * backwards — and every system here derives its value from one clock
-         * on the assumption that the clock only moves forward through a piece
-         * that was authored in one direction.
-         */
-        if (cinematic !== 'idle' || night) return
-        /*
-         * Never fly through fallback coordinates.
-         *
-         * The camera derives its whole approach from the portal's measured
-         * bounds, and those are published by the model only once it has
-         * loaded. Pressing F during that window would have aimed the traversal
-         * at the default centre — which is close enough to the real one that
-         * the failure would not look like a bug, just an approach that misses
-         * slightly. Silent near-misses are worse than loud ones.
-         */
+        if (cinematic === 'playing') return
         if (!portalFrame.measured) return
+
+        // Night is now a real return journey, not a dead end.
+        cinematicDirection.value = night || cinematic === 'complete' ? -1 : 1
         setCinematic('playing')
       }
     }
+
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [toggleNight, toggleRain, setCinematic, cinematic, night])
