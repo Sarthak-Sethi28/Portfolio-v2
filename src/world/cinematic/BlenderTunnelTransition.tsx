@@ -8,22 +8,20 @@ import { useScene } from '@/store/scene'
 /** Same moment used by TunnelAperture. Playback starts before the portal crossing. */
 const APERTURE_ON = 11.55
 /** The render ends in black; clear it quickly onto the timeline's own blackout. */
-const CLIP_CLEAR = 0.20
-/** PROJECTS starts its CSS reveal only after the night world has begun to emerge. */
-const TITLE_TRIGGER = 0.10
+const CLIP_CLEAR = 0.12
+/** PROJECTS begins only once the night world has had time to emerge from black. */
+const TITLE_TRIGGER = 0.16
 
 /**
  * The single tunnel video element for the entire journey.
  *
- * Entry continuity is no longer a swap between a VideoTexture plane and a DOM
- * video. TunnelAperture clips THIS element to the projected portal opening, then
- * removes that mask only when it already covers the viewport. The element never
- * restarts, rescales, changes object-fit or changes crop.
+ * Entry continuity is one image: TunnelAperture clips this exact element to the
+ * projected portal opening, then removes only that mask once the aperture covers
+ * the viewport. There is no second player, crop, scale, restart or crossfade.
  *
- * Exit continuity uses the existing R3F blackout that already hides the camera
- * handback. The Blender render's black core fades directly onto that black, and
- * the timeline then reveals the real night ocean / moon / pillars / red portal.
- * There is no second DOM black card between the tunnel and the destination.
+ * Exit continuity uses the R3F blackout that already hides the destination
+ * camera handback. The Blender core and that blackout overlap for only a short
+ * beat, then the actual night ocean resolves underneath.
  */
 export function BlenderTunnelTransition() {
   const setArrivedTitle = useScene((s) => s.setArrivedTitle)
@@ -108,17 +106,11 @@ export function BlenderTunnelTransition() {
         el.style.opacity = '0'
         el.style.clipPath = 'none'
         // Keep fullscreen latched until the next run so TunnelAperture cannot
-        // re-arm itself on the ended frame while the master clock is still > 11.55.
+        // re-arm itself while the master clock is still past the entry window.
         tunnelVideo.aperture = false
         blenderTunnelActive.value = false
       }
 
-      /*
-       * The timeline's camera-attached blackout is already falling away here,
-       * so the real night world is resolving underneath the black Blender core.
-       * Title.tsx adds its own short delay; triggering here places PROJECTS over
-       * a readable destination instead of on a separate black title card.
-       */
       if (after.current >= TITLE_TRIGGER && !titled.current) {
         titled.current = true
         setArrivedTitle(true)
@@ -157,6 +149,14 @@ export function BlenderTunnelTransition() {
         pointerEvents: 'none',
         zIndex: 9999,
         background: '#000',
+        /*
+         * The Blender beauty render was a little warmer/brighter than the live
+         * portal in final-run(8). A restrained transit-only grade pulls orange
+         * toward crimson and lowers the hot walls without touching the signed-
+         * off day/night world or the site's global tone mapping.
+         */
+        filter: 'hue-rotate(-12deg) saturate(1.05) brightness(0.86) contrast(1.08)',
+        willChange: 'clip-path, opacity',
       }}
     />
   )
