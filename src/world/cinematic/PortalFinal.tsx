@@ -16,21 +16,9 @@ import { cinematicSample, portalFrame } from './cinematicState'
 /**
  * THE PORTAL — the finished Blender asset, used as-is.
  *
- * This GLB is the source of truth. Nothing here rebuilds any part of it from
- * primitives, and nothing flattens its depth: the bore is 1.89 model units
- * deep against a 1.9 wide ring, and the camera physically travels down it in
- * frames 13-15. An earlier asset was only 0.72 deep, which is why the
- * traversal never read — the camera crossed a thin ring and there was nothing
- * inside to pass.
- *
- * MEASURED, NOT ASSUMED. Scale comes from the bounding box at runtime, and the
- * aperture plane and forward axis are published for the camera rig, so a
- * re-export at another size cannot leave the flight aimed at empty water.
- *
- * The red is driven here rather than baked. Blender's emissive animation does
- * not survive glTF — the format carries translation, rotation, scale and morph
- * weights and nothing else — so `PORTAL_AUTO_EnergyRed` is found by name and
- * its emissive strength comes off the cinematic timeline.
+ * The GLB remains the source of truth for geometry. React only drives the
+ * things glTF cannot carry for us: material emission and the speed/state of the
+ * exported mechanical clips.
  */
 export function PortalFinal({
   height = 84,
@@ -46,7 +34,6 @@ export function PortalFinal({
   const built = useMemo(() => {
     const root = scene.clone(true)
 
-    /** The one emissive channel, plus the deeper rails that echo it. */
     let energy = null as MeshStandardMaterial | null
     const rails: MeshStandardMaterial[] = []
     const indicators: MeshStandardMaterial[] = []
@@ -58,12 +45,6 @@ export function PortalFinal({
       mesh.castShadow = true
       mesh.receiveShadow = true
 
-      /*
-       * Materials are shared across the many meshes that use them, so each is
-       * cloned exactly ONCE and the clone reused. Cloning per mesh would give
-       * fifty-eight copies of the same channel to keep in step; not cloning at
-       * all would mutate the cached asset and leak into the mirrored world.
-       */
       const src = mesh.material as MeshStandardMaterial
       if (!src) return
       const name = src.name
@@ -72,7 +53,7 @@ export function PortalFinal({
         seen.add(src)
         const copy = src.clone()
         if (name === 'PORTAL_AUTO_EnergyRed') {
-          copy.emissive = new Color('#ff1a0d')
+          copy.emissive = new Color('#ff160a')
           copy.emissiveIntensity = 0
           energy = copy
         } else if (name === 'PORTAL_AUTO_IndicatorGreen') {
@@ -85,17 +66,15 @@ export function PortalFinal({
       mesh.material = src.userData.clone as MeshStandardMaterial
 
       /*
-       * The deep rails read at a fraction of the front channel.
-       *
-       * Inside the bore they run the full length of the tunnel and sit much
-       * closer to the lens than the ring does, so matching the channel's
-       * strength would make the interior a pink neon pipe. The brief's split —
-       * roughly 85% graphite, 10% gold, 5% red — only survives if the thing
-       * you are inside of is darker than the thing you came through.
+       * The long internal rails are intentionally much dimmer than the front
+       * channel. When the camera is physically inside the bore those strips are
+       * centimetres from the lens; even a moderate value turns the tunnel into
+       * a pink pipe. Frame 14 is supposed to be mostly graphite and black with
+       * red fragments, not a second glowing portal.
        */
       if (o.name.startsWith('PORTAL_AUTO_TunnelRail') && name === 'PORTAL_AUTO_EnergyRed') {
         const deep = (src.userData.clone as MeshStandardMaterial).clone()
-        deep.emissive = new Color('#ff1a0d')
+        deep.emissive = new Color('#a90d06')
         deep.emissiveIntensity = 0
         mesh.material = deep
         rails.push(deep)
@@ -107,14 +86,8 @@ export function PortalFinal({
     box.getSize(size)
     const scale = size.y > 0 ? height / size.y : 1
 
-    /*
-     * The APERTURE plane, not the bounding-box centre.
-     *
-     * With a deep bore the box centre sits a long way behind the opening, and
-     * a camera aimed at it would be pointed at the back wall rather than
-     * through the hole. The front face is the maximum Z of the box; the ring's
-     * centre height is the box's mid-Y.
-     */
+    // Front aperture plane, not bounding-box centre: the bore is almost as deep
+    // as the ring is wide, so the box centre would point the flight at the back.
     const apertureLocal = new Vector3(0, (box.min.y + box.max.y) / 2, box.max.z)
     const depth = (box.max.z - box.min.z) * scale
 
@@ -122,13 +95,6 @@ export function PortalFinal({
   }, [scene, height])
 
   useEffect(() => {
-    /*
-     * Publish the real frame for the camera rig.
-     *
-     * Everything the flight needs — where the hole is, which way is out, how
-     * far back the tunnel runs — comes from the asset's own bounds rather than
-     * from constants copied off a screenshot.
-     */
     portalFrame.centre.set(
       position[0] + built.apertureLocal.x * built.scale,
       position[1] + built.apertureLocal.y * built.scale,
@@ -141,13 +107,6 @@ export function PortalFinal({
   }, [position, built])
 
   useEffect(() => {
-    /*
-     * Both mechanical clips, together and looping.
-     *
-     * Their names carry Blender's export suffix, so they are matched by prefix
-     * rather than typed out — a re-export bumps ".005" to ".006" and an exact
-     * string would silently stop finding them.
-     */
     const started: import('three').AnimationAction[] = []
     for (const [name, action] of Object.entries(actions)) {
       if (!action || !name.startsWith('PORTAL_AUTO_MechanicalRing')) continue
@@ -162,34 +121,29 @@ export function PortalFinal({
   }, [actions])
 
   /* eslint-disable react-hooks/immutability */
-  useFrame((_, delta) => {
+  useFrame(() => {
     const s = cinematicSample
-    // Activation: the rings only turn once the machine is coming alive, and
-    // keep turning slowly afterwards — by frame 12 activation is complete and
-    // the portal is simply running.
+
     const alive = Math.max(s.ignition, s.power, s.night)
     for (const [name, action] of Object.entries(actions)) {
       if (!action || !name.startsWith('PORTAL_AUTO_MechanicalRing')) continue
       action.paused = alive < 0.01
-      action.timeScale = 0.25 + alive * 0.55
+      // Heavy machinery: it wakes during charge and never becomes a turbine.
+      action.timeScale = 0.18 + alive * 0.42
     }
-    void delta
 
     /*
-     * RESTRAINED. Red is a recessed channel, not a coat of paint.
-     *
-     * Under ACES any channel driven far past 1 tops out on all three and
-     * arrives white, so a bright setting does not read as more powerful — it
-     * reads as less red. Power is carried by the spill onto the world and by
-     * how dark everything around it is.
+     * The front channel carries the red gateway. The deeper rails are only
+     * fragments seen during the pass-through. The new PortalGatewayLighting
+     * component is responsible for spill/reflection on the world; these values
+     * are only what the portal itself emits.
      */
-    const lit = Math.max(s.ignition * 0.9, s.power, s.night * 0.95)
-    if (built.energy) built.energy.emissiveIntensity = lit * 1.15
-    // Deep rails at roughly a quarter of the front channel — see the note above.
-    for (const r of built.rails) r.emissiveIntensity = lit * 0.3
-    // Indicators arrive after the main power and stay far below it.
-    const ind = Math.max(0, Math.min(1, (s.power - 0.2) * 2.4))
-    for (const g of built.indicators) g.emissiveIntensity = ind * 0.7
+    const lit = Math.max(s.ignition * 0.9, s.power, s.night * 0.96)
+    if (built.energy) built.energy.emissiveIntensity = lit * 1.45
+    for (const r of built.rails) r.emissiveIntensity = lit * 0.13
+
+    const ind = Math.max(0, Math.min(1, (s.power - 0.18) * 2.5))
+    for (const g of built.indicators) g.emissiveIntensity = ind * 0.55
   })
   /* eslint-enable react-hooks/immutability */
 
