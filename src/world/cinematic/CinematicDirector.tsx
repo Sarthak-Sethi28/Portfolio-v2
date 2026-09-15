@@ -6,13 +6,14 @@ import { useScene } from '@/store/scene'
 import { advanceCinematic, cinematicClock, resetCinematic, DURATION } from './cinematicState'
 import { PortalGatewayLighting } from './PortalGatewayLighting'
 import { PortalTransitionOverlay } from './PortalTransitionOverlay'
+import { OceanRupture } from './OceanRupture'
 
 /**
- * Advances the one clock, then mounts the two visual systems that depend on it.
+ * Advances the one clock, then mounts the visual systems that depend on it.
  *
- * This component is mounted before the rest of the cinematic consumers, so its
- * frame callback writes the authoritative sample first. The lighting and final
- * transition overlay below therefore always read the same frame the world does.
+ * The entire piece is one event now: ocean rupture -> red charge -> water
+ * discharge -> sinking columns -> gateway pull -> bore traversal. These systems
+ * overlap on the same clock instead of handing off with visible pauses.
  */
 export function CinematicDirector() {
   const status = useScene((s) => s.cinematic)
@@ -46,15 +47,11 @@ export function CinematicDirector() {
     // A restored/background tab must not jump the entire piece in one update.
     advanceCinematic(Math.min(delta, 1 / 20))
 
-    /*
-     * The title changes only while Frame 15 is already black. The previous
-     * 14.72 handoff was later than the new physical crossing; 14.50 sits safely
-     * inside the black/red transition and gives the destination the final half
-     * second to resolve rather than popping at the very end.
-     */
+    // Swap the title only when the red/black travel layer is already covering
+    // the destination handback.
     const t = cinematicClock.elapsed
     if (!arrivedTitle && t >= 14.50) setArrivedTitle(true)
-    else if (arrivedTitle && t < 14.34 && cinematicClock.scrub !== null) setArrivedTitle(false)
+    else if (arrivedTitle && t < 14.30 && cinematicClock.scrub !== null) setArrivedTitle(false)
 
     if (cinematicClock.running && cinematicClock.elapsed >= DURATION) {
       cinematicClock.running = false
@@ -65,6 +62,7 @@ export function CinematicDirector() {
 
   return (
     <>
+      <OceanRupture />
       <PortalGatewayLighting />
       <PortalTransitionOverlay />
     </>
