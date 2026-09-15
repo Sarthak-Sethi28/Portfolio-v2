@@ -1,52 +1,40 @@
 /**
  * THE CINEMATIC TIMELINE — one deterministic clock for the whole sequence.
  *
- * The important rule in this pass is CAUSALITY. The ocean reacts first, the
- * portal charges second, full charge releases one low red front across the
- * water, that front is what makes the columns yield, and only after the world
- * has settled does the camera enter the gateway. Nothing later explodes again.
+ * Nothing here is allowed to feel like: effect -> stop -> next effect. The
+ * water rupture is still moving when the red circuit begins, the red charge is
+ * still building when the surface discharge leaves, the wave is still crossing
+ * the ocean when the pillars yield, and the camera is already advancing while
+ * those consequences finish. One cause, one uninterrupted escalation.
  */
 
 export const DURATION = 15
 
-/** 0 before `a`, 1 after `b`, smoothstepped between. */
 export function span(t: number, a: number, b: number): number {
   if (b <= a) return t >= b ? 1 : 0
   const x = Math.min(1, Math.max(0, (t - a) / (b - a)))
   return x * x * (3 - 2 * x)
 }
 
-/** Rises to 1 at `peak`, falls back to 0 by `b`. */
 export function pulse(t: number, a: number, peak: number, b: number): number {
   return t < peak ? span(t, a, peak) : 1 - span(t, peak, b)
 }
 
-/** A weighty ease used by systems that want a slow start before committing. */
 export function heavy(t: number, a: number, b: number): number {
   const x = span(t, a, b)
   return x * x * (3 - 2 * x)
 }
 
 export interface CinematicSample {
-  /** Local water agitation around the portal. */
   disturbance: number
-  /** Birds break formation and flee. */
   scatter: number
-  /** The ocean draws inward toward the machine. */
   pull: number
-  /** Columns sink. 1 is fully submerged. */
   pillarDescent: number
-  /** Time available to Blender-driven portal animation. */
   portalTime: number
-  /** How far the red circuit has travelled, 0..1. */
   ignition: number
-  /** Steady-state portal power once the circuit closes. */
   power: number
-  /** The ONE low red water-surface discharge, 0..1 radius. */
   shockwave: number
-  /** Authoritative night level during the cinematic. */
   night: number
-  /** Final safety veil used only for the hidden destination handback. */
   blackout: number
 }
 
@@ -67,63 +55,54 @@ export function createSample(): CinematicSample {
 
 export function sampleCinematic(t: number, out: CinematicSample): CinematicSample {
   /*
-   * 01-04 — THE WATER NOTICES FIRST.
+   * 00.6 onward — THE OCEAN BREAKS FIRST.
    *
-   * Only the local patch around the portal changes. It begins as a disturbance,
-   * then the flow acquires an inward bias. This is the first hint that the
-   * machine is doing something to the world rather than the world merely
-   * changing weather.
+   * The disturbance never drops back to zero before the gateway takes over.
+   * OceanRupture adds the visible cavity/pressure wall; this channel keeps the
+   * existing water shading alive underneath it.
    */
-  out.disturbance = span(t, 1.15, 2.75) * (1 - span(t, 10.9, 11.7) * 0.7)
-  out.pull = span(t, 2.65, 4.25)
+  const waterRise = span(t, 0.60, 1.85)
+  const waterRelease = 1 - span(t, 9.20, 11.55) * 0.72
+  out.disturbance = waterRise * waterRelease
+  out.pull = span(t, 1.35, 4.20)
 
-  // Birds leave before the machine gets loud, so they do not clutter the hero beat.
-  out.scatter = span(t, 2.0, 3.3)
+  // The birds react during the same build, not as an isolated prelude.
+  out.scatter = span(t, 1.15, 2.85)
 
   /*
-   * 07-09 — THE MACHINE CHARGES.
+   * 05-08 — RED GROWS INSIDE THE STORM.
    *
-   * The red circuit completes BEFORE anything major is discharged into the
-   * environment. That ordering is the visual logic of the whole sequence.
+   * This intentionally overlaps the violent water instead of waiting for it to
+   * finish. The machine is charging because of the same event we are already
+   * watching, not starting a new scene.
    */
-  out.ignition = span(t, 6.95, 8.20)
-  out.power = span(t, 8.20, 8.65)
+  out.ignition = span(t, 5.15, 7.15)
+  out.power = span(t, 6.85, 7.65)
 
   /*
-   * ONE discharge only.
-   *
-   * It starts exactly when full power is reached and travels across the water.
-   * WaterShockwave renders this as a thin, low pressure/energy front — never a
-   * sphere, fireball or screen flash.
+   * ONE low red front. It leaves while the charge is still visually climbing
+   * and remains on the water while the first pillars begin to move.
    */
-  out.shockwave = t < 8.65 ? 0 : Math.min(1, (t - 8.65) / 1.15)
+  out.shockwave = t < 7.45 ? 0 : Math.min(1, (t - 7.45) / 1.55)
 
   /*
-   * 09-11 — THE WAVE MAKES THE COLUMNS YIELD.
-   *
-   * The per-column stagger is applied by ArrayWorld/ModelPier. The envelope is
-   * deliberately the same 1.8 seconds the existing stagger was authored for,
-   * so each pillar begins roughly two tenths after the previous one. They are
-   * restored only under the final black transition for the signed-off Projects
-   * endpoint.
+   * 08-11 — THE WAVE TAKES THE PILLARS.
+   * Per-column delay is still applied by ModelPier. The long envelope lets the
+   * descents overlap; none of them waits for the previous one to finish.
    */
-  out.pillarDescent = span(t, 8.95, 10.75) * (1 - span(t, 14.34, 14.52))
+  out.pillarDescent = span(t, 8.00, 10.60) * (1 - span(t, 14.28, 14.50))
 
-  // The mechanical clip can still use absolute cinematic time if needed.
   out.portalTime = Math.min(DURATION, Math.max(0, t))
 
-  /*
-   * Night arrives WITH the consequences of the discharge, not before it. The
-   * last pillar is still going under as the warm world collapses into blue-black.
-   */
-  out.night = span(t, 9.35, 11.45)
+  // Night is already arriving while the pillars are in motion.
+  out.night = span(t, 7.55, 10.95)
 
   /*
-   * The black/red Frame-15 look is rendered by PortalTransitionOverlay. This
-   * veil exists only to make the hidden camera handback completely safe near
-   * 14.5 seconds, then it clears into Projects by 15.0.
+   * Final safety veil only. The authored red high-speed transition is rendered
+   * by PortalTransitionOverlay; this black channel merely guarantees the hidden
+   * destination handback cannot leak a frame.
    */
-  out.blackout = pulse(t, 14.28, 14.48, 15.0)
+  out.blackout = pulse(t, 14.12, 14.46, 15.0)
 
   return out
 }
