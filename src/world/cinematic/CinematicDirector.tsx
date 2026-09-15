@@ -4,18 +4,15 @@ import { useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useScene } from '@/store/scene'
 import { advanceCinematic, cinematicClock, resetCinematic, DURATION } from './cinematicState'
+import { PortalGatewayLighting } from './PortalGatewayLighting'
+import { PortalTransitionOverlay } from './PortalTransitionOverlay'
 
 /**
- * Advances the one clock, and nothing else.
+ * Advances the one clock, then mounts the two visual systems that depend on it.
  *
- * Mounted FIRST inside the scene so its frame callback runs before every
- * consumer's — R3F runs same-priority subscriptions in mount order, so the
- * sample is always written before anything reads it. A non-zero renderPriority
- * would guarantee ordering too, but it also hands the render loop over to the
- * caller, which is a much larger change than this needs.
- *
- * The only writes to React state here are the three transitions of a coarse
- * status. Everything continuous lives in the mutable clock.
+ * This component is mounted before the rest of the cinematic consumers, so its
+ * frame callback writes the authoritative sample first. The lighting and final
+ * transition overlay below therefore always read the same frame the world does.
  */
 export function CinematicDirector() {
   const status = useScene((s) => s.cinematic)
@@ -33,14 +30,6 @@ export function CinematicDirector() {
 
   useEffect(() => {
     if (status === 'playing') {
-      /*
-       * Reduced motion gets the destination, not the journey.
-       *
-       * Fifteen seconds of collapsing sky, fleeing birds and sinking towers is
-       * exactly the kind of thing the setting exists to refuse. It is not
-       * served by playing the same piece faster — that is more motion per
-       * second, not less — so the world simply arrives at night.
-       */
       if (reducedMotion) {
         resetCinematic()
         setNight(true)
@@ -54,38 +43,30 @@ export function CinematicDirector() {
   }, [status, reducedMotion, setNight, setCinematic, setArrivedTitle])
 
   useFrame((_, delta) => {
-    // Guard against a hitch producing a huge step. A tab restored after a
-    // minute in the background reports a minute of delta, which would jump the
-    // whole piece in one frame.
+    // A restored/background tab must not jump the entire piece in one update.
     advanceCinematic(Math.min(delta, 1 / 20))
 
     /*
-     * Swap the title's word while nobody can see it.
-     *
-     * This is a React state write inside a frame loop, which is normally the
-     * thing to avoid — but it happens exactly ONCE, at a moment when the
-     * blackout veil is fully opaque, so the render it causes is invisible and
-     * there is no per-frame cost. The alternative, rendering both words and
-     * cross-fading them, would put the destination's name on screen during the
-     * journey with only an opacity between it and the viewer.
+     * The title changes only while Frame 15 is already black. The previous
+     * 14.72 handoff was later than the new physical crossing; 14.50 sits safely
+     * inside the black/red transition and gives the destination the final half
+     * second to resolve rather than popping at the very end.
      */
     const t = cinematicClock.elapsed
-    if (!arrivedTitle && t >= 14.72) setArrivedTitle(true)
-    else if (arrivedTitle && t < 14.5 && cinematicClock.scrub !== null) setArrivedTitle(false)
+    if (!arrivedTitle && t >= 14.50) setArrivedTitle(true)
+    else if (arrivedTitle && t < 14.34 && cinematicClock.scrub !== null) setArrivedTitle(false)
 
     if (cinematicClock.running && cinematicClock.elapsed >= DURATION) {
       cinematicClock.running = false
-      /*
-       * Hand over to the stable night scene.
-       *
-       * The store's night flag becomes true at exactly the moment the timeline
-       * reaches its own full night, so the value handed over is the value
-       * already on screen and the swap is invisible.
-       */
       setNight(true)
       setCinematic('complete')
     }
   })
 
-  return null
+  return (
+    <>
+      <PortalGatewayLighting />
+      <PortalTransitionOverlay />
+    </>
+  )
 }
