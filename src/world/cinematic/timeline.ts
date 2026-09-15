@@ -98,11 +98,12 @@ export function sampleCinematic(t: number, out: CinematicSample): CinematicSampl
   out.night = span(t, 7.55, 10.95)
 
   /*
-   * Final safety veil only. The authored red high-speed transition is rendered
-   * by PortalTransitionOverlay; this black channel merely guarantees the hidden
-   * destination handback cannot leak a frame.
+   * Tight safety veil around the hidden destination camera handback. The peak
+   * still covers the reset at ~14.46, but it now falls away sooner so the black
+   * tunnel core immediately becomes moon/water/portal detail instead of holding
+   * as a separate black beat.
    */
-  out.blackout = pulse(t, 14.12, 14.46, 15.0)
+  out.blackout = pulse(t, 14.08, 14.44, 14.84)
 
   return out
 }
