@@ -70,8 +70,8 @@ export function CinematicDirector() {
      * journey with only an opacity between it and the viewer.
      */
     const t = cinematicClock.elapsed
-    if (!arrivedTitle && t >= 14.35) setArrivedTitle(true)
-    else if (arrivedTitle && t < 14.0 && cinematicClock.scrub !== null) setArrivedTitle(false)
+    if (!arrivedTitle && t >= 14.72) setArrivedTitle(true)
+    else if (arrivedTitle && t < 14.5 && cinematicClock.scrub !== null) setArrivedTitle(false)
 
     if (cinematicClock.running && cinematicClock.elapsed >= DURATION) {
       cinematicClock.running = false

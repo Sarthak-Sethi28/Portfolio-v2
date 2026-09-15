@@ -3,6 +3,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { DoubleSide, ShaderMaterial, type Mesh } from 'three'
+import { cinematicClock } from './cinematicState'
 import { waterline } from './waterline'
 
 /** One patch per column. Four columns, four independent fields. */
@@ -182,6 +183,20 @@ export function PillarWake() {
    */
   /* eslint-disable react-hooks/immutability */
   useFrame((_, delta) => {
+    /*
+     * The wake has to DIE.
+     *
+     * Its strength was keyed off how far the column had sunk, and the descent
+     * curve settles just short of 1 — so every patch sat at full strength for
+     * the rest of the piece and two pale ellipses were still on the water in
+     * the night endpoint, which is a signed-off frame. Disturbed water calms
+     * down; it needed a clock, not a position.
+     *
+     * Long enough that the sea is still visibly troubled through ALONE, gone
+     * by the time the machine wakes.
+     */
+    const et = cinematicClock.elapsed
+    const settle = et <= 6.2 ? 1 : Math.max(0, 1 - (et - 6.2) / 1.6)
     // Reading a Map's values allocates an iterator, so the entries are pulled
     // by index into fixed slots instead — this runs every frame.
     let i = 0
@@ -203,8 +218,8 @@ export function PillarWake() {
       const active = w.depth > 0.001 && w.depth < 0.999
       const residual = w.depth >= 0.999 ? 0.45 : 0
       const amount = active ? Math.min(1, w.depth * 3.2) : residual
-      m.uniforms.uAmount.value = amount
-      g.visible = amount > 0.004
+      m.uniforms.uAmount.value = amount * settle
+      g.visible = amount * settle > 0.004
 
       const span = w.height * 0.95
       g.position.set(w.x, 0.32, w.z)

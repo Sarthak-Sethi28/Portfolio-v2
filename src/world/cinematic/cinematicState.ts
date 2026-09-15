@@ -33,6 +33,8 @@ export const portalFrame = {
   axis: new Vector3(0, 0, 1),
   /** Outer radius in world units. */
   radius: 42,
+  /** How far the bore runs back from the aperture, world units. */
+  depth: 84,
   measured: false,
 }
 
@@ -44,6 +46,16 @@ export const portalFrame = {
  * not touch the camera at all.
  */
 export const cameraOwnedByCinematic = { value: false }
+
+/**
+ * True only during the flight through the portal, frames 12 to 15.
+ *
+ * Separate from `cameraOwnedByCinematic` on purpose: that says the cinematic
+ * owns the camera at all, this says a specific rig is flying it. IdleRig
+ * returns immediately on either, so there is never a frame where two systems
+ * both write the camera and the result depends on which ran last.
+ */
+export const portalTransitionActive = { value: false }
 
 /**
  * The world's day/night blend, 0 to 1, OUTSIDE React.

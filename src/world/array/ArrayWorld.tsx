@@ -10,7 +10,7 @@ import { scatterField, sectionRing } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
 import { Pier } from './Pier'
 import { ModelPier } from './ModelPier'
-import { PortalCinematic } from '../cinematic/PortalCinematic'
+import { PortalFinal } from '../cinematic/PortalFinal'
 import { Figure } from './Figure'
 
 /**
@@ -162,7 +162,7 @@ export function ArrayWorld({
         />
       ))}
 
-      {!flags.noGate && <PortalCinematic />}
+      {!flags.noGate && <PortalFinal />}
       {/* The telescope, well clear on the right and near enough to approach. */}
       {/*
         Left of the axis, not right.

@@ -16,6 +16,7 @@ import { ArrayWorld } from './array/ArrayWorld'
 import { UnderWorld } from './under/UnderWorld'
 import { Mirror } from './array/Mirror'
 import { IdleRig } from './camera/IdleRig'
+import { PortalTransitionRig } from './camera/PortalTransitionRig'
 import { CinematicDirector } from './cinematic/CinematicDirector'
 import { CinematicCamera } from './cinematic/CinematicCamera'
 import { WaterDisturbance } from './cinematic/WaterDisturbance'
@@ -283,6 +284,7 @@ export function Stage() {
       <CinematicDirector />
       <IdleRig />
       <CinematicCamera />
+      <PortalTransitionRig />
 
       {/* multisampling is NOT optional.
           EffectComposer renders into its own buffer, which silently discards

@@ -4,7 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useRef } from 'react'
 import { MathUtils, Vector3 } from 'three'
 import { useScene } from '@/store/scene'
-import { cameraOwnedByCinematic } from '../cinematic/cinematicState'
+import { cameraOwnedByCinematic, portalTransitionActive } from '../cinematic/cinematicState'
 
 /**
  * Pixel-stable resting camera.
@@ -106,7 +106,7 @@ export function IdleRig() {
      * gets in and then survives every attempt to find it, because it only
      * appears on the frames where the order happened to flip.
      */
-    if (cameraOwnedByCinematic.value) {
+    if (cameraOwnedByCinematic.value || portalTransitionActive.value) {
       initialized.current = false
       return
     }
