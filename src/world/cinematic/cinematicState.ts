@@ -48,6 +48,16 @@ export const portalFrame = {
 export const cameraOwnedByCinematic = { value: false }
 
 /**
+ * True while the Blender tunnel render is covering the screen.
+ *
+ * PREVIEW ONLY. The procedural corridor is suppressed while this is set, so
+ * the two never stack — the whole point of the test is to see the Blender move
+ * on its own, with the live world running underneath it rather than a second
+ * tunnel showing through.
+ */
+export const blenderTunnelActive = { value: false }
+
+/**
  * True only during the flight through the portal, frames 12 to 15.
  *
  * Separate from `cameraOwnedByCinematic` on purpose: that says the cinematic

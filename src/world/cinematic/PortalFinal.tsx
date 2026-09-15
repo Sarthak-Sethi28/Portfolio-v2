@@ -11,7 +11,7 @@ import {
   type Mesh,
   type MeshStandardMaterial,
 } from 'three'
-import { cinematicSample, portalFrame } from './cinematicState'
+import { cinematicSample, cinematicClock, portalFrame } from './cinematicState'
 
 /**
  * THE PORTAL — the finished Blender asset, used as-is.
@@ -143,7 +143,17 @@ export function PortalFinal({
     for (const r of built.rails) r.emissiveIntensity = lit * 0.13
 
     const ind = Math.max(0, Math.min(1, (s.power - 0.18) * 2.5))
-    for (const g of built.indicators) g.emissiveIntensity = ind * 0.55
+    /*
+     * The indicators go dark for the crossing.
+     *
+     * They are green and cyan, and during transit they were the only thing on
+     * screen outside the black / graphite / crimson the passage is meant to
+     * live in — small, but the eye finds them immediately against that palette
+     * and they read as UI rather than as machinery. Faded out as the aperture
+     * opens, so nothing switches off visibly.
+     */
+    const transit = Math.max(0, Math.min(1, (cinematicClock.elapsed - 11.6) / 0.6))
+    for (const g of built.indicators) g.emissiveIntensity = ind * 0.55 * (1 - transit)
   })
   /* eslint-enable react-hooks/immutability */
 
