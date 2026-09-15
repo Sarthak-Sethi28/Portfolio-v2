@@ -5,7 +5,6 @@ import { useFrame } from '@react-three/fiber'
 import { useScene } from '@/store/scene'
 import { advanceCinematic, cinematicClock, resetCinematic, DURATION } from './cinematicState'
 import { PortalGatewayLighting } from './PortalGatewayLighting'
-import { RedCorridor } from './RedCorridor'
 import { TunnelAperture } from './TunnelAperture'
 import { OceanChaos } from './OceanChaos'
 
@@ -13,8 +12,9 @@ import { OceanChaos } from './OceanChaos'
  * Advances the one clock, then mounts the visual systems that depend on it.
  *
  * The entire piece is one event now: ocean rupture -> red charge -> water
- * discharge -> sinking columns -> gateway pull -> bore traversal. These systems
- * overlap on the same clock instead of handing off with visible pauses.
+ * discharge -> sinking columns -> gateway pull -> Blender tunnel traversal.
+ * These systems overlap on the same clock instead of handing off with visible
+ * pauses.
  */
 export function CinematicDirector() {
   const status = useScene((s) => s.cinematic)
@@ -48,17 +48,13 @@ export function CinematicDirector() {
     // A restored/background tab must not jump the entire piece in one update.
     advanceCinematic(Math.min(delta, 1 / 20))
 
-    // Swap the title only when the red/black travel layer is already covering
-    // the destination handback.
     const t = cinematicClock.elapsed
+
     /*
-     * The title is NOT raised here any more.
-     *
-     * Firing it on the master clock put PROJECTS on screen while the tunnel's
-     * black core was still covering everything, which produced a black title
-     * card sitting between the tunnel and the night world. The word belongs
-     * over the completed night composition, so the transition raises it once
-     * that composition is actually readable — see BlenderTunnelTransition.
+     * PROJECTS is raised by BlenderTunnelTransition only after the actual night
+     * destination is resolving. Keeping that authority out of the master clock
+     * prevents the word from becoming a black title card between the tunnel and
+     * the night world.
      */
     if (arrivedTitle && t < 14.30 && cinematicClock.scrub !== null) setArrivedTitle(false)
 
@@ -73,7 +69,16 @@ export function CinematicDirector() {
     <>
       <OceanChaos />
       <PortalGatewayLighting />
-      <RedCorridor />
+      {/*
+       * No procedural RedCorridor here.
+       *
+       * final-run(9) exposed why: the Blender video ends while the old corridor's
+       * black shell/cap is still active on the master timeline. As soon as the
+       * DOM video clears, that shell becomes visible for a few frames, producing
+       * the black wedge + red streaks before the night destination. The authored
+       * Blender tunnel now owns the passage completely, so a second corridor is
+       * both redundant and visually wrong.
+       */}
       <TunnelAperture />
     </>
   )
