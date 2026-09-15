@@ -2,100 +2,175 @@
 
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { DoubleSide, ShaderMaterial, type Mesh } from 'three'
+import {
+  BufferGeometry,
+  DoubleSide,
+  Float32BufferAttribute,
+  ShaderMaterial,
+  type Mesh,
+  type Points as ThreePoints,
+} from 'three'
 import { cinematicClock } from './cinematicState'
 
 const PORTAL_X = 0
 const PORTAL_Z = -150
 
+function smooth01(x: number): number {
+  const v = Math.max(0, Math.min(1, x))
+  return v * v * (3 - 2 * v)
+}
+
+function span(t: number, a: number, b: number): number {
+  if (b <= a) return t >= b ? 1 : 0
+  return smooth01((t - a) / (b - a))
+}
+
 /**
- * THE SEA LOSES CONTROL.
+ * THE PULL.
  *
- * This replaces a system that raised a smooth circular dome and darkened a
- * disc under it — a membrane floating on the water. The problem with that
- * shape is that it is a shape: water under stress does not form a clean
- * paraboloid, and anything radially symmetric and smooth reads as a graphic
- * laid on the ocean rather than as the ocean doing something.
+ * Reference lock: storyboard Frame 04.
  *
- * So there is no dome, no cavity and no circle here. The height field is
- * RIDGED noise — folded so its valleys become sharp creases — advected inward
- * toward the gate, which gives peaks that break rather than swell. Four
- * octaves at different speeds and scales keep the motion from ever repeating
- * into a pattern the eye can lock onto.
+ * This is not a graphic on top of the ocean. The local surface is genuinely
+ * displaced in the vertex shader: the centre draws down, broken ridges are
+ * advected inward, and only later does a broad asymmetric surge travel toward
+ * camera. A separate GPU spray field throws droplets off the steep water.
  *
- * The surge is a travelling wall, not a ring: a broad crest leaving the portal
- * whose radius is perturbed by angle, so its front is ragged and it arrives at
- * different distances around the circle.
- *
- * Foam is where the water is steepest and highest, which is where whitewater
- * actually forms — not a texture painted on afterwards. It composites rather
- * than adding, because whitewater hides what is beneath it.
- *
- * Red does not replace any of this. It arrives as a light that the existing
- * crests and spray catch, so the same violent water simply becomes lit from
- * the gate.
+ * There is deliberately no clean circular dome, black disc, annulus or
+ * membrane. Nothing radial is allowed to stay geometrically perfect.
  */
 export function OceanChaos() {
-  const mesh = useRef<Mesh>(null)
+  const surface = useRef<Mesh>(null)
+  const spray = useRef<ThreePoints>(null)
   const warm = useRef(0)
 
-  const material = useMemo(
+  const surfaceMaterial = useMemo(
     () =>
       new ShaderMaterial({
         transparent: true,
         depthWrite: false,
+        depthTest: true,
         side: DoubleSide,
         uniforms: {
           uTime: { value: 0 },
-          /** Overall instability, 0 calm to 1 chaotic. */
           uChaos: { value: 0 },
-          /** How hard the water is being drawn toward the gate. */
           uPull: { value: 0 },
-          /** Position of the travelling surge wall, 0 unborn to 1 gone. */
           uSurge: { value: 0 },
-          /** How much of the gate's red the water is catching. */
           uRed: { value: 0 },
         },
         vertexShader: `
           varying vec2 vUv;
-          void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `,
-        fragmentShader: `
-          varying vec2 vUv;
+          varying float vHeight;
+          varying float vWall;
+          varying float vNearGate;
+
           uniform float uTime;
           uniform float uChaos;
           uniform float uPull;
           uniform float uSurge;
-          uniform float uRed;
 
-          float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-
-          float noise(vec2 p) {
-            vec2 i = floor(p), f = fract(p);
-            f = f * f * (3.0 - 2.0 * f);
-            return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x),
-                       mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+          float hash(vec2 p) {
+            return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
           }
 
-          /*
-           * RIDGED noise. Folding the field about its midpoint turns smooth
-           * valleys into sharp creases, which is the difference between a
-           * swell and a breaking peak. Plain fbm can only ever look calm.
-           */
+          float noise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(
+              mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+              mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),
+              f.y
+            );
+          }
+
           float ridge(vec2 p) {
             return 1.0 - abs(noise(p) * 2.0 - 1.0);
           }
 
-          float chop(vec2 p, float t) {
-            float s = 0.0;
-            s += ridge(p * 3.0  + vec2(t * 0.55, -t * 0.40)) * 0.50;
-            s += ridge(p * 7.0  - vec2(t * 0.85,  t * 0.60)) * 0.27;
-            s += ridge(p * 15.0 + vec2(-t * 1.30, t * 1.05)) * 0.15;
-            s += ridge(p * 31.0 + vec2(t * 2.10, t * 1.70)) * 0.08;
-            return s;
+          float signedChop(vec2 p, float t) {
+            float h = 0.0;
+            h += ridge(p * 2.6 + vec2(t * 0.30, -t * 0.23)) * 0.46;
+            h += ridge(p * 5.7 - vec2(t * 0.53,  t * 0.39)) * 0.28;
+            h += ridge(p * 12.8 + vec2(-t * 0.87, t * 0.71)) * 0.17;
+            h += ridge(p * 26.0 + vec2(t * 1.37, t * 1.05)) * 0.09;
+            return (h - 0.57) * 2.0;
+          }
+
+          vec2 rotate2(vec2 p, float a) {
+            float c = cos(a);
+            float s = sin(a);
+            return mat2(c, -s, s, c) * p;
+          }
+
+          void main() {
+            vUv = uv;
+            vec2 p = uv * 2.0 - 1.0;
+            float r = length(p);
+            float ang = atan(p.y, p.x);
+
+            float nearGate = 1.0 - smoothstep(0.05, 0.62, r);
+            vNearGate = nearGate;
+
+            vec2 dir = r > 0.0001 ? p / r : vec2(0.0);
+
+            // The surface is pulled inward AND slightly around the throat.
+            // Angular noise stops the flow becoming a perfect whirlpool.
+            float swirlNoise = (noise(vec2(ang * 2.2, uTime * 0.12)) - 0.5) * 0.55;
+            vec2 drawn = rotate2(p, (0.46 + swirlNoise) * uPull * nearGate);
+            drawn -= dir * uPull * nearGate * (0.20 + noise(p * 4.0) * 0.10);
+
+            float base = signedChop(drawn * 1.45, uTime) * uChaos;
+            float broken = base * (0.55 + nearGate * 3.9);
+
+            // A real draw-down: irregular and shallow enough to stay water,
+            // not a black hole. The broken ridges/spray carry the violence.
+            float throatShape = exp(-r * r / 0.055);
+            float throatNoise = 0.68 + noise(vec2(ang * 3.4, uTime * 0.20)) * 0.55;
+            float sink = -uPull * throatShape * throatNoise * 6.0;
+
+            // The tsunami-like beat comes AFTER the pull. It is a broad curved
+            // front moving toward camera, not a radial ring.
+            float crooked = (noise(vec2(p.x * 3.1, uTime * 0.17)) - 0.5) * 0.13;
+            float front = mix(-0.34, 0.76, uSurge) + p.x * p.x * 0.18 + crooked;
+            float wall = exp(-pow((p.y - front) / 0.115, 2.0));
+            float wallLife = smoothstep(0.02, 0.16, uSurge) * (1.0 - smoothstep(0.78, 1.0, uSurge));
+            float surge = wall * wallLife * (6.5 + uChaos * 5.5);
+            vWall = wall * wallLife;
+
+            float height = broken * (1.5 + nearGate * 3.5) + sink + surge;
+
+            vec3 pos = position;
+            // Plane local +Z becomes world +Y after the mesh rotation.
+            pos.z += height;
+
+            vHeight = height;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec2 vUv;
+          varying float vHeight;
+          varying float vWall;
+          varying float vNearGate;
+
+          uniform float uTime;
+          uniform float uChaos;
+          uniform float uPull;
+          uniform float uRed;
+
+          float hash(vec2 p) {
+            return fract(sin(dot(p, vec2(269.5, 183.3))) * 43758.5453123);
+          }
+
+          float noise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(
+              mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+              mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),
+              f.y
+            );
           }
 
           void main() {
@@ -103,154 +178,197 @@ export function OceanChaos() {
             float r = length(p);
             if (r > 1.0) discard;
 
-            vec2 dir = r > 0.0001 ? p / r : vec2(0.0);
+            // Broken whitewater: concentrated on displaced crests and the
+            // travelling wall. No concentric foam bands.
+            float grain = noise(p * 33.0 + vec2(uTime * 0.44, -uTime * 0.31));
+            float crest = smoothstep(1.4, 5.4, vHeight) * smoothstep(0.36, 0.78, grain);
+            float tear = vWall * smoothstep(0.30, 0.72, noise(p * 48.0 - uTime * 0.7));
+            float foam = clamp(crest * 0.78 + tear * 0.62, 0.0, 1.0);
 
-            /*
-             * DRAWN IN. The field is sampled further along its own radius the
-             * closer it is to the gate, so the texture of the water slides
-             * inward — the surface moves toward the portal instead of a shape
-             * appearing on top of it.
-             */
-            /*
-             * A much tighter falloff.
-             *
-             * At 0.62 the disturbance still had real strength out at the edge
-             * of a six-hundred-unit patch, and since the camera sits near that
-             * edge the whole foreground went white — the sea did not look
-             * violent, it looked like fog. The event belongs to the water
-             * AROUND THE GATE; the ocean the viewer is standing over should
-             * still be recognisably ocean.
-             */
-            float nearGate = 1.0 - smoothstep(0.0, 0.34, r);
-            vec2 drawn = p - dir * uPull * nearGate * 0.55;
-
-            float h = chop(drawn * 1.6, uTime) * uChaos;
-
-            // Violence concentrates near the gate and falls off outward.
-            h *= 0.12 + nearGate * 1.55;
-
-            /*
-             * THE SURGE: a wall, not a ring.
-             *
-             * Its radius is perturbed by angle so the front is ragged and
-             * reaches different distances around the circle — a clean annulus
-             * is the tell of a drawn effect.
-             */
+            // Thin converging foam traces make the pull legible from the low
+            // camera without drawing a literal spiral on the sea.
             float ang = atan(p.y, p.x);
-            float ragged = noise(vec2(ang * 2.4, uTime * 0.25)) * 0.16
-                         + noise(vec2(ang * 5.7, uTime * 0.4)) * 0.07;
-            float front = uSurge * 1.05 + ragged - 0.08;
-            float wall = exp(-pow((r - front) / 0.17, 2.0));
-            float wallAlive = uSurge > 0.001 ? (1.0 - uSurge) : 0.0;
-            // The wall carries real height but is not allowed to whiteout.
-            h += wall * wallAlive * 0.95;
+            float stream = abs(sin(ang * 5.0 + r * 19.0 - uTime * 0.65 - uPull * 2.2));
+            stream = pow(1.0 - smoothstep(0.74, 0.98, stream), 2.0);
+            stream *= vNearGate * uPull * (0.25 + 0.75 * smoothstep(0.08, 0.42, r));
+            foam = clamp(foam + stream * 0.38, 0.0, 1.0);
 
-            // Surface normal from the height field's own slope.
-            float e = 0.004;
-            float hx = chop((drawn + vec2(e, 0.0)) * 1.6, uTime) - chop((drawn - vec2(e, 0.0)) * 1.6, uTime);
-            float hy = chop((drawn + vec2(0.0, e)) * 1.6, uTime) - chop((drawn - vec2(0.0, e)) * 1.6, uTime);
-            float steep = length(vec2(hx, hy)) * 22.0;
-            vec3 n = normalize(vec3(-hx * 30.0, -hy * 30.0, 0.5));
+            vec3 deep = vec3(0.045, 0.095, 0.125);
+            vec3 crestCol = vec3(0.67, 0.78, 0.84);
+            vec3 foamCol = vec3(0.93, 0.96, 0.98);
 
-            vec3 lightDir = normalize(vec3(0.38, 0.32, 0.87));
-            float spec = pow(max(dot(n, lightDir), 0.0), 5.0);
+            float lift = clamp(vHeight / 8.0 + 0.32, 0.0, 1.0);
+            vec3 colour = mix(deep, crestCol, lift * 0.58);
+            colour = mix(colour, foamCol, foam);
 
-            /*
-             * FOAM where the water is both HIGH and STEEP — which is where a
-             * crest is actually tearing itself apart. Painting foam by radius
-             * instead would put it in neat bands.
-             */
-            // Higher threshold: foam only where the water is genuinely tearing,
-            // not merely textured.
-            float crest = smoothstep(0.78, 1.30, h) * smoothstep(0.35, 1.05, steep);
-            float spray = crest * (0.55 + 0.45 * noise(drawn * 40.0 + uTime * 3.0));
-            float foam = clamp(crest * 0.7 + spray * 0.38, 0.0, 1.0);
+            // Red lands on already-moving high water/spray; it never paints a
+            // flat red layer over the whole patch.
+            vec3 red = vec3(0.86, 0.018, 0.008);
+            float redCatch = uRed * vNearGate * (0.10 + foam * 0.82 + max(vHeight, 0.0) * 0.035);
+            colour = mix(colour, red, clamp(redCatch, 0.0, 0.72));
 
-            // Nothing at all until the sea is actually disturbed.
-            float present = smoothstep(0.03, 0.30, abs(h)) * uChaos;
-            float edge = 1.0 - smoothstep(0.38, 0.86, r);
+            float present = smoothstep(0.22, 1.15, abs(vHeight)) * uChaos;
+            present = max(present, vWall * 0.68);
+            present = max(present, stream * 0.38);
 
-            vec3 water = vec3(0.40, 0.49, 0.60) * (0.35 + spec * 1.6);
-            vec3 white = vec3(0.93, 0.96, 1.0);
-            vec3 col = mix(water, white, foam);
+            float edge = 1.0 - smoothstep(0.58, 0.94, r);
+            float alpha = clamp((present * 0.32 + foam * 0.56) * edge, 0.0, 0.68);
+            if (alpha < 0.006) discard;
 
-            /*
-             * The gate's light lands ON the chaos rather than replacing it:
-             * strongest on the crests and spray, which are the parts facing
-             * up and out toward the portal, and nearly absent in the troughs.
-             */
-            vec3 red = vec3(1.0, 0.13, 0.06);
-            float catchRed = uRed * nearGate * (0.25 + foam * 0.95 + spec * 0.6);
-            col = mix(col, red, clamp(catchRed, 0.0, 0.82));
-
-            /*
-             * Capped well below opaque. This composites over the real ocean,
-             * and the moment it can fully replace it the shot stops being
-             * water and starts being a white plane.
-             */
-            float a = clamp((present * 0.30 + foam * 0.62) * edge, 0.0, 0.66);
-            gl_FragColor = vec4(col, a);
+            gl_FragColor = vec4(colour, alpha);
           }
         `,
       }),
     [],
   )
 
+  const sprayBuilt = useMemo(() => {
+    const count = 320
+    let state = 0x71ab39d1 >>> 0
+    const rand = () => {
+      state = (state * 1664525 + 1013904223) >>> 0
+      return state / 4294967296
+    }
+
+    const seeds = new Float32Array(count * 4)
+    for (let i = 0; i < count; i++) {
+      const o = i * 4
+      seeds[o] = rand() * Math.PI * 2
+      seeds[o + 1] = 24 + rand() * 62
+      seeds[o + 2] = rand()
+      seeds[o + 3] = rand()
+    }
+
+    const geometry = new BufferGeometry()
+    geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(count * 3), 3))
+    geometry.setAttribute('aSeed', new Float32BufferAttribute(seeds, 4))
+
+    const material = new ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      depthTest: true,
+      uniforms: {
+        uTime: { value: 0 },
+        uAmount: { value: 0 },
+        uRed: { value: 0 },
+      },
+      vertexShader: `
+        attribute vec4 aSeed;
+        uniform float uTime;
+        uniform float uAmount;
+        varying float vLife;
+        varying float vRed;
+
+        void main() {
+          float angle = aSeed.x;
+          float radius = aSeed.y;
+          float phase = aSeed.z;
+          float character = aSeed.w;
+
+          float cycle = fract(phase + uTime * (0.20 + character * 0.12));
+          float alive = smoothstep(0.02, 0.12, cycle) * (1.0 - smoothstep(0.70, 0.98, cycle));
+
+          // Ballistic splash: launch, rise, fall. Not suspended glitter.
+          float launch = radius + cycle * (8.0 + 22.0 * character);
+          vec3 pos = vec3(
+            cos(angle) * launch,
+            0.8 + sin(cycle * 3.14159265) * (7.0 + 18.0 * character) - cycle * cycle * 5.0,
+            sin(angle) * launch
+          );
+          pos.z += cycle * (10.0 + character * 18.0);
+
+          vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+          gl_Position = projectionMatrix * mv;
+          gl_PointSize = (1.1 + character * 2.5) * alive * uAmount * (92.0 / max(18.0, -mv.z));
+
+          vLife = alive * uAmount;
+          vRed = character;
+        }
+      `,
+      fragmentShader: `
+        uniform float uRed;
+        varying float vLife;
+        varying float vRed;
+
+        void main() {
+          vec2 q = gl_PointCoord * 2.0 - 1.0;
+          float rr = dot(q, q);
+          if (rr > 1.0) discard;
+
+          float soft = (1.0 - smoothstep(0.18, 1.0, rr)) * vLife;
+          vec3 cold = vec3(0.78, 0.88, 0.94);
+          vec3 hot = vec3(0.95, 0.10, 0.035);
+          vec3 colour = mix(cold, hot, clamp(uRed * (0.28 + vRed * 0.72), 0.0, 0.72));
+
+          gl_FragColor = vec4(colour, soft * 0.78);
+        }
+      `,
+    })
+
+    return { geometry, material }
+  }, [])
+
   /* eslint-disable react-hooks/immutability */
   useFrame((_, delta) => {
-    const g = mesh.current
-    if (!g) return
     const t = cinematicClock.elapsed
-    const u = material.uniforms
+    const u = surfaceMaterial.uniforms
+
+    // One uninterrupted escalation. The pull is readable by ~3s; the large
+    // surge is born later, while that pull/spray is still active.
+    const chaos = span(t, 0.9, 3.9) * (1 - span(t, 9.1, 11.3) * 0.70)
+    const pull = span(t, 1.45, 3.35) * (1 - span(t, 7.7, 9.6) * 0.48)
+    const surge = t < 4.25 ? 0 : Math.min(1, (t - 4.25) / 2.35)
+    const red = span(t, 5.55, 7.55)
+
     u.uTime.value += delta
-
-    const sp = (a: number, b: number) => {
-      const x = Math.max(0, Math.min(1, (t - a) / (b - a)))
-      return x * x * (3 - 2 * x)
-    }
-
-    /*
-     * ONE ESCALATION, not a list of effects.
-     *
-     * Instability starts small at 1s, is genuinely breaking by 3s, is at its
-     * worst through 4-6s, and only calms once the gate has taken over. It
-     * never fully returns to glass, because the beat after this is the world
-     * turning to night and a suddenly serene ocean would undo the event.
-     */
-    const chaos = sp(1.0, 4.2) * (1 - sp(9.0, 11.2) * 0.72)
     u.uChaos.value = chaos
-    u.uPull.value = sp(1.8, 3.6) * (1 - sp(7.5, 9.5) * 0.6)
+    u.uPull.value = pull
+    u.uSurge.value = surge
+    u.uRed.value = red
 
-    // The surge wall is born at 4.6 and takes about two seconds to cross.
-    u.uSurge.value = t < 4.6 ? 0 : Math.min(1, (t - 4.6) / 2.1)
+    sprayBuilt.material.uniforms.uTime.value += delta
+    sprayBuilt.material.uniforms.uAmount.value =
+      chaos * span(t, 2.35, 3.65) * (1 - span(t, 8.6, 10.5) * 0.62)
+    sprayBuilt.material.uniforms.uRed.value = red
 
-    // Red reaches the water as the machine charges, and stays while it burns.
-    u.uRed.value = Math.min(1, sp(5.6, 7.4) * 1.0)
+    const s = surface.current
+    const p = spray.current
+    if (!s || !p) return
 
-    /*
-     * Drawn for a few frames at zero strength while the page settles, so the
-     * program is compiled and linked before anyone presses anything — a shader
-     * compile is a synchronous stall, and this one would land in the beat it
-     * belongs to.
-     */
     if (warm.current < 4) {
       warm.current++
-      g.visible = true
+      s.visible = true
+      p.visible = true
       return
     }
-    g.visible = chaos > 0.004 || u.uSurge.value > 0.004
+
+    s.visible = chaos > 0.004 || surge > 0.004
+    p.visible = sprayBuilt.material.uniforms.uAmount.value > 0.01
   })
   /* eslint-enable react-hooks/immutability */
 
   return (
-    <mesh
-      ref={mesh}
-      position={[PORTAL_X, 0.3, PORTAL_Z]}
-      rotation={[-Math.PI / 2, 0, 0]}
-      visible={false}
-    >
-      <planeGeometry args={[620, 620]} />
-      <primitive object={material} attach="material" />
-    </mesh>
+    <>
+      <mesh
+        ref={surface}
+        position={[PORTAL_X, 0.18, PORTAL_Z]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        visible={false}
+        renderOrder={13}
+      >
+        <planeGeometry args={[620, 620, 112, 112]} />
+        <primitive object={surfaceMaterial} attach="material" />
+      </mesh>
+
+      <points
+        ref={spray}
+        position={[PORTAL_X, 0, PORTAL_Z]}
+        geometry={sprayBuilt.geometry}
+        material={sprayBuilt.material}
+        visible={false}
+        frustumCulled={false}
+        renderOrder={14}
+      />
+    </>
   )
 }
