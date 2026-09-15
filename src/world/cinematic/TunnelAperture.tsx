@@ -1,129 +1,149 @@
 'use client'
 
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { LinearFilter, SRGBColorSpace, VideoTexture, type Mesh, type MeshBasicMaterial } from 'three'
+import { Vector3 } from 'three'
 import type { PerspectiveCamera } from 'three'
 import { cinematicClock, portalFrame } from './cinematicState'
 import { tunnelVideo } from './tunnelVideo'
 
-/** When the tunnel becomes visible through the ring, seconds. */
+/** Start the SAME fullscreen video while it is still only visible through the portal hole. */
+const APERTURE_ON = 11.55
+/** Resolve the tunnel gently inside the aperture; the exterior never fades. */
+const APERTURE_FADE = 0.48
 /**
- * When the tunnel starts becoming visible through the ring, seconds.
- *
- * Earlier than the crossing by well over a second, because the portal has to
- * read as a WINDOW before the camera reaches it. Switched on instantly this
- * was a visible pop — a dark opening in one frame and a detailed tunnel in the
- * next — so it now comes up over a short ramp instead.
+ * Measured from portal_final.glb: inner opening radius / authored outer radius.
+ * Keeping a tiny inset prevents the DOM layer from painting over the metal lip.
  */
-const APERTURE_ON = 11.80
-/**
- * How long the tunnel takes to resolve inside the aperture.
- *
- * Only the plane inside the ring fades; the exterior world and the portal are
- * untouched. A screen-wide fade would dim the whole approach, which is not
- * what is being revealed — the aperture is.
- */
-const APERTURE_FADE = 0.55
+const INNER_RADIUS_RATIO = 0.555
+const MASK_INSET = 0.985
+const RIGHT = new Vector3(1, 0, 0)
+const UP = new Vector3(0, 1, 0)
+
+function smooth01(x: number): number {
+  const v = Math.max(0, Math.min(1, x))
+  return v * v * (3 - 2 * v)
+}
+
+function ellipseCoversViewport(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  width: number,
+  height: number,
+): boolean {
+  if (rx <= 0 || ry <= 0) return false
+  const corners: [number, number][] = [
+    [0, 0],
+    [width, 0],
+    [0, height],
+    [width, height],
+  ]
+  return corners.every(([x, y]) => {
+    const dx = (x - cx) / rx
+    const dy = (y - cy) / ry
+    return dx * dx + dy * dy <= 1
+  })
+}
 
 /**
- * How far behind the aperture the video plane sits.
+ * ONE-IMAGE portal entry.
  *
- * This distance is the whole trick. The plane is sized so that it EXACTLY
- * fills the viewport when the camera reaches the portal's aperture — so at the
- * instant of the crossing, the in-world plane and a fullscreen presentation of
- * the same frame are the same image, at the same scale, on the same centre.
- * The handoff is then a swap between two identical pictures, which is why it
- * needs no crossfade and leaves nothing to notice.
- */
-const PLANE_DEPTH = 60
-
-/**
- * THE TUNNEL, SEEN THROUGH THE PORTAL.
+ * There is no 3D video plane any more. A plane and a fixed DOM video can share
+ * currentTime and still disagree spatially because one is perspective-projected
+ * and the other is object-fit: cover. That tiny scale reset was the visible
+ * "join" in final-run(7).
  *
- * Previously the clip only existed as a fullscreen layer that appeared at the
- * crossing, which is why it read as two shots: an exterior, then a cut to an
- * interior. The fix is that there is no cut — the tunnel is already running
- * inside the ring while the camera is still outside it, and the ring's own
- * geometry is what the viewer's eye is following in.
- *
- * The plane sits BEHIND the portal, so the real ring occludes its edges and
- * does the masking. Nothing here draws a circle; the aperture is the portal's
- * actual opening.
+ * Instead the one fixed video element is present for the entire passage. While
+ * the camera is outside, this component clips that exact element to the real
+ * portal opening projected into CSS pixels. As the camera advances, the mask
+ * naturally grows with the ring. Once the ellipse covers every viewport corner
+ * the mask is removed. The pixels, crop, scale and playback clock do not change
+ * on that frame, so there is literally no second presentation to cut to.
  */
 export function TunnelAperture() {
-  const mesh = useRef<Mesh>(null)
   const camera = useThree((s) => s.camera) as PerspectiveCamera
   const size = useThree((s) => s.size)
 
-  const texture = useMemo(() => {
-    const el = tunnelVideo.el
-    if (!el) return null
-    const t = new VideoTexture(el)
-    t.minFilter = LinearFilter
-    t.magFilter = LinearFilter
-    t.colorSpace = SRGBColorSpace
-    return t
-  }, [])
+  const scratch = useMemo(
+    () => ({
+      centre: new Vector3(),
+      left: new Vector3(),
+      right: new Vector3(),
+      up: new Vector3(),
+      down: new Vector3(),
+      cameraDelta: new Vector3(),
+    }),
+    [],
+  )
 
   /* eslint-disable react-hooks/immutability */
   useFrame(() => {
-    const g = mesh.current
-    if (!g || !texture) return
+    const el = tunnelVideo.el
+    if (!el || !portalFrame.measured) return
 
     const t = cinematicClock.elapsed
+
+    if (t < APERTURE_ON) {
+      if (!tunnelVideo.fullscreen) {
+        tunnelVideo.aperture = false
+        el.style.opacity = '0'
+        el.style.clipPath = 'ellipse(0px 0px at 50% 50%)'
+      }
+      return
+    }
+
+    // Once the mask has been removed, never touch opacity again. The transition
+    // component owns the final fade into the night destination after `ended`.
+    if (tunnelVideo.fullscreen) return
+
     const c = portalFrame.centre
+    const r = portalFrame.radius * INNER_RADIUS_RATIO * MASK_INSET
+
+    scratch.centre.copy(c).project(camera)
+    scratch.left.copy(c).addScaledVector(RIGHT, -r).project(camera)
+    scratch.right.copy(c).addScaledVector(RIGHT, r).project(camera)
+    scratch.up.copy(c).addScaledVector(UP, r).project(camera)
+    scratch.down.copy(c).addScaledVector(UP, -r).project(camera)
+
+    const cx = (scratch.centre.x * 0.5 + 0.5) * size.width
+    const cy = (0.5 - scratch.centre.y * 0.5) * size.height
+    const leftX = (scratch.left.x * 0.5 + 0.5) * size.width
+    const rightX = (scratch.right.x * 0.5 + 0.5) * size.width
+    const upY = (0.5 - scratch.up.y * 0.5) * size.height
+    const downY = (0.5 - scratch.down.y * 0.5) * size.height
+
+    const rx = Math.max(Math.abs(cx - leftX), Math.abs(rightX - cx))
+    const ry = Math.max(Math.abs(cy - upY), Math.abs(downY - cy))
+
+    if (![cx, cy, rx, ry].every(Number.isFinite) || rx < 1 || ry < 1) return
+
+    const alpha = smooth01((t - APERTURE_ON) / APERTURE_FADE)
+    tunnelVideo.aperture = true
+    el.style.opacity = String(alpha)
+    el.style.clipPath = `ellipse(${rx.toFixed(2)}px ${ry.toFixed(2)}px at ${cx.toFixed(2)}px ${cy.toFixed(2)}px)`
 
     /*
-     * Visible from the moment the tunnel should be showing through the ring,
-     * and switched off the instant the fullscreen layer takes over — never
-     * both at once, or the plane would be seen edge-on as the camera passes
-     * through it.
+     * The important handoff is no handoff at all: only remove the mask once the
+     * masked video already covers the whole viewport. Clearing clip-path then
+     * changes zero visible pixels. If projection becomes singular right at the
+     * threshold, the geometric plane-crossing is the fallback: once the camera
+     * is physically behind the aperture there is no exterior ring left to hide.
      */
-    const on = t >= APERTURE_ON && !tunnelVideo.fullscreen
-    g.visible = on
-    tunnelVideo.aperture = on
-    if (!on) return
-
-    /*
-     * The tunnel resolves INSIDE the aperture rather than appearing.
-     *
-     * Ramping the material's opacity leaves the ring, the ocean and the sky
-     * exactly as they are and only brings up what is seen through the hole —
-     * so the portal turns into a window rather than switching into one.
-     */
-    const mat = g.material as MeshBasicMaterial
-    mat.opacity = Math.min(1, (t - APERTURE_ON) / APERTURE_FADE)
-
-    g.position.set(c.x, c.y, c.z - PLANE_DEPTH)
-
-    /*
-     * Sized from the LIVE camera, every frame.
-     *
-     * The plane has to fill the viewport exactly at the crossing, and that
-     * depends on the camera's current field of view and the window's aspect —
-     * both of which change (the rig widens the lens on approach, and the user
-     * can resize). Deriving it each frame is what keeps the two presentations
-     * identical at the join under any of those conditions.
-     */
-    const vFov = (camera.fov * Math.PI) / 180
-    const h = 2 * PLANE_DEPTH * Math.tan(vFov / 2)
-    const w = h * (size.width / size.height)
-    g.scale.set(w, h, 1)
+    const signedDistance = scratch.cameraDelta
+      .copy(camera.position)
+      .sub(c)
+      .dot(portalFrame.axis)
+    if (ellipseCoversViewport(cx, cy, rx, ry, size.width, size.height) || signedDistance <= 0) {
+      tunnelVideo.aperture = false
+      tunnelVideo.fullscreen = true
+      el.style.clipPath = 'none'
+      el.style.opacity = '1'
+      console.log('TUNNEL MASK CLEARED  currentTime=', el.currentTime.toFixed(3))
+    }
   })
   /* eslint-enable react-hooks/immutability */
 
-  if (!texture) return null
-
-  return (
-    <mesh ref={mesh} visible={false} renderOrder={-2}>
-      <planeGeometry args={[1, 1]} />
-      {/*
-        Unlit and depth-writing: this is a rendered image, not a surface in the
-        scene, so it must not take light from the world — and it must occlude
-        the night ocean behind it, or the sea shows through the tunnel.
-      */}
-      <meshBasicMaterial map={texture} toneMapped={false} transparent opacity={0} />
-    </mesh>
-  )
+  return null
 }
