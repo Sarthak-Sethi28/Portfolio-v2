@@ -162,7 +162,7 @@ export function OceanWhitewater() {
 
             // Feather the very outside of the giant plane so its rectangular
             // boundary can never become visible at an oblique camera angle.
-            float edge = smoothstep(1.0, 0.82, max(abs(p.x), abs(p.y)));
+            float edge = 1.0 - smoothstep(0.82, 1.0, max(abs(p.x), abs(p.y)));
             alpha *= edge;
 
             if (alpha < 0.004) discard;
