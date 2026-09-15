@@ -8,40 +8,18 @@ import { cinematicSample } from './cinematicState'
 const PORTAL = [0, -150] as const
 
 /**
- * ONE shockwave, leaving the portal as it reaches full power.
+ * The single environmental discharge.
  *
- * Exactly one primary ring with a weaker trailing one, and it is driven by the
- * master clock rather than fired by an event — so scrubbing back to 9.4
- * seconds shows the wave where it was at 9.4 seconds, every time. An
- * event-triggered effect cannot do that: it has no idea it was supposed to
- * have gone off already.
- *
- * NOT a neon ring on the water. Same approach as the local disturbance: build
- * a height field, take its gradient, light it. A bright circle expanding
- * outward reads as a Tron effect pasted over the sea; a moving band of
- * displaced surface catching the light reads as water being shoved. Amplitude
- * falls as the radius grows, because the same energy is being spread around an
- * ever longer circumference.
+ * This must NEVER read as a bomb. There is no sphere, no fireball and no
+ * full-screen flash. It is a low pressure/energy front skimming across the
+ * water after the red circuit reaches full charge. The front is thin enough to
+ * read as one travelling event, but irregular and soft enough not to become a
+ * perfect Tron ring pasted onto the ocean.
  */
 export function WaterShockwave() {
   const mat = useRef<ShaderMaterial>(null)
   const mesh = useRef<Mesh>(null)
-  /*
-   * WARM-UP FRAMES.
-   *
-   * This shader compiles the first time its mesh is actually drawn, and a
-   * shader compile is a synchronous stall — measured at up to 179ms in a
-   * production build, landing squarely in the beat where the effect first
-   * appears. WebGLRenderer.compile() cannot pre-empt it either, because that
-   * walks the scene with traverseVisible and skips anything hidden.
-   *
-   * So the mesh is drawn for a few frames while the page is still settling,
-   * with its amount at zero — the fragment shader resolves to nothing, so
-   * there is no visual change whatsoever, but the program is built and linked
-   * long before the visitor presses anything.
-   */
   const warm = useRef(0)
-
 
   const shader = useMemo(
     () => ({
@@ -49,7 +27,10 @@ export function WaterShockwave() {
       depthWrite: false,
       blending: AdditiveBlending,
       side: DoubleSide,
-      uniforms: { uProgress: { value: 0 }, uTime: { value: 0 } },
+      uniforms: {
+        uProgress: { value: 0 },
+        uTime: { value: 0 },
+      },
       vertexShader: `
         varying vec2 vUv;
         void main() {
@@ -66,89 +47,40 @@ export function WaterShockwave() {
           return exp(-pow((r - centre) / width, 2.0));
         }
 
-        float height(vec2 p, float lead) {
-          float r = length(p);
-          /*
-           * ONE BROAD PRESSURE CREST, not a drawn ring.
-           *
-           * The crest was 0.045 wide and read as a clean white circle inked
-           * onto the sea — the exact CGI look this has to avoid. Real displaced
-           * water is a long low swell: the band is four times wider now, so the
-           * lighting catches a slope rather than an edge, and the trailing wave
-           * is wider still and much weaker.
-           */
-          float a = band(r, lead, 0.175) * 1.0;
-          float b = band(r, lead - 0.20, 0.16) * 0.30;
-          /*
-           * Irregularity, so the front is not a perfect circle. Angular
-           * variation as well as radial: a pressure wave crossing open water
-           * does not stay a textbook annulus.
-           */
-          float ang = atan(p.y, p.x);
-          float wobble = sin(ang * 7.0 + uTime * 0.6) * 0.035 + sin(ang * 13.0) * 0.02;
-          float a2 = band(r, lead + wobble, 0.175) * 0.55;
-          float detail = sin(r * 90.0 - uTime * 5.0) * 0.10 * band(r, lead, 0.22);
-          return a + a2 + b + detail;
-        }
-
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
           float r = length(p);
           if (r > 1.0) discard;
 
-          float lead = uProgress * 0.95;
+          float angle = atan(p.y, p.x);
+          float lead = mix(0.025, 0.96, uProgress);
 
-          float e = 0.0035;
-          float hx = height(p + vec2(e, 0.0), lead) - height(p - vec2(e, 0.0), lead);
-          float hy = height(p + vec2(0.0, e), lead) - height(p - vec2(0.0, e), lead);
-          // GAIN on the gradient. The height field is in UV units, so its raw
-          // slope over a 0.0035 sample is a fraction of a degree and the normal
-          // came out essentially flat — the crest computed a specular of almost
-          // zero and the wave was invisible against a lit sky. Scaling the
-          // gradient is the difference between a surface that is disturbed and
-          // one that merely has small numbers in it.
-          // Gentler gain to match the wider, lower crest — a broad swell has a
-          // shallow slope, and driving it hard again would just re-draw a line.
-          vec3 n = normalize(vec3(-hx * 11.0, -hy * 11.0, 0.42));
+          // Break the front very slightly so it belongs to moving water rather
+          // than to a graphics package. The wobble stays far smaller than the
+          // band itself: this is still one coherent pressure front.
+          float wobble = sin(angle * 7.0 + uTime * 0.45) * 0.018
+                       + sin(angle * 13.0 - uTime * 0.28) * 0.009;
 
-          vec3 lightDir = normalize(vec3(0.35, 0.30, 0.89));
-          float spec = pow(max(dot(n, lightDir), 0.0), 4.0);
+          float front = band(r, lead + wobble, 0.060);
+          float after = band(r, lead - 0.105 + wobble * 0.45, 0.135) * 0.20;
 
-          /*
-           * Rise, then fall. The rise is not optional.
-           *
-           * With only the falloff term the wave existed at full amplitude on
-           * its very first frame, when its crest is still at radius zero — the
-           * height field is near-vertical there, the gain drives the normal
-           * hard over, and the specular saturated across the entire plane. The
-           * ocean went pure white for a frame. Energy leaving a source starts
-           * at nothing and builds, so the front now grows in over the first
-           * tenth of the wave's life.
-           */
-          /*
-           * GATE ON THE WAVE ITSELF.
-           *
-           * This was the real cause of the foreground washing out, and it is
-           * not obvious: flat water has a normal of (0,0,1), which points
-           * almost directly at the light, so the specular came back high across the
-           * ENTIRE plane and not just on the crest. The gradient tells you how
-           * the surface is tilted; it says nothing about whether there is a
-           * wave there at all. Undisturbed water must contribute nothing, so
-           * the output is masked by the local amplitude.
-           */
-          float amp = abs(height(p, lead));
-          float present = smoothstep(0.015, 0.30, amp);
+          // A faint broken glint inside the front makes the water feel like it
+          // is carrying red light, without turning the wave into a solid ring.
+          float breakup = 0.58 + 0.42 * sin(r * 74.0 - uTime * 2.2 + angle * 3.0);
+          breakup = smoothstep(0.18, 0.92, breakup);
 
-          float rise = smoothstep(0.0, 0.11, uProgress);
-          float falloff = (1.0 - uProgress) * (1.0 - uProgress);
-          // Clamped: additive blending has no natural ceiling, and one bad
-          // frame of unbounded highlight is a flash in the viewer's face.
-          float a = min(spec * present * rise * falloff * 2.2, 0.55);
+          float rise = smoothstep(0.0, 0.10, uProgress);
+          float fall = 1.0 - smoothstep(0.84, 1.0, uProgress);
+          float life = rise * fall;
 
-          // A trace of the portal's red carried on the front, no more.
-          // Tinted toward the portal's own light rather than white foam.
-          vec3 col = mix(vec3(0.62, 0.68, 0.80), vec3(1.0, 0.22, 0.10), 0.45);
-          gl_FragColor = vec4(col * a, a);
+          float redFront = front * (0.38 + breakup * 0.62);
+          float amount = (redFront * 0.44 + after * 0.12) * life;
+
+          // Deliberately deep red. Bright pink/white is what made the previous
+          // event read as an explosion rather than power travelling through water.
+          vec3 col = vec3(1.0, 0.035, 0.012) * amount;
+          float alpha = min(amount * 0.78, 0.34);
+          gl_FragColor = vec4(col, alpha);
         }
       `,
     }),
@@ -159,15 +91,29 @@ export function WaterShockwave() {
     const m = mat.current
     const g = mesh.current
     if (!m || !g) return
+
     const p = cinematicSample.shockwave
     m.uniforms.uTime.value += delta
     m.uniforms.uProgress.value = p
-    if (warm.current < 4) { warm.current++; g.visible = true; return }
+
+    // Compile before the visitor ever sees it; this effect arrives on a key beat.
+    if (warm.current < 4) {
+      warm.current++
+      g.visible = true
+      return
+    }
+
     g.visible = p > 0.001 && p < 0.999
   })
 
   return (
-    <mesh ref={mesh} position={[PORTAL[0], 0.3, PORTAL[1]]} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+    <mesh
+      ref={mesh}
+      position={[PORTAL[0], 0.34, PORTAL[1]]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      visible={false}
+      renderOrder={14}
+    >
       <planeGeometry args={[900, 900]} />
       <shaderMaterial ref={mat} args={[shader]} />
     </mesh>
