@@ -15,9 +15,12 @@ import { tunnelVideo } from './tunnelVideo'
 /** Forward trip: tunnel starts resolving through the real opening here. */
 const APERTURE_ON = 11.55
 const APERTURE_FADE = 0.82
-/** Reverse trip: expand the night portal into the tunnel over this beat. */
-const REVERSE_ENTER = 0.78
-const REVERSE_REVEAL = 0.34
+/**
+ * Reverse trip must be fully covered BEFORE the live reverse camera leaves its
+ * held night pose at ~14.46. Starting at 15, 0.42s gives us that safety margin.
+ */
+const REVERSE_ENTER = 0.42
+const REVERSE_REVEAL = 0.24
 
 /** Measured inner opening / authored outer radius. */
 const INNER_RADIUS_RATIO = 0.555
