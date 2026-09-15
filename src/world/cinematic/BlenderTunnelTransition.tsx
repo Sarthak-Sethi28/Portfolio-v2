@@ -9,8 +9,12 @@ import { useScene } from '@/store/scene'
 const APERTURE_ON = 11.55
 /** The render ends in black; clear it quickly onto the timeline's own blackout. */
 const CLIP_CLEAR = 0.12
-/** PROJECTS begins only once the night world has had time to emerge from black. */
-const TITLE_TRIGGER = 0.16
+/**
+ * Wait until the real night composition is readable before Title.tsx begins its
+ * own delayed reveal. final-run(9) showed PROJECTS while the destination was
+ * still mostly black; this pushes the word onto the actual scene instead.
+ */
+const TITLE_TRIGGER = 0.30
 
 /**
  * The single tunnel video element for the entire journey.
@@ -20,8 +24,9 @@ const TITLE_TRIGGER = 0.16
  * the viewport. There is no second player, crop, scale, restart or crossfade.
  *
  * Exit continuity uses the R3F blackout that already hides the destination
- * camera handback. The Blender core and that blackout overlap for only a short
- * beat, then the actual night ocean resolves underneath.
+ * camera handback. The Blender core and that blackout overlap briefly, then the
+ * actual night ocean resolves underneath. No procedural corridor is allowed to
+ * appear between those two states.
  */
 export function BlenderTunnelTransition() {
   const setArrivedTitle = useScene((s) => s.setArrivedTitle)
@@ -150,10 +155,8 @@ export function BlenderTunnelTransition() {
         zIndex: 9999,
         background: '#000',
         /*
-         * The Blender beauty render was a little warmer/brighter than the live
-         * portal in final-run(8). A restrained transit-only grade pulls orange
-         * toward crimson and lowers the hot walls without touching the signed-
-         * off day/night world or the site's global tone mapping.
+         * Transit-only grade: pull the warmer Blender render toward the live
+         * portal's deeper crimson without changing the signed-off site grade.
          */
         filter: 'hue-rotate(-12deg) saturate(1.05) brightness(0.86) contrast(1.08)',
         willChange: 'clip-path, opacity',
