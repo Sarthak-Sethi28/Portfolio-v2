@@ -1,11 +1,8 @@
 'use client'
 
 /**
- * The master clock, deliberately OUTSIDE React.
- *
- * React owns only the coarse cinematic status. The continuous playhead lives in
- * this mutable object so every visual system can sample the exact same value
- * without forcing the entire scene tree to re-render every frame.
+ * The master clock lives outside React so every visual system can sample the
+ * exact same position without re-rendering the world every frame.
  */
 
 import { Vector3 } from 'three'
@@ -29,54 +26,71 @@ export const cameraOwnedByCinematic = { value: false }
 /** True while the authored Blender tunnel is the transit visual. */
 export const blenderTunnelActive = { value: false }
 
-/** True while the dedicated portal flight rig owns the camera. */
+/** True while a dedicated portal flight rig owns the camera. */
 export const portalTransitionActive = { value: false }
 
 /** Continuous day/night blend published for render-only consumers. */
 export const worldNight = { value: 0 }
 
-/**
- * Which way the journey is currently travelling.
- *
- * +1 = day -> night
- * -1 = night -> day
- *
- * Keeping direction beside the clock lets EVERY existing timeline envelope run
- * backward automatically: pillars rise, red power falls, whitewater settles and
- * the sky returns to day from the exact same authored values.
- */
+/** +1 = day -> night, -1 = night -> day. */
 export const cinematicDirection = { value: 1 as 1 | -1 }
 
+/**
+ * Night -> day is NOT the forward movie played backwards anymore.
+ *
+ * The previous pass literally rewound the exterior timeline after the tunnel:
+ * the camera retreated from the portal, pillars rose backwards and every water
+ * beat visibly un-happened. The recording made that feel like scrubbing a
+ * video in reverse. The return now has its own short forward portal approach;
+ * while the Blender tunnel covers the frame we silently restore the DAY state.
+ */
+export const returnJourney = {
+  active: false,
+  /** Real-time seconds since F was pressed on the night destination. */
+  elapsed: 0,
+}
+
 export const cinematicClock = {
-  /** Timeline position in seconds. */
+  /** Forward authored timeline position in seconds. */
   elapsed: 0,
   /** Frozen position from ?seq=, or null to let it run. */
   scrub: null as number | null,
-  /** True while advancing in either direction. */
+  /** True only while the authored DAY -> NIGHT timeline is advancing. */
   running: false,
 }
 
 /** The shared sample. Written once per frame by the director, read by all. */
 export const cinematicSample: CinematicSample = createSample()
 
+/** Set the timeline absolutely and update every dependent envelope immediately. */
+export function setCinematicTime(t: number): void {
+  cinematicClock.elapsed = Math.max(0, Math.min(DURATION, t))
+  sampleCinematic(cinematicClock.elapsed, cinematicSample)
+}
+
 /** Advance and re-sample. Called from exactly one place. */
 export function advanceCinematic(delta: number): void {
   if (cinematicClock.scrub !== null) {
-    cinematicClock.elapsed = cinematicClock.scrub
-  } else if (cinematicClock.running) {
-    cinematicClock.elapsed = Math.max(
-      0,
-      Math.min(DURATION, cinematicClock.elapsed + delta * cinematicDirection.value),
-    )
+    setCinematicTime(cinematicClock.scrub)
+    return
   }
+
+  if (cinematicClock.running) {
+    // The authored exterior sequence only runs forward. Return travel is a
+    // separate portal/tunnel journey, not a negative-speed version of this.
+    setCinematicTime(cinematicClock.elapsed + delta)
+    return
+  }
+
   sampleCinematic(cinematicClock.elapsed, cinematicSample)
 }
 
 export function resetCinematic(): void {
   cinematicDirection.value = 1
-  cinematicClock.elapsed = 0
+  returnJourney.active = false
+  returnJourney.elapsed = 0
   cinematicClock.running = false
-  sampleCinematic(0, cinematicSample)
+  setCinematicTime(0)
 }
 
 export { DURATION }
