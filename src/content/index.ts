@@ -28,6 +28,14 @@ export const SECTION_LABEL: Record<SectionId, string> = {
   contact: 'CONTACT',
 }
 
+/** What each column is called after the crossing. */
+export const SECTION_LABEL_NIGHT: Record<SectionId, string> = {
+  'experience-i': 'PROJECTS I',
+  'experience-ii': 'PROJECTS II',
+  waterloo: 'PROJECTS III',
+  contact: 'PROJECTS IV',
+}
+
 /** Two digits, as shown on the hover label: 01 / EXPERIENCE I. */
 export function sectionNumber(id: SectionId): string {
   return String(SECTIONS.indexOf(id) + 1).padStart(2, '0')

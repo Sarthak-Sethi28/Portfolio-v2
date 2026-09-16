@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useScene } from '@/store/scene'
-import { SECTIONS, SECTION_LABEL, sectionNumber, type SectionId } from '@/content'
+import { SECTIONS, SECTION_LABEL, SECTION_LABEL_NIGHT, sectionNumber, type SectionId } from '@/content'
 import { CONFIG_DEFAULTS } from '@/store/scene'
 import { sectionRing } from '@/world/geometry/layout'
 import { panelSideFor } from '@/world/selection/selectionState'
@@ -35,7 +35,9 @@ export function SelectionShell({
 }) {
   const openSection = useScene((s) => s.openSection)
   const openSectionPanel = useScene((s) => s.openSectionPanel)
+  const night = useScene((s) => s.night)
   const open = openSection === section
+  const title = (night ? SECTION_LABEL_NIGHT : SECTION_LABEL)[section]
 
   const panel = useRef<HTMLDivElement>(null)
 
@@ -108,7 +110,7 @@ export function SelectionShell({
       <div
         ref={panel}
         role="dialog"
-        aria-label={`${sectionNumber(section)} ${SECTION_LABEL[section]}`}
+        aria-label={`${sectionNumber(section)} ${title}`}
         className={
           narrow
             ? 'pointer-events-auto mb-0 flex max-h-[58vh] w-full flex-col px-4 pb-4'
@@ -143,7 +145,7 @@ export function SelectionShell({
             className="text-[10px]"
             style={{ ...MONO, letterSpacing: '0.3em', color: INK }}
           >
-            {SECTION_LABEL[section]}
+            {title}
           </h2>
         </header>
 

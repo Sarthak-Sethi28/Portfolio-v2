@@ -1,6 +1,6 @@
 'use client'
 
-import { SECTION_LABEL, sectionNumber } from '@/content'
+import { SECTION_LABEL, SECTION_LABEL_NIGHT, sectionNumber } from '@/content'
 import { useScene } from '@/store/scene'
 
 /**
@@ -16,6 +16,7 @@ import { useScene } from '@/store/scene'
 export function HoverLabel() {
   const hovered = useScene((s) => s.hovered)
   const open = useScene((s) => s.openSection ?? s.openProject)
+  const night = useScene((s) => s.night)
 
   const visible = Boolean(hovered) && !open
 
@@ -59,7 +60,7 @@ export function HoverLabel() {
           <span className="inline-flex items-baseline gap-3">
             <span style={{ opacity: 0.5, fontSize: '0.78em' }}>{sectionNumber(hovered)}</span>
             <span aria-hidden style={{ opacity: 0.3, fontSize: '0.78em' }}>/</span>
-            <span>{SECTION_LABEL[hovered]}</span>
+            <span>{(night ? SECTION_LABEL_NIGHT : SECTION_LABEL)[hovered]}</span>
           </span>
         )}
       </div>
