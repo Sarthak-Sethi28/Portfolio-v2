@@ -10,6 +10,7 @@ import { useScene } from '@/store/scene'
 import { cinematicSample, worldNight } from '../cinematic/cinematicState'
 import { waterline } from '../cinematic/waterline'
 import { PILLAR_RISE } from '../selection/selectionState'
+import { attract } from '../selection/attract'
 
 /**
  * A pier from a downloaded model, on trial.
@@ -276,8 +277,8 @@ export function ModelPier({
     const ease = (from: number, to: number, perSecond: number) =>
       from + (to - from) * (1 - Math.exp(-perSecond * Math.min(delta, 1 / 20)))
 
-    lift.current = ease(lift.current, isSelected ? 1 : 0, 3.6)
-    quiet.current = ease(quiet.current, someoneElseSelected ? 1 : 0, 4.2)
+    lift.current = ease(lift.current, isSelected ? 1 : 0, 5.6)
+    quiet.current = ease(quiet.current, someoneElseSelected ? 1 : 0, 6.2)
     nudge.current = ease(nudge.current, isHovered && !isSelected ? 1 : 0, 9)
 
     const night = worldNight.value
@@ -331,7 +332,19 @@ export function ModelPier({
      * has to be felt and not read — if you can name the distance it moved, it
      * has already become a click that did not need a click.
      */
-    const risen = lift.current * PILLAR_RISE + nudge.current * 0.9
+    /*
+     * The nudge, staggered along the colonnade.
+     *
+     * descentDelay already encodes each column's place in the line — far-left,
+     * far-right, near-left, near-right — so reusing it makes the hint travel
+     * across the frame as one movement rather than four columns twitching at
+     * once. Deliberately smaller than the hover response: this has to be
+     * noticed, not obeyed.
+     */
+    const offer = sectionId !== undefined
+      ? Math.max(0, attract.value - descentDelay * 0.55) * 1.35
+      : 0
+    const risen = lift.current * PILLAR_RISE + nudge.current * 0.9 + offer * 1.15
     g.position.y = -d * height * 1.6 + risen
     // Published so the water knows where this column currently cuts the
     // surface — the interaction has to follow the real waterline, not sit at

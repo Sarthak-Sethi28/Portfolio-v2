@@ -23,7 +23,7 @@ export function SoundToggle() {
   const [ready, setReady] = useState(false)
   useEffect(() => {
     if (phase === 'booting') return
-    const id = window.setTimeout(() => setReady(true), 2400)
+    const id = window.setTimeout(() => setReady(true), 1100)
     return () => window.clearTimeout(id)
   }, [phase])
 
@@ -40,7 +40,7 @@ export function SoundToggle() {
       className="group fixed bottom-5 right-5 z-20 flex items-center gap-2.5 px-3 py-2"
       style={{
         opacity: ready ? 1 : 0,
-        transition: 'opacity 700ms ease',
+        transition: 'opacity 450ms ease',
         pointerEvents: ready ? 'auto' : 'none',
         background:
           'radial-gradient(70% 140% at 50% 50%, rgba(5,7,9,0.72) 0%, rgba(5,7,9,0.32) 55%, rgba(5,7,9,0) 100%)',

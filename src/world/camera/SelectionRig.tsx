@@ -43,8 +43,8 @@ const AIM_SHIFT = 9
 const AIM_LIFT = 2
 
 /** Seconds-ish. Opening is unhurried; closing is quicker, as briefed. */
-const OPEN_RATE = 2.8
-const CLOSE_RATE = 5.0
+const OPEN_RATE = 4.2
+const CLOSE_RATE = 6.4
 
 /** Below this the restore is finished and the exact captured pose is written. */
 const SETTLED = 0.002

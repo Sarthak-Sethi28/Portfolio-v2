@@ -126,8 +126,8 @@ export function SelectionShell({
               ? 'translate(0, 16px)'
               : `translate(${left ? -12 : 12}px, 10px)`,
           transition: open
-            ? 'opacity 300ms ease-out, transform 340ms cubic-bezier(0.22,0.61,0.36,1)'
-            : 'opacity 170ms ease-in, transform 170ms ease-in',
+            ? 'opacity 200ms ease-out, transform 230ms cubic-bezier(0.22,0.61,0.36,1)'
+            : 'opacity 130ms ease-in, transform 130ms ease-in',
           visibility: open ? 'visible' : 'hidden',
         }}
       >

@@ -30,7 +30,9 @@ export function TransitionHint() {
 
   useEffect(() => {
     if (phase === 'booting') return
-    const id = window.setTimeout(() => setReady(true), 2200)
+    // Early. The previous 2.2s landed after the eye had already started
+    // wandering, and a hint nobody is looking at is a hint nobody reads.
+    const id = window.setTimeout(() => setReady(true), 700)
     return () => window.clearTimeout(id)
   }, [phase])
 
@@ -55,7 +57,7 @@ export function TransitionHint() {
         bottom: '4.5%',
         opacity: visible ? 1 : 0,
         transform: `translateY(${visible ? 0 : 8}px)`,
-        transition: 'opacity 700ms ease, transform 700ms ease',
+        transition: 'opacity 420ms ease, transform 420ms ease',
       }}
       aria-hidden={!visible}
     >
