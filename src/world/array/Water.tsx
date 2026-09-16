@@ -1,31 +1,40 @@
 'use client'
 
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { MeshReflectorMaterial, useTexture } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { RepeatWrapping, Vector2, type MeshStandardMaterial, type Texture } from 'three'
+import {
+  DynamicDrawUsage,
+  PlaneGeometry,
+  RepeatWrapping,
+  Vector2,
+  type BufferAttribute,
+  type Mesh,
+  type MeshStandardMaterial,
+  type Texture,
+} from 'three'
 import type { Palette } from '../atmosphere/palette'
-import { worldNight } from '../cinematic/cinematicState'
+import { cinematicSample, worldNight } from '../cinematic/cinematicState'
+
+const PORTAL_Z = -150
+const WATER_SIZE = 1600
+const WATER_SEGMENTS = 96
+
+function gaussian(x: number, width: number): number {
+  const q = x / width
+  return Math.exp(-(q * q))
+}
 
 /**
- * The salt plain: a centimetre of standing water over a flat bed.
+ * The actual reflective ocean surface.
  *
- * The surface normals come from a PHOTOGRAPH of water, converted to a normal
- * map offline (scripts/make-water-normal.mjs). A sum of sine waves cannot
- * produce what the eye actually looks for — ripples of varying length crossing
- * at inconsistent angles, never repeating. Every procedural field eventually
- * betrays its period, and at this scale it showed as corduroy.
- *
- * The field drifts continuously, so the surface is never the same twice.
- *
- * PLAIN repeat wrapping, not mirrored.
- *
- * Mirroring is seamless by construction, but it makes every tile a reflection
- * of its neighbour — and that symmetry reads as a hard grid across the
- * surface, kaleidoscoping about each boundary. The source is already made
- * seamless by cross-fading opposite edges into each other
- * (scripts/make-water-normal.mjs), so it can simply repeat, and a repeat has
- * no symmetry for the eye to latch onto.
+ * At rest it is still the photographed-normal-map salt plain we liked. During
+ * the F cinematic, however, the REAL reflector geometry now moves. The old
+ * white overlay made a second translucent surface heave above an otherwise
+ * flat blue sea, which is exactly why it looked like a white thing sitting on
+ * top of the water. This mesh now carries the broad swell, short chop, portal
+ * draw-down and travelling surge itself, so reflections/pillars/red light live
+ * on the moving surface rather than underneath a separate effect.
  */
 export function Water({
   palette,
@@ -41,24 +50,31 @@ export function Water({
 }) {
   const reflective = reflectorResolution > 0
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
-
-  /*
-   * The galaxy, emitted by the water.
-   *
-   * The night sky panorama is used as the surface's EMISSIVE map, so the
-   * plain glows with stars rather than reflecting them. That is the inversion:
-   * the sky above is emptied and the heavens are underfoot.
-   *
-   * Emissive rather than a reflection because a reflection needs something to
-   * reflect, and there is deliberately nothing up there any more.
-   */
-  const stars = useTexture('/sky/night.jpg') as Texture
+  const meshRef = useRef<Mesh>(null)
   const nightMat = useRef<MeshStandardMaterial>(null)
+  const wasDeformed = useRef(false)
+  const normalTick = useRef(0)
 
+  const geometryData = useMemo(() => {
+    const geometry = new PlaneGeometry(WATER_SIZE, WATER_SIZE, WATER_SEGMENTS, WATER_SEGMENTS)
+    const position = geometry.attributes.position as BufferAttribute
+    position.setUsage(DynamicDrawUsage)
+
+    const baseXY = new Float32Array(position.count * 2)
+    for (let i = 0; i < position.count; i++) {
+      baseXY[i * 2] = position.getX(i)
+      baseXY[i * 2 + 1] = position.getY(i)
+    }
+
+    return { geometry, baseXY }
+  }, [])
+
+  useEffect(() => () => geometryData.geometry.dispose(), [geometryData])
+
+  const stars = useTexture('/sky/night.jpg') as Texture
   const starMap = useMemo(() => {
     const t = stars.clone()
     t.wrapS = t.wrapT = RepeatWrapping
-    // Large, so the galaxy spans the plain rather than tiling across it.
     t.repeat.set(1.4, 1.4)
     t.anisotropy = maxAniso
     t.needsUpdate = true
@@ -72,7 +88,6 @@ export function Water({
     tex.anisotropy = maxAniso
   }) as Texture
 
-  // Independent clones so each can carry its own tiling and drift.
   const coarse = useMemo(() => {
     const t = base.clone()
     t.wrapS = t.wrapT = RepeatWrapping
@@ -82,102 +97,125 @@ export function Water({
     return t
   }, [base, maxAniso])
 
-  // Rain does not distort the reflection any more; it raises the surface's
-  // own slope instead, which is both physically truer and cannot sample out
-  // of bounds.
   const amp = 0.5 + distort * 0.9
   const normalScale = useMemo(() => new Vector2(amp, amp), [amp])
 
   useFrame(({ clock }) => {
-    // The galaxy has to READ, not hint — it is the only thing in the frame's
-    // upper half opposite. Driven here rather than through a prop so a
-    // continuously changing value never re-renders the world.
     if (nightMat.current) nightMat.current.emissiveIntensity = worldNight.value * 5.5
+
+    const s = cinematicSample
+    const disturbance = Math.max(0, Math.min(1, s.disturbance))
+    const pull = Math.max(0, Math.min(1, s.pull))
+    const surgeAmount = Math.max(0, Math.min(1, s.shockwave))
+    const active = Math.max(disturbance, pull, surgeAmount)
     const t = clock.elapsedTime
-    coarse.offset.set(t * 0.0075, t * 0.0046)
+
+    // The photographic micro-normal remains, but becomes rougher/faster as the
+    // actual geometry breaks up. It is detail on the waves, not the waves.
+    const normalBoost = 1 + disturbance * 2.15 + surgeAmount * 0.65
+    normalScale.set(amp * normalBoost, amp * normalBoost)
+    coarse.offset.set(
+      t * (0.0075 + disturbance * 0.014),
+      t * (0.0046 + disturbance * 0.010),
+    )
+
+    const geometry = geometryData.geometry
+    const position = geometry.attributes.position as BufferAttribute
+
+    if (active < 0.002) {
+      if (wasDeformed.current) {
+        for (let i = 0; i < position.count; i++) position.setZ(i, 0)
+        position.needsUpdate = true
+        geometry.computeVertexNormals()
+        wasDeformed.current = false
+      }
+      return
+    }
+
+    wasDeformed.current = true
+
+    for (let i = 0; i < position.count; i++) {
+      const x = geometryData.baseXY[i * 2]
+      const localY = geometryData.baseXY[i * 2 + 1]
+      // Plane local +Y becomes world -Z after the -90deg X rotation.
+      const worldZ = -localY
+
+      // Whole-ocean storm field: several wavelengths crossing at different
+      // angles. This is deliberately irregular and directional rather than a
+      // concentric procedural ring around the gate.
+      const swellA = Math.sin(x * 0.018 + worldZ * 0.026 - t * 1.55) * 1.55
+      const swellB = Math.sin(x * 0.037 - worldZ * 0.021 + t * 2.05 + 1.7) * 0.92
+      const chopA = Math.sin(x * 0.071 + worldZ * 0.058 - t * 3.15 + 0.4) * 0.48
+      const chopB = Math.sin(x * 0.113 - worldZ * 0.086 + t * 4.05 + 2.2) * 0.27
+      const storm = (swellA + swellB + chopA + chopB) * disturbance * (0.72 + disturbance * 1.18)
+
+      const dz = worldZ - PORTAL_Z
+      const d = Math.hypot(x, dz)
+      const nearGate = gaussian(d, 135)
+      const throat = gaussian(d, 44)
+
+      // Near the machine, the same water gets substantially more violent. The
+      // phase is broken with X/Z terms so it never becomes a perfect whirlpool.
+      const localBreak = nearGate * disturbance * (
+        Math.sin(d * 0.098 - t * 4.15 + x * 0.013) * 2.25 +
+        Math.sin(x * 0.084 + dz * 0.063 + t * 3.30) * 1.35
+      )
+      const drawDown = -pull * throat * (3.8 + 1.2 * Math.sin(t * 2.1 + x * 0.025))
+
+      // A broad crooked front travels FROM the portal toward camera. It is a
+      // real raised band in the base ocean, not a white translucent sheet.
+      const frontZ = PORTAL_Z + surgeAmount * 355
+      const crookedFront = frontZ + Math.sin(x * 0.018 + t * 0.7) * 13 + Math.sin(x * 0.049) * 7
+      const frontBand = gaussian(worldZ - crookedFront, 48) * gaussian(x, 360)
+      const surge = frontBand * surgeAmount * (5.8 + disturbance * 3.0)
+
+      position.setZ(i, storm + localBreak + drawDown + surge)
+    }
+
+    position.needsUpdate = true
+
+    // The normal map supplies micro-facets; updating geometric normals every
+    // second frame is enough for the large wave faces while keeping CPU cost
+    // comfortably below doing a full normal rebuild at 60/120Hz.
+    normalTick.current = (normalTick.current + 1) & 1
+    if (normalTick.current === 0) geometry.computeVertexNormals()
+
+    if (meshRef.current) meshRef.current.frustumCulled = false
   })
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-      <planeGeometry args={[1600, 1600, 1, 1]} />
+    <mesh
+      ref={meshRef}
+      geometry={geometryData.geometry}
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, 0, 0]}
+      receiveShadow
+      frustumCulled={false}
+    >
       {reflective ? (
         <MeshReflectorMaterial
           blur={[30, 9]}
           resolution={reflectorResolution}
           mixBlur={0.22}
-          // Lower, deliberately.
-          //
-          // At 6 the surface's brightness came almost entirely from the
-          // reflection pass — a second full render of the scene, every frame.
-          // Miss that pass once and the water loses most of its light: a
-          // single dark frame confined to the lower third, which is precisely
-          // what a frame-by-frame analysis of a screen recording found (three
-          // dips of 12-15%, none anywhere else in the frame).
-          //
-          // With the environment map carrying more of the load, a late
-          // reflection is a small change rather than a blackout.
           mixStrength={2.6}
           roughness={roughness}
           depthScale={0}
           color={palette.waterTint}
           metalness={1}
           mirror={1}
-          // NO distortion map.
-          //
-          // distortion offsets where the reflection is sampled from. At this
-          // tiling it pushed samples outside the reflection buffer, which
-          // returns black — a scatter of dark dashes across the plain, in a
-          // regular pattern because the offsets come from a tiled texture.
-          // Reducing it only made them fainter.
-          //
-          // It is not needed: the normal map already breaks the surface up,
-          // and it does so by changing the SHADING, which cannot sample
-          // anything out of bounds.
           normalMap={coarse}
           normalScale={normalScale}
-          // The sky is reflected from the environment map regardless of the
-          // reflection pass, so the surface always has light of its own.
           envMapIntensity={1.35}
           reflectorOffset={0}
         />
       ) : (
-        /*
-         * The reflection-free surface.
-         *
-         * Not a fallback any more — a real alternative. It reflects the
-         * ENVIRONMENT MAP instead of re-rendering the scene, so it still
-         * mirrors the sky, still carries the sun's path across the ripples,
-         * and costs nothing per frame. What it loses is the piers' own
-         * reflections.
-         *
-         * That trade is worth stating plainly: the reflector renders the whole
-         * scene a second time every frame, and a pass that long is the one
-         * thing in this scene that can arrive late — which shows as the water
-         * going dark for a frame.
-         */
         <meshStandardMaterial
           color={palette.waterTint}
-          // Low roughness plus full metalness is a mirror of the environment.
           roughness={Math.max(roughness, 0.06)}
           metalness={1}
           envMapIntensity={2.1}
           normalMap={coarse}
           normalScale={normalScale}
-          /*
-           * BOUND FROM THE START, at zero strength.
-           *
-           * This was `night > 0.02 ? starMap : null`, which adds and removes a
-           * texture from the material — and a texture is a shader DEFINE, so
-           * crossing that threshold relinked the program. It happened at about
-           * ten and a half seconds, inside the exact window where the cold run
-           * stalled, and it could never happen on the second run because the
-           * variant was already cached.
-           *
-           * Binding it permanently means the same program exists from the
-           * first frame of the day scene. At zero intensity it costs one
-           * texture fetch that multiplies to nothing, and the day appearance is
-           * unchanged.
-           */
           emissiveMap={starMap}
           emissive="#ffffff"
           emissiveIntensity={0}
