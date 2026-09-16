@@ -33,7 +33,7 @@ export const selectionCameraActive = { value: false }
  * that keeps the shaft genuinely cut by the water — which is what makes the
  * move look like the sea giving something up rather than an object levitating.
  */
-export const PILLAR_RISE = 3.0
+export const PILLAR_RISE = 2.0
 
 /**
  * Which half of the screen the panel takes.

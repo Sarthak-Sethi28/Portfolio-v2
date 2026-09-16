@@ -1,7 +1,7 @@
 import { SceneCanvas } from '@/overlay/SceneCanvas'
 import { BootCover } from '@/overlay/BootCover'
 import { Title } from '@/overlay/Title'
-import { ExperiencePanel } from '@/overlay/selection/ExperiencePanel'
+import { PillarPanels } from '@/overlay/selection/PillarPanels'
 import { Stats } from '@/overlay/Stats'
 import { HoverLabel } from '@/overlay/HoverLabel'
 import { Controls } from '@/overlay/Chrome/Controls'
@@ -13,9 +13,8 @@ export default function Home() {
       <SceneCanvas />
       <Title />
       <HoverLabel />
-      {/* PILLAR 01. Contact and the rest will mount beside it, each supplying
-          its own content to the same SelectionShell. */}
-      <ExperiencePanel />
+      {/* All four monuments. One shell, four sets of children. */}
+      <PillarPanels />
       <Controls />
       {/* Preview layer: the real Blender tunnel render, over the live scene. */}
       <BlenderTunnelTransition />

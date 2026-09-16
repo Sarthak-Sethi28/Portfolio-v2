@@ -1,18 +1,13 @@
 'use client'
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useScene } from '@/store/scene'
-import { SECTIONS, SECTION_LABEL, type SectionId } from '@/content'
+import { SECTIONS, SECTION_LABEL, sectionNumber, type SectionId } from '@/content'
 import { CONFIG_DEFAULTS } from '@/store/scene'
 import { sectionRing } from '@/world/geometry/layout'
 import { panelSideFor } from '@/world/selection/selectionState'
+import { GLASS, MONO, INK, INK_FAINT, useStagger } from './kit'
 
-/**
- * Where a section's column stands, in world x.
- *
- * Computed from the same layout function the scene uses rather than hard-coded
- * here, so moving a column moves its panel with it.
- */
 const RING = sectionRing(SECTIONS.length, CONFIG_DEFAULTS.arraySpacing)
 function sectionX(section: SectionId): number {
   const i = SECTIONS.indexOf(section)
@@ -20,17 +15,16 @@ function sectionX(section: SectionId): number {
 }
 
 /**
- * The frame every selected pillar's content grows inside.
+ * The frame every monument's content grows inside.
  *
- * Deliberately knows nothing about experience, contact or writing. It owns the
- * things that must be identical whichever column you chose — where the panel
- * sits, how it enters, the three ways out, and the fact that the world stays
- * visible behind it — so that adding CONTACT later is a matter of passing
- * different children, not of building a second panel that almost matches.
+ * It knows nothing about experience, Waterloo or contact. It owns the things
+ * that must be identical whichever column you chose — where the panel sits, how
+ * it arrives, the ways out, and the fact that the world stays visible behind it
+ * — so each pillar supplies children rather than a fourth panel that almost
+ * matches the other three.
  *
- * It is NOT a modal. There is no scrim over the scene and no focus trap that
- * would make the world feel switched off: the column you clicked is the subject
- * and this is an annotation beside it.
+ * Not a modal: no scrim, no focus trap. The column is the subject; this is an
+ * annotation beside it.
  */
 export function SelectionShell({
   section,
@@ -46,14 +40,17 @@ export function SelectionShell({
   const panel = useRef<HTMLDivElement>(null)
 
   /*
-   * Escape, and a click on the world outside the panel.
+   * Escape, and a pointer anywhere that is not this panel.
    *
-   * The third way out — clicking the raised column again — belongs to the
-   * column itself and lives in ModelPier, because that one is a fact about the
-   * 3D object rather than about this panel.
+   * The second of those is the universal "back to the main view": the water,
+   * the sky, the horizon, a scenery column — anything that is not the panel and
+   * not the raised monument itself. Binding it here rather than putting a click
+   * handler on the ocean mesh means it cannot be defeated by whatever the
+   * pointer happens to land on, and it costs no raycasting.
    *
-   * The outside click is bound on pointerdown rather than click so that a drag
-   * that starts on the scene and releases over the panel does not dismiss it.
+   * Bound on pointerdown so a drag that begins on the scene and releases over
+   * the panel does not dismiss it; deferred one tick so the very click that
+   * opened the panel is not also the one that closes it.
    */
   useEffect(() => {
     if (!open) return
@@ -68,8 +65,6 @@ export function SelectionShell({
     }
 
     window.addEventListener('keydown', onKey)
-    // Deferred a frame: the very click that opened this would otherwise be the
-    // same gesture that closes it.
     const id = window.setTimeout(() => window.addEventListener('pointerdown', onDown), 0)
 
     return () => {
@@ -80,66 +75,85 @@ export function SelectionShell({
   }, [open, openSectionPanel])
 
   /*
-   * The panel takes the half of the screen the column does not.
+   * Narrow screens get the panel along the bottom instead of beside the column.
    *
-   * Pinning it to one side put the content directly over the object it
-   * describes for two of the four columns. The side comes from the same world
-   * x the camera reads, so the two cannot disagree.
+   * Floating a card next to a monument needs horizontal room that a phone does
+   * not have; squeezing it there leaves both the text and the world unreadable.
+   * Below the breakpoint the panel takes the lower half and the world keeps the
+   * upper half, which is the same idea expressed in the space available.
    */
-  const side = panelSideFor(sectionX(section))
-  const left = side === 'left'
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 860px)')
+    const sync = () => setNarrow(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
+  const left = panelSideFor(sectionX(section)) === 'left'
+  const header = useStagger(open, 0)
 
   return (
     <div
-      className={`pointer-events-none fixed inset-0 z-30 flex items-center ${
-        left ? 'justify-start' : 'justify-end'
-      }`}
+      className={
+        narrow
+          ? 'pointer-events-none fixed inset-0 z-30 flex items-end justify-center'
+          : `pointer-events-none fixed inset-0 z-30 flex items-center ${
+              left ? 'justify-start' : 'justify-end'
+            }`
+      }
       aria-hidden={!open}
     >
       <div
         ref={panel}
         role="dialog"
-        aria-label={SECTION_LABEL[section]}
-        className={`pointer-events-auto flex max-h-[82vh] w-[min(680px,52vw)] flex-col ${
-          left ? 'ml-[4vw]' : 'mr-[4vw]'
-        }`}
+        aria-label={`${sectionNumber(section)} ${SECTION_LABEL[section]}`}
+        className={
+          narrow
+            ? 'pointer-events-auto mb-0 flex max-h-[58vh] w-full flex-col px-4 pb-4'
+            : `pointer-events-auto flex max-h-[78vh] w-[min(620px,46vw)] flex-col ${
+                left ? 'ml-[4vw]' : 'mr-[4vw]'
+              }`
+        }
         style={{
           opacity: open ? 1 : 0,
-          transform: `translate(${open ? 0 : left ? -14 : 14}px, ${open ? 0 : 14}px)`,
-          // Restrained, as briefed — a few hundred milliseconds, and the panel
-          // leaves faster than it arrives so dismissing never feels sticky.
+          transform: open
+            ? 'translate(0,0)'
+            : narrow
+              ? 'translate(0, 16px)'
+              : `translate(${left ? -12 : 12}px, 10px)`,
           transition: open
-            ? 'opacity 340ms ease-out 120ms, transform 340ms cubic-bezier(0.22,0.61,0.36,1) 120ms'
-            : 'opacity 180ms ease-in, transform 180ms ease-in',
+            ? 'opacity 300ms ease-out, transform 340ms cubic-bezier(0.22,0.61,0.36,1)'
+            : 'opacity 170ms ease-in, transform 170ms ease-in',
           visibility: open ? 'visible' : 'hidden',
         }}
       >
-        {children}
+        <header className="mb-3 flex items-baseline gap-3 px-1" style={header}>
+          <span
+            className="text-[10px]"
+            style={{ ...MONO, letterSpacing: '0.3em', color: INK_FAINT }}
+          >
+            {sectionNumber(section)}
+          </span>
+          <span aria-hidden style={{ color: INK_FAINT, fontSize: '10px' }}>
+            /
+          </span>
+          <h2
+            className="text-[10px]"
+            style={{ ...MONO, letterSpacing: '0.3em', color: INK }}
+          >
+            {SECTION_LABEL[section]}
+          </h2>
+        </header>
+
+        <div
+          className="flex min-h-0 flex-col gap-3 overflow-y-auto p-5"
+          style={{ ...GLASS, overscrollBehavior: 'contain' }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   )
 }
-
-/**
- * Shared surface treatment.
- *
- * Dark translucent graphite, one-pixel borders, glass. Exported so the contact
- * form's panel and the experience cards cannot drift apart into two house
- * styles.
- */
-export const GLASS: React.CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(14,17,21,0.82) 0%, rgba(9,11,14,0.88) 100%)',
-  border: '1px solid rgba(233,230,222,0.10)',
-  backdropFilter: 'blur(14px) saturate(1.1)',
-  WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
-  boxShadow: '0 24px 70px rgba(0,0,0,0.55)',
-}
-
-export const MONO: React.CSSProperties = {
-  fontFamily: 'var(--font-mono), monospace',
-  letterSpacing: '0.24em',
-  textTransform: 'uppercase',
-}
-
-/** The one accent in the world, used sparingly. */
-export const ACCENT = 'rgba(196,42,28,0.92)'

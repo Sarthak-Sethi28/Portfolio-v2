@@ -1,6 +1,6 @@
 'use client'
 
-import { SECTION_LABEL } from '@/content'
+import { SECTION_LABEL, sectionNumber } from '@/content'
 import { useScene } from '@/store/scene'
 
 /**
@@ -40,7 +40,19 @@ export function HoverLabel() {
           borderBottom: '1px solid rgba(242,239,232,0.35)',
         }}
       >
-        {hovered ? SECTION_LABEL[hovered] : ''}
+        {/*
+          Numbered, because the monuments are numbered: 01 / EXPERIENCE I.
+          The digits sit back so the name is what reads at a glance, and the
+          whole thing is gone the moment the pointer leaves — a permanent
+          caption over a world like this would be a menu bar.
+        */}
+        {hovered && (
+          <span className="inline-flex items-baseline gap-3">
+            <span style={{ opacity: 0.5, fontSize: '0.78em' }}>{sectionNumber(hovered)}</span>
+            <span aria-hidden style={{ opacity: 0.3, fontSize: '0.78em' }}>/</span>
+            <span>{SECTION_LABEL[hovered]}</span>
+          </span>
+        )}
       </div>
     </div>
   )

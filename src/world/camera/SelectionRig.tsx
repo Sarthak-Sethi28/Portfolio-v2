@@ -2,12 +2,12 @@
 
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { PerspectiveCamera as ProxyCamera, Quaternion, Vector3 } from 'three'
+import { Quaternion, Vector3 } from 'three'
 import type { PerspectiveCamera } from 'three'
 import { useScene } from '@/store/scene'
 import { SECTIONS } from '@/content'
-import { sectionRing } from '../geometry/layout'
 import { CONFIG_DEFAULTS } from '@/store/scene'
+import { sectionRing } from '../geometry/layout'
 import {
   cameraOwnedByCinematic,
   portalTransitionActive,
@@ -15,33 +15,39 @@ import {
 import { panelSideFor, selectionCameraActive } from '../selection/selectionState'
 
 /**
- * The camera's answer to a chosen pillar.
+ * A FOCUS, not a shot.
  *
- * Deliberately a REFRAME and not a flight. The brief for the cinematic was a
- * journey; this is a room you are already standing in turning slightly to face
- * something. So the camera drifts a little toward the chosen column and a
- * little off-axis, leaving the opposite side of frame clear for the panel, and
- * that is the whole move. Anything bigger competes with the portal sequence,
- * and the world has only one journey in it.
+ * The previous version swung the camera bodily toward whichever column you
+ * picked and offset its aim by forty-odd world units to clear the panel. It
+ * worked, and it was disorienting: every selection threw away the hero
+ * composition and replaced it with a different photograph, so choosing two
+ * pillars in a row felt like being moved around a room by someone else.
  *
- * It yields completely to the cinematic: pressing F while a pillar is up must
- * never turn into two rigs writing the same camera.
+ * This one is bounded by design rather than by taste. The numbers below are
+ * small enough that the original framing stays plainly recognisable — the
+ * horizon does not tilt, the portal keeps its place, the focal length never
+ * changes — and the rising column, not the camera, is what tells you which
+ * monument you chose.
+ *
+ * The rest pose is CAPTURED from the live camera at the moment a pillar opens,
+ * not assumed. On close it eases back to exactly that and then snaps to it, so
+ * no drift can accumulate across repeated open/close cycles.
  */
-const HOME_POS = new Vector3(0, 9, 128)
-const HOME_TARGET = new Vector3(0, 26, -110)
 
-/** How far toward the column the body drifts, as a fraction of the gap. */
-const APPROACH = 0.17
-/** Lateral push away from the panel side, in world units. */
-const SIDESTEP = 16
-const LIFT = 4.5
-/** Lateral aim offset, which is what actually moves the column across frame. */
-const AIM_PUSH = 46
+/** Forward dolly, world units. About a two-hundredth of the distance to the ring. */
+const DOLLY = 5
+/** Lateral shift of the body, world units. Deliberately smaller than the dolly. */
+const SHIFT = 3.5
+/** How far the gaze moves, world units at the columns' depth. */
+const AIM_SHIFT = 9
+const AIM_LIFT = 2
 
-function smooth01(x: number): number {
-  const v = Math.max(0, Math.min(1, x))
-  return v * v * (3 - 2 * v)
-}
+/** Seconds-ish. Opening is unhurried; closing is quicker, as briefed. */
+const OPEN_RATE = 2.8
+const CLOSE_RATE = 5.0
+
+/** Below this the restore is finished and the exact captured pose is written. */
+const SETTLED = 0.002
 
 export function SelectionRig() {
   const camera = useThree((s) => s.camera) as PerspectiveCamera
@@ -51,90 +57,116 @@ export function SelectionRig() {
     () => ({
       pos: new Vector3(),
       aim: new Vector3(),
-      look: new ProxyCamera(),
       q: new Quaternion(),
-      home: new Quaternion(),
+      fwd: new Vector3(),
+      right: new Vector3(),
+      up: new Vector3(0, 1, 0),
     }),
     [],
   )
 
-  /** Where each section's column stands, in the same order SECTIONS is in. */
   const ring = useMemo(
     () => sectionRing(SECTIONS.length, CONFIG_DEFAULTS.arraySpacing),
     [],
   )
 
+  /**
+   * The exact camera the visitor had before any of this started.
+   *
+   * Captured once, on the transition from "nothing open" to "something open",
+   * and never recaptured while a pillar is up — otherwise switching directly
+   * from one pillar to another would save the OFFSET pose as home and the
+   * camera would walk a little further away with every selection.
+   */
+  const home = useRef<{ pos: Vector3; quat: Quaternion; fov: number } | null>(null)
   const t = useRef(0)
-  const wasActive = useRef(false)
 
   /* eslint-disable react-hooks/immutability */
   useFrame((_, delta) => {
-    // The cinematic outranks this without negotiation.
+    // The cinematic outranks this without negotiation, and takes the camera as
+    // it finds it.
     if (cameraOwnedByCinematic.value || portalTransitionActive.value) {
       t.current = 0
+      home.current = null
       selectionCameraActive.value = false
-      wasActive.current = false
       return
     }
 
     const index = openSection ? SECTIONS.indexOf(openSection) : -1
     const want = index >= 0 ? 1 : 0
 
-    const step = Math.min(delta, 1 / 20) * 2.1
-    t.current += (want - t.current) * (1 - Math.exp(-step * 2.4))
-
-    // Fully home, and nothing to do: hand the camera back to IdleRig and stay
-    // out of the way entirely rather than writing the rest pose every frame.
-    if (t.current < 0.0015 && want === 0) {
-      t.current = 0
-      if (wasActive.current) {
-        selectionCameraActive.value = false
-        wasActive.current = false
+    if (want === 1 && home.current === null) {
+      home.current = {
+        pos: camera.position.clone(),
+        quat: camera.quaternion.clone(),
+        fov: camera.fov,
       }
+    }
+
+    const rest = home.current
+    if (!rest) {
+      selectionCameraActive.value = false
+      return
+    }
+
+    const rate = want === 1 ? OPEN_RATE : CLOSE_RATE
+    t.current += (want - t.current) * (1 - Math.exp(-rate * Math.min(delta, 1 / 20)))
+
+    if (want === 0 && t.current < SETTLED) {
+      // Land on the captured pose EXACTLY, then let go. An asymptote left the
+      // camera a hair off home every time, and "a hair" accumulates.
+      camera.position.copy(rest.pos)
+      camera.quaternion.copy(rest.quat)
+      camera.fov = rest.fov
+      camera.updateProjectionMatrix()
+      t.current = 0
+      home.current = null
+      selectionCameraActive.value = false
       return
     }
 
     selectionCameraActive.value = true
-    wasActive.current = true
 
     const placement = index >= 0 ? ring[index] : null
     const cx = placement ? placement.position[0] : 0
-    const cz = placement ? placement.position[2] : -110
+    // Away from the panel, so the column sits in the free half — but by a few
+    // units, not by a swing.
+    const push = panelSideFor(cx) === 'left' ? 1 : -1
+
+    // The camera's own axes, so the nudge is relative to where it is looking
+    // rather than to world X. That keeps this correct if the rest pose ever
+    // changes.
+    scratch.fwd.set(0, 0, -1).applyQuaternion(rest.quat)
+    scratch.right.set(1, 0, 0).applyQuaternion(rest.quat)
+
+    const k = t.current * t.current * (3 - 2 * t.current)
+
+    scratch.pos
+      .copy(rest.pos)
+      .addScaledVector(scratch.fwd, DOLLY * k)
+      .addScaledVector(scratch.right, push * SHIFT * k)
+    camera.position.copy(scratch.pos)
 
     /*
-     * The column must land in the half the panel does not take.
-     *
-     * Aiming AT the column centres it, and a centred column sits under the
-     * inside edge of the panel whichever side that panel is on. So the aim is
-     * offset laterally instead: look to the left of the column and the column
-     * moves right in frame, and vice versa. The camera body steps the same way,
-     * which keeps the move reading as a turn rather than a slide.
+     * Rotation is produced by moving the LOOK POINT a little, not by aiming at
+     * the column. Aiming at the column is what made the old rig swing: the
+     * further off-axis the column, the larger the rotation, so two pillars felt
+     * like two different cameras. A fixed small offset applied to the existing
+     * gaze gives every pillar the same tiny, predictable move.
      */
-    const panelLeft = panelSideFor(cx) === 'left'
-    const push = panelLeft ? -1 : 1
+    scratch.aim
+      .copy(rest.pos)
+      .addScaledVector(scratch.fwd, 240)
+      .addScaledVector(scratch.right, push * AIM_SHIFT * k)
+      .addScaledVector(scratch.up, AIM_LIFT * k)
 
-    scratch.pos.set(
-      HOME_POS.x + (cx - HOME_POS.x) * APPROACH + push * SIDESTEP,
-      HOME_POS.y + LIFT,
-      HOME_POS.z + (cz - HOME_POS.z) * APPROACH,
-    )
-
-    const k = smooth01(t.current)
-    camera.position.lerpVectors(HOME_POS, scratch.pos, k)
-
-    scratch.look.position.copy(HOME_POS)
-    scratch.look.lookAt(HOME_TARGET)
-    scratch.home.copy(scratch.look.quaternion)
-
-    // Offset the aim, not the column. AIM_PUSH is in world units at the
-    // column's depth; it is what decides how far into the free half it lands.
-    scratch.aim.set(cx + push * AIM_PUSH, 22, cz)
-    scratch.look.position.copy(camera.position)
-    scratch.look.lookAt(scratch.aim)
-
-    scratch.q.copy(scratch.home).slerp(scratch.look.quaternion, k)
-    camera.quaternion.copy(scratch.q)
+    scratch.q.copy(camera.quaternion)
+    camera.lookAt(scratch.aim)
     camera.rotation.z = 0
+
+    // FOV is never touched. Changing it is the single fastest way to make a
+    // small move feel like a zoom.
+    camera.fov = rest.fov
     camera.updateProjectionMatrix()
   })
   /* eslint-enable react-hooks/immutability */
