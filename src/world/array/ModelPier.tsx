@@ -5,8 +5,11 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import { Box3, Color, Plane, Vector3, type Group, type Mesh, type MeshStandardMaterial, type PointLight } from 'three'
 import type { Placement } from '../geometry/layout'
+import type { SectionId } from '@/content'
+import { useScene } from '@/store/scene'
 import { cinematicSample, worldNight } from '../cinematic/cinematicState'
 import { waterline } from '../cinematic/waterline'
+import { PILLAR_RISE } from '../selection/selectionState'
 
 /**
  * A pier from a downloaded model, on trial.
@@ -44,8 +47,17 @@ export function ModelPier({
   src = '/models/pillar.glb',
   mirrored = false,
   descentDelay = 0,
+  sectionId,
 }: {
   placement: Placement
+  /**
+   * Set only on the four navigation columns.
+   *
+   * Its presence is what makes a pier something you can point at: it adds the
+   * pick volume, the hover response and the rise. The dozen scenery piers pass
+   * nothing and stay exactly as inert as they were.
+   */
+  sectionId?: SectionId
   /** Which asset to use. See the note in ArrayWorld on mixing them. */
   src?: string
   /**
@@ -217,13 +229,35 @@ export function ModelPier({
   const name = `${position[0].toFixed(1)}_${position[2].toFixed(1)}`
   const sink = useRef<Group>(null)
   const lampRef = useRef<PointLight>(null)
+
+  /*
+   * Three booleans, not a subscription to the whole selection.
+   *
+   * Each selector returns a primitive that only flips when this particular
+   * column's situation changes, so choosing a pillar re-renders the one that
+   * rose and the ones that must quieten — a handful of commits on a click,
+   * rather than anything per frame. The animation itself is in the frame loop
+   * below, where it belongs.
+   */
+  const isSelected = useScene((s) => sectionId !== undefined && s.openSection === sectionId)
+  const isHovered = useScene((s) => sectionId !== undefined && s.hovered === sectionId)
+  const someoneElseSelected = useScene(
+    (s) => s.openSection !== null && s.openSection !== sectionId,
+  )
+  const setHovered = useScene((s) => s.setHovered)
+  const openSectionPanel = useScene((s) => s.openSectionPanel)
+
+  // Eased toward the booleans above, so nothing snaps.
+  const lift = useRef(0)
+  const quiet = useRef(0)
+  const nudge = useRef(0)
   /*
    * Per-frame mutation of three.js objects, which the React Compiler cannot
    * model — it sees memoised values being written to and assumes a
    * render-phase mutation. See the fuller note in PortalCinematic.
    */
   /* eslint-disable react-hooks/immutability */
-  useFrame(() => {
+  useFrame((_, delta) => {
     /*
      * Read the night blend here rather than receive it as a prop.
      *
@@ -232,9 +266,28 @@ export function ModelPier({
      * counting the mirrored world — purely to set a number that is written on
      * the material in this callback anyway.
      */
+    /*
+     * SELECTION, EASED.
+     *
+     * A frame-rate independent approach: the same fraction of the remaining
+     * distance per second regardless of how long the frame took, so a 144Hz
+     * machine and a struggling one arrive together.
+     */
+    const ease = (from: number, to: number, perSecond: number) =>
+      from + (to - from) * (1 - Math.exp(-perSecond * Math.min(delta, 1 / 20)))
+
+    lift.current = ease(lift.current, isSelected ? 1 : 0, 3.6)
+    quiet.current = ease(quiet.current, someoneElseSelected ? 1 : 0, 4.2)
+    nudge.current = ease(nudge.current, isHovered && !isSelected ? 1 : 0, 9)
+
     const night = worldNight.value
-    for (const m of litMaterials) m.emissiveIntensity = night * 0.5
-    if (lampRef.current) lampRef.current.intensity = night * height * height * 0.42
+    // The chosen column keeps its light; the others step back rather than go
+    // out, because a world that switches off is a menu, not a place.
+    const attention = 1 - quiet.current * 0.55
+    for (const m of litMaterials) m.emissiveIntensity = night * 0.5 * attention
+    if (lampRef.current) {
+      lampRef.current.intensity = night * height * height * 0.42 * attention
+    }
 
     /*
      * THE RESPONSE — the columns descend.
@@ -267,7 +320,19 @@ export function ModelPier({
       : raw < 0.75
         ? 0.15 + (raw - 0.25) * 1.5                       // committed
         : 0.9 + (1 - Math.pow(1 - (raw - 0.75) * 4, 2)) * 0.1  // settling
-    g.position.y = -d * height * 1.6
+    /*
+     * THE RISE.
+     *
+     * Added to the descent rather than replacing it, so the two can overlap
+     * without either needing to know about the other: a column caught mid-
+     * cinematic simply rises from wherever the sea currently has it.
+     *
+     * The hover nudge is a fraction of the selection rise on purpose. Hover
+     * has to be felt and not read — if you can name the distance it moved, it
+     * has already become a click that did not need a click.
+     */
+    const risen = lift.current * PILLAR_RISE + nudge.current * 0.9
+    g.position.y = -d * height * 1.6 + risen
     // Published so the water knows where this column currently cuts the
     // surface — the interaction has to follow the real waterline, not sit at
     // a fixed point and hope.
@@ -284,9 +349,45 @@ export function ModelPier({
     return size.y > 0 ? height / size.y : 1
   }, [cloned, height])
 
+  const interactive = sectionId !== undefined && !mirrored
+
   return (
     <group position={position} rotation={[0, rotationY, tilt]}>
       <group ref={sink}>
+      {/*
+        A plain box to point at, rather than the carving itself.
+
+        Raycasting the muqarnas mesh would mean testing tens of thousands of
+        triangles against the pointer on every move, for four columns, to
+        answer a question a box answers exactly as well: is the pointer on this
+        column. It writes no colour and no depth, so it is invisible in every
+        sense except to the raycaster.
+
+        It does NOT live on the mirrored copy — a reflection is an image, and
+        you cannot click a reflection.
+      */}
+      {interactive && (
+        <mesh
+          position={[0, height * 0.06, 0]}
+          onPointerOver={(e) => {
+            e.stopPropagation()
+            setHovered(sectionId)
+          }}
+          onPointerOut={(e) => {
+            e.stopPropagation()
+            setHovered(null)
+          }}
+          onClick={(e) => {
+            e.stopPropagation()
+            // Clicking the raised column again puts it back down, which is one
+            // of the three ways out named in the brief.
+            openSectionPanel(isSelected ? null : sectionId)
+          }}
+        >
+          <boxGeometry args={[height * 0.42, height * 0.92, height * 0.42]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
+        </mesh>
+      )}
       {/*
         A source inside the stone, not just a surface that is bright.
         

@@ -8,7 +8,6 @@ import { SECTIONS } from '@/content'
 import { useScene } from '@/store/scene'
 import { scatterField, sectionRing } from '../geometry/layout'
 import type { Palette } from '../atmosphere/palette'
-import { Pier } from './Pier'
 import { ModelPier } from './ModelPier'
 import { PortalFinal } from '../cinematic/PortalFinal'
 import { Figure } from './Figure'
@@ -41,7 +40,7 @@ export function ArrayWorld({
 }) {
   // Columns light from within as night arrives — see ModelPier's glow note.
   const maxAniso = useThree((s) => s.gl.capabilities.getMaxAnisotropy())
-  const [stoneNormal, stoneRough] = useTexture(
+  useTexture(
     ['/stone-normal.jpg', '/stone-rough.jpg'],
     (loaded) => {
       const list = (Array.isArray(loaded) ? loaded : [loaded]) as Texture[]
@@ -51,13 +50,11 @@ export function ArrayWorld({
         t.anisotropy = maxAniso
       }
     },
-  ) as Texture[]
+  )
 
   const flags = useScene((s) => s.flags)
   const config = useScene((s) => s.config)
   const hovered = useScene((s) => s.hovered)
-  const setHovered = useScene((s) => s.setHovered)
-  const openSectionPanel = useScene((s) => s.openSectionPanel)
 
   useEffect(() => {
     document.body.style.cursor = hovered ? 'pointer' : 'auto'
@@ -130,18 +127,24 @@ export function ArrayWorld({
         // All four are the same order. A colonnade is one column repeated —
         // mixing traditions along a single line would read as an accident.
         const src = '/models/muqarnas.glb'
-        return <ModelPier key={id} placement={placement} variant={0} src={src} mirrored={mirrored} descentDelay={descentDelays[i]} />
+        /*
+         * The section id is what makes this column navigable.
+         *
+         * Hover and click used to be wired to a procedural <Pier> in a block
+         * below this line that could never run — an earlier `return` stood in
+         * front of it — so for as long as the models have been in, none of the
+         * four columns has been pointable at all. The behaviour now lives on
+         * the mesh that is actually rendered.
+         */
         return (
-          <Pier
+          <ModelPier
             key={id}
             placement={placement}
-            palette={palette}
-            emphasis={hovered === id ? 1 : 0}
-            onPointerOver={() => setHovered(id)}
-            onPointerOut={() => setHovered(null)}
-            onClick={() => openSectionPanel(id)}
-            stoneNormal={stoneNormal}
-            stoneRough={stoneRough}
+            variant={0}
+            src={src}
+            mirrored={mirrored}
+            descentDelay={descentDelays[i]}
+            sectionId={id}
           />
         )
       })}

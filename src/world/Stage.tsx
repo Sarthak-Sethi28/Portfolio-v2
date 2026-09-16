@@ -16,6 +16,7 @@ import { ArrayWorld } from './array/ArrayWorld'
 import { UnderWorld } from './under/UnderWorld'
 import { Mirror } from './array/Mirror'
 import { IdleRig } from './camera/IdleRig'
+import { SelectionRig } from './camera/SelectionRig'
 import { PortalTransitionRig } from './camera/PortalTransitionRig'
 import { CinematicDirector } from './cinematic/CinematicDirector'
 import { CinematicCamera } from './cinematic/CinematicCamera'
@@ -297,6 +298,8 @@ export function Stage() {
       {/* First, so the clock is written before anything reads it. */}
       <CinematicDirector />
       <IdleRig />
+      {/* Runs after IdleRig, and only while a pillar is up. */}
+      <SelectionRig />
       <CinematicCamera />
       <PortalTransitionRig />
 

@@ -5,6 +5,7 @@ import { useRef } from 'react'
 import { MathUtils, Vector3 } from 'three'
 import { useScene } from '@/store/scene'
 import { cameraOwnedByCinematic, portalTransitionActive } from '../cinematic/cinematicState'
+import { selectionCameraActive } from '../selection/selectionState'
 
 /**
  * Pixel-stable resting camera.
@@ -106,7 +107,14 @@ export function IdleRig() {
      * gets in and then survives every attempt to find it, because it only
      * appears on the frames where the order happened to flip.
      */
-    if (cameraOwnedByCinematic.value || portalTransitionActive.value) {
+    if (
+      cameraOwnedByCinematic.value ||
+      portalTransitionActive.value ||
+      // A raised pillar owns the camera for as long as it is raised, and
+      // SelectionRig drops this the instant it has eased fully home — so the
+      // handback needs no coordination beyond the one boolean.
+      selectionCameraActive.value
+    ) {
       initialized.current = false
       return
     }

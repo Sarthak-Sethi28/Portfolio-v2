@@ -32,6 +32,7 @@ export function CinematicDirector() {
   const seqFlag = useScene((s) => s.flags.seq)
   const arrivedTitle = useScene((s) => s.arrivedTitle)
   const setArrivedTitle = useScene((s) => s.setArrivedTitle)
+  const openSectionPanel = useScene((s) => s.openSectionPanel)
 
   /*
    * Every mount begins in DAY, from zero.
@@ -52,6 +53,16 @@ export function CinematicDirector() {
 
   useEffect(() => {
     if (status !== 'playing') return
+
+    /*
+     * A raised pillar has no business surviving into the journey.
+     *
+     * Handled here rather than in the key handler so that every route into the
+     * cinematic — the F key today, a button tomorrow — closes the panel, and
+     * the camera hands cleanly from SelectionRig to the portal rig instead of
+     * two of them writing the same camera on the first frame.
+     */
+    openSectionPanel(null)
 
     const direction = cinematicDirection.value
 
@@ -87,7 +98,7 @@ export function CinematicDirector() {
     cinematicClock.running = false
     returnJourney.active = true
     returnJourney.elapsed = 0
-  }, [status, reducedMotion, setNight, setCinematic, setArrivedTitle])
+  }, [status, reducedMotion, setNight, setCinematic, setArrivedTitle, openSectionPanel])
 
   useFrame((_, delta) => {
     advanceCinematic(Math.min(delta, 1 / 20))
