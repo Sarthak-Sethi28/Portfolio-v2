@@ -5,28 +5,28 @@ import {
   blenderTunnelActive,
   cinematicClock,
   cinematicDirection,
+  returnJourney,
+  setCinematicTime,
 } from './cinematicState'
 import { tunnelVideo } from './tunnelVideo'
 import { useScene } from '@/store/scene'
 
-/** Forward trip starts revealing through the aperture at this timeline point. */
 const APERTURE_ON = 11.55
-/** The render ends in black; clear it quickly onto the live world. */
+const RETURN_VIDEO_ON = 0.30
 const CLIP_CLEAR = 0.12
-/** Forward-only: wait until the night composition is readable before PROJECTS. */
 const TITLE_TRIGGER = 0.30
 
 /**
- * One tunnel movie for both journeys.
+ * One authored tunnel movie for both journeys, always played FORWARD.
  *
- * We deliberately play the authored clip FORWARD in both directions. Going
- * night -> day is still travelling forward through a gateway from the opposite
- * side; reversing the H.264 frames would make rings unnaturally suck backward
- * toward the viewer. The live world timeline reverses, but the passage itself
- * retains forward momentum.
+ * The return no longer rewinds the exterior world after the movie. When the
+ * black core reaches us on the return trip, DAY + the home camera are restored
+ * underneath that fully opaque frame, then the same video simply clears away.
  */
 export function BlenderTunnelTransition() {
   const setArrivedTitle = useScene((s) => s.setArrivedTitle)
+  const setNight = useScene((s) => s.setNight)
+  const setCinematic = useScene((s) => s.setCinematic)
   const video = useRef<HTMLVideoElement>(null)
   const started = useRef(false)
   const ended = useRef(false)
@@ -42,18 +42,6 @@ export function BlenderTunnelTransition() {
     let raf = 0
     let last = performance.now()
 
-    const onEnded = () => {
-      ended.current = true
-      after.current = 0
-      console.log(
-        'TUNNEL END direction=',
-        cinematicDirection.value,
-        ' currentTime=',
-        el.currentTime.toFixed(3),
-      )
-    }
-    el.addEventListener('ended', onEnded)
-
     const resetForDirection = () => {
       started.current = false
       ended.current = false
@@ -68,27 +56,55 @@ export function BlenderTunnelTransition() {
       el.style.clipPath = 'ellipse(0px 0px at 50% 50%)'
     }
 
+    const onEnded = () => {
+      ended.current = true
+      after.current = 0
+
+      if (cinematicDirection.value < 0) {
+        /*
+         * We are on the blackest frame of the tunnel, so this is the safe place
+         * to change worlds. Nothing visibly runs backwards: on the next rendered
+         * frame the hidden R3F scene is already DAY at its home camera.
+         */
+        returnJourney.active = false
+        returnJourney.elapsed = 0
+        setCinematicTime(0)
+        setNight(false)
+        setArrivedTitle(false)
+      }
+
+      console.log(
+        'TUNNEL END direction=',
+        cinematicDirection.value,
+        ' currentTime=',
+        el.currentTime.toFixed(3),
+      )
+    }
+    el.addEventListener('ended', onEnded)
+
     const tick = () => {
       raf = requestAnimationFrame(tick)
       const now = performance.now()
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
 
-      const t = cinematicClock.elapsed
       const direction = cinematicDirection.value
 
-      // A new trip in the opposite direction is the only time the player is
-      // rewound. It is never restarted at the portal threshold itself.
       if (lastDirection.current !== direction) {
         lastDirection.current = direction
         resetForDirection()
       }
 
       if (!started.current) {
-        const shouldStart = direction > 0 ? t >= APERTURE_ON : cinematicClock.running
+        const shouldStart =
+          direction > 0
+            ? cinematicClock.elapsed >= APERTURE_ON
+            : returnJourney.active && returnJourney.elapsed >= RETURN_VIDEO_ON
+
         if (!shouldStart) return
 
         started.current = true
+        ended.current = false
         blenderTunnelActive.value = true
         tunnelVideo.fullscreen = false
         tunnelVideo.aperture = true
@@ -107,7 +123,6 @@ export function BlenderTunnelTransition() {
         return
       }
 
-      // TunnelAperture owns the mask/opacity until the authored render ends.
       if (!ended.current) return
 
       after.current += dt
@@ -116,19 +131,19 @@ export function BlenderTunnelTransition() {
       if (after.current >= CLIP_CLEAR) {
         el.style.opacity = '0'
         el.style.clipPath = 'none'
-        // Leave fullscreen latched for the rest of this trip. Otherwise the
-        // aperture component could re-arm against the same timeline window.
         tunnelVideo.aperture = false
         blenderTunnelActive.value = false
+
+        if (direction < 0) {
+          // The day scene is already underneath; release camera ownership only
+          // after the black tunnel frame has completely cleared.
+          tunnelVideo.fullscreen = false
+          cinematicClock.running = false
+          setCinematic('idle')
+        }
       }
 
-      // PROJECTS belongs only to the day -> night arrival. On the return trip
-      // the title stays gone and the user's name returns naturally at day idle.
-      if (
-        direction > 0 &&
-        after.current >= TITLE_TRIGGER &&
-        !titled.current
-      ) {
+      if (direction > 0 && after.current >= TITLE_TRIGGER && !titled.current) {
         titled.current = true
         setArrivedTitle(true)
         console.log('PROJECTS SHOWN')
@@ -144,12 +159,14 @@ export function BlenderTunnelTransition() {
       tunnelVideo.aperture = false
       blenderTunnelActive.value = false
     }
-  }, [setArrivedTitle])
+  }, [setArrivedTitle, setNight, setCinematic])
 
   return (
     <video
       ref={video}
-      src="/cinematic/tunnel-move.mp4"
+      // The query token deliberately invalidates Chrome's cached 943KB preview
+      // once the 2560x1440 master is copied over this public path.
+      src="/cinematic/tunnel-move.mp4?v=master-2560-20260916"
       muted
       playsInline
       preload="auto"
