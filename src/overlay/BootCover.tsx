@@ -22,7 +22,7 @@ export function BootCover() {
 
   useEffect(() => {
     if (phase !== 'revealing') return
-    const id = window.setTimeout(() => setPhase('live'), 620)
+    const id = window.setTimeout(() => setPhase('live'), 440)
     return () => window.clearTimeout(id)
   }, [phase, setPhase])
 
@@ -35,7 +35,7 @@ export function BootCover() {
       style={{
         background: '#05070a',
         opacity: booting ? 1 : 0,
-        transition: 'opacity 620ms ease-out',
+        transition: 'opacity 440ms ease-out',
         // Once it is gone it must not keep compositing a full-screen layer over
         // every frame of the cinematic for the rest of the session.
         visibility: phase === 'live' ? 'hidden' : 'visible',

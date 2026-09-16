@@ -48,7 +48,7 @@ export function Label({ children, tone = INK_FAINT }: { children: ReactNode; ton
  * fade, offset by a fixed step. Restrained on purpose — 18ms apart reads as one
  * considered movement, 120ms apart reads as a slideshow.
  */
-export function useStagger(open: boolean, index: number, step = 34): CSSProperties {
+export function useStagger(open: boolean, index: number, step = 20): CSSProperties {
   const [shown, setShown] = useState(false)
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export function useStagger(open: boolean, index: number, step = 34): CSSProperti
     // anyway, so deferring costs nothing.
     const id = window.setTimeout(
       () => setShown(open),
-      open ? 90 + index * step : 0,
+      open ? 45 + index * step : 0,
     )
     return () => window.clearTimeout(id)
   }, [open, index, step])
@@ -66,7 +66,7 @@ export function useStagger(open: boolean, index: number, step = 34): CSSProperti
   return {
     opacity: shown ? 1 : 0,
     transform: `translateY(${shown ? 0 : 9}px)`,
-    transition: 'opacity 300ms ease-out, transform 300ms cubic-bezier(0.22,0.61,0.36,1)',
+    transition: 'opacity 210ms ease-out, transform 210ms cubic-bezier(0.22,0.61,0.36,1)',
   }
 }
 

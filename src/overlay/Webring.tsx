@@ -27,7 +27,7 @@ export function Webring() {
   const [ready, setReady] = useState(false)
   useEffect(() => {
     if (phase === 'booting') return
-    const id = window.setTimeout(() => setReady(true), 2400)
+    const id = window.setTimeout(() => setReady(true), 1100)
     return () => window.clearTimeout(id)
   }, [phase])
 
@@ -42,7 +42,7 @@ export function Webring() {
       style={{
         opacity: visible ? 1 : 0,
         pointerEvents: visible ? 'auto' : 'none',
-        transition: 'opacity 700ms ease',
+        transition: 'opacity 450ms ease',
         background:
           'radial-gradient(70% 140% at 50% 50%, rgba(5,7,9,0.72) 0%, rgba(5,7,9,0.32) 55%, rgba(5,7,9,0) 100%)',
       }}

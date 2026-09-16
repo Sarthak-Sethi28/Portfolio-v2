@@ -24,6 +24,7 @@ import { WaterShockwave } from './cinematic/WaterShockwave'
 import { PillarWake } from './cinematic/PillarWake'
 import { WorldReady } from './WorldReady'
 import { AudioDirector } from './audio/AudioDirector'
+import { AttractDirector } from './selection/AttractDirector'
 import { createAnim, type Anim } from './anim'
 import { cinematicSample, worldNight } from './cinematic/cinematicState'
 import { FlickerProbe } from './FlickerProbe'
@@ -300,6 +301,7 @@ export function Stage() {
       <CinematicDirector />
       {/* Renders nothing; it is here for the frame callback. */}
       <AudioDirector />
+      <AttractDirector />
       <IdleRig />
       {/* Runs after IdleRig, and only while a pillar is up. */}
       <SelectionRig />
