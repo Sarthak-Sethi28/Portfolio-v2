@@ -199,6 +199,20 @@ export function ContactPanel() {
           onBlur={() => setTouched((t) => ({ ...t, subject: true }))}
         />
 
+        {/*
+          Honeypot. Off-screen, unfocusable and hidden from assistive tech, so
+          no human ever meets it — a filled value means a bot, and the server
+          answers 200 anyway so it learns nothing from the difference.
+        */}
+        <input
+          type="text"
+          name="company"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
+        />
+
         <Field
           label="Message"
           multiline
