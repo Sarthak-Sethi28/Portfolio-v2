@@ -7,12 +7,12 @@ import {
   cinematicDirection,
   returnJourney,
   setCinematicTime,
+  RETURN_VIDEO_ON,
 } from './cinematicState'
 import { tunnelVideo } from './tunnelVideo'
 import { useScene } from '@/store/scene'
 
 const APERTURE_ON = 11.55
-const RETURN_VIDEO_ON = 0.30
 const CLIP_CLEAR = 0.12
 const TITLE_TRIGGER = 0.30
 

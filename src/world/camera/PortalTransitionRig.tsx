@@ -10,6 +10,8 @@ import {
   portalFrame,
   portalTransitionActive,
   returnJourney,
+  RETURN_APPROACH,
+  RETURN_HOLD,
 } from '../cinematic/cinematicState'
 
 const T_START = 10.75
@@ -21,8 +23,11 @@ const HOME_POS = new Vector3(0, 9, 128)
 const HOME_TARGET = new Vector3(0, 26, -110)
 const HOME_FOV = 50
 
-/** Night -> day: a fresh FORWARD push into the same portal. */
-const RETURN_APPROACH = 1.28
+/*
+ * Night -> day: a fresh FORWARD push into the same portal, now paced to match
+ * the forward flight. The beat sheet lives beside the clock in cinematicState
+ * so the camera, the aperture mask and the video all read the same numbers.
+ */
 
 function smooth01(x: number): number {
   const v = Math.max(0, Math.min(1, x))
@@ -88,8 +93,16 @@ export function PortalTransitionRig() {
       wasActive.current = true
 
       const c = portalFrame.centre
-      const u = Math.max(0, Math.min(1, returnJourney.elapsed / RETURN_APPROACH))
-      const move = 0.18 * u + 0.82 * Math.pow(u, 1.48)
+      // The hold comes first: u stays at zero, so the camera sits exactly where
+      // the night shot left it and the destination gets a beat to read before
+      // anything moves.
+      const u = Math.max(
+        0,
+        Math.min(1, (returnJourney.elapsed - RETURN_HOLD) / RETURN_APPROACH),
+      )
+      // Same accelerating progression as travelAt() above — a small linear lead
+      // so the push starts rather than creeps, then the forward flight's curve.
+      const move = 0.15 * u + 0.85 * Math.pow(u, 1.36)
       const start = returnStart.current
 
       const targetX = c.x

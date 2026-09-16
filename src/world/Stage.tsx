@@ -19,7 +19,6 @@ import { IdleRig } from './camera/IdleRig'
 import { PortalTransitionRig } from './camera/PortalTransitionRig'
 import { CinematicDirector } from './cinematic/CinematicDirector'
 import { CinematicCamera } from './cinematic/CinematicCamera'
-import { WaterDisturbance } from './cinematic/WaterDisturbance'
 import { WaterShockwave } from './cinematic/WaterShockwave'
 import { PillarWake } from './cinematic/PillarWake'
 import { createAnim, type Anim } from './anim'
@@ -271,8 +270,15 @@ export function Stage() {
         )}
       </Suspense>
 
-      {/* Local water response to the portal. Both are inert at rest. */}
-      <WaterDisturbance />
+      {/*
+        Local water response to the portal, all inert at rest.
+
+        WaterDisturbance is gone: it was a 420-unit pale specular disc floating
+        above the sea, and once the real reflector geometry started moving it
+        had nothing left to fake except a grey wash over the foreground.
+        WaterShockwave stays because it is deep red, not white, and PillarWake
+        is small and welded to each column.
+      */}
       <WaterShockwave />
       <PillarWake />
 

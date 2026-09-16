@@ -9,13 +9,17 @@ import {
   cinematicDirection,
   portalFrame,
   returnJourney,
+  RETURN_APERTURE_FADE,
+  RETURN_VIDEO_ON,
 } from './cinematicState'
 import { tunnelVideo } from './tunnelVideo'
 
 const APERTURE_ON = 11.55
 const APERTURE_FADE = 0.82
-const RETURN_APERTURE_ON = 0.30
-const RETURN_APERTURE_FADE = 0.50
+// Both directions now bring the tunnel into the ring 0.80s after the push
+// begins, over the same fade. The return used to do it in 0.50s from a
+// standstill, which is most of why it felt hurried.
+const RETURN_APERTURE_ON = RETURN_VIDEO_ON
 
 const INNER_RADIUS_RATIO = 0.555
 const MASK_INSET = 0.985

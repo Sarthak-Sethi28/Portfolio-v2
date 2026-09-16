@@ -50,6 +50,45 @@ export const returnJourney = {
   elapsed: 0,
 }
 
+/*
+ * RETURN BEAT SHEET, matched to the forward one.
+ *
+ * The return was previously a 1.28s dash that began on the very frame F was
+ * pressed, against a forward flight of 3.71s that arrives after ten seconds of
+ * exterior build. Same destination, a third of the time, and no beat in which
+ * to register it — which is why it read as a snap rather than a journey.
+ *
+ * Forward, measured off PortalTransitionRig and BlenderTunnelTransition:
+ *   T_START 10.75 -> T_HANDBACK 14.46   3.71s of flight into the ring
+ *   video + aperture in at 11.55        0.80s after that flight begins
+ *   aperture fade                       0.82s
+ *
+ * The return now holds on the night shot first, then flies for a comparable
+ * stretch, and brings the tunnel in at the same 0.80s offset with the same
+ * fade. These four numbers are the whole of the change; the flight path, the
+ * easing shape and the tunnel itself are untouched.
+ */
+export const RETURN_HOLD = 0.85
+export const RETURN_APPROACH = 3.55
+export const RETURN_APERTURE_FADE = 0.82
+
+/*
+ * When the tunnel appears inside the ring.
+ *
+ * This cannot simply copy the forward offset. The moment the aperture grows to
+ * cover the viewport is GEOMETRIC — it happens at roughly 95% of the approach
+ * whatever that approach lasts — while the video is a fixed 3.00s. Starting the
+ * clip 0.80s into a 3.55s approach, as the forward beat does inside its own
+ * flight, left only 0.37s of full-frame tunnel before the file ran out.
+ *
+ * So the clip is instead started a fixed lead BEFORE the crossing, which is
+ * what actually governs how the beat reads: the tunnel is visible through the
+ * ring for that lead, then fills the frame for the remainder. Forward measures
+ * 1.13s of tunnel-in-ring and 1.87s full-frame; these numbers reproduce it.
+ */
+const RETURN_CROSSING = RETURN_HOLD + RETURN_APPROACH * 0.95
+export const RETURN_VIDEO_ON = RETURN_CROSSING - 1.15
+
 export const cinematicClock = {
   /** Forward authored timeline position in seconds. */
   elapsed: 0,
