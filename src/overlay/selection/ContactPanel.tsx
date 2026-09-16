@@ -98,6 +98,19 @@ export function ContactPanel() {
     }
   }
 
+  /*
+   * THE ESCAPE HATCH.
+   *
+   * If the transport is down, the worst outcome is a visitor who typed a
+   * considered message, got an error, and walked away. This hands their own
+   * words straight into a mail draft — subject and body already filled — so a
+   * broken send costs them one click rather than the whole message.
+   */
+  const mailtoHref = () => {
+    const body = `${form.message}\n\n—\n${form.name}\n${form.email}`
+    return `mailto:${profile.email}?subject=${encodeURIComponent(form.subject || 'Hello')}&body=${encodeURIComponent(body)}`
+  }
+
   const linksEnter = useStagger(open, 1)
   const formEnter = useStagger(open, 4)
 
@@ -214,7 +227,18 @@ export function ContactPanel() {
 
           <p className="text-[10px]" role="status" aria-live="polite">
             {status === 'sent' && <span style={{ color: INK_DIM }}>Message sent.</span>}
-            {status === 'error' && error && <span style={{ color: ACCENT }}>{error}</span>}
+            {status === 'error' && error && (
+              <span className="flex flex-wrap items-center gap-2">
+                <span style={{ color: ACCENT }}>{error}</span>
+                <a
+                  href={mailtoHref()}
+                  className="underline underline-offset-2"
+                  style={{ ...MONO, fontSize: '9px', letterSpacing: '0.18em', color: INK }}
+                >
+                  Open in mail
+                </a>
+              </span>
+            )}
             {status === 'idle' && !SEND_ENABLED && (
               <span style={{ color: INK_FAINT }}>Email link works today.</span>
             )}
