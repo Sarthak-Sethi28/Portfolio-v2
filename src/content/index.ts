@@ -8,15 +8,35 @@
 export { profile } from './profile'
 export { experience } from './experience'
 export { projects } from './projects'
+export * from './pillars'
 export type { Profile, Role, Project } from './schema'
 
-/** The four section monoliths of World 1, in fixed compass order. */
-export const SECTIONS = ['about', 'experience', 'writing', 'contact'] as const
+/**
+ * The four monuments, in the order they are numbered.
+ *
+ * The number is a fact about the CONTENT, not about where the column happens to
+ * stand — 01 is Experience I wherever the layout puts it — so the index in this
+ * array is the number, and the ring simply takes them in order.
+ */
+export const SECTIONS = ['experience-i', 'experience-ii', 'waterloo', 'contact'] as const
 export type SectionId = (typeof SECTIONS)[number]
 
 export const SECTION_LABEL: Record<SectionId, string> = {
-  about: 'ABOUT',
-  experience: 'EXPERIENCE',
-  writing: 'WRITING',
+  'experience-i': 'EXPERIENCE I',
+  'experience-ii': 'EXPERIENCE II',
+  waterloo: 'WATERLOO',
   contact: 'CONTACT',
+}
+
+/** What each column is called after the crossing. */
+export const SECTION_LABEL_NIGHT: Record<SectionId, string> = {
+  'experience-i': 'PROJECTS I',
+  'experience-ii': 'PROJECTS II',
+  waterloo: 'PROJECTS III',
+  contact: 'PROJECTS IV',
+}
+
+/** Two digits, as shown on the hover label: 01 / EXPERIENCE I. */
+export function sectionNumber(id: SectionId): string {
+  return String(SECTIONS.indexOf(id) + 1).padStart(2, '0')
 }

@@ -64,14 +64,20 @@ export const NIGHT: Palette = {
   skyHorizon: new Color('#0a1524'),
   sunColor: new Color('#9fb6d8'),
   /*
-   * The moon sits HIGH and near the view axis.
+   * The moon sits HIGH and OFF TO ONE SIDE.
    *
-   * Low and centred it landed at exactly the height of the name, so the title
-   * ran straight through it — the disc appeared to be resting on the K.
-   * Raised, it frames in the upper half of the ring's opening, above the type,
-   * which is a better composition than the accident was.
+   * It has been three places. Low and centred put it at exactly the height of
+   * the title, so the type ran straight through the disc. High and centred
+   * framed it inside the ring, which composed well but plugged the opening —
+   * the one part of the frame that should read as a way through. Pushed out
+   * to the corner it does the thing a moon over water is actually for: it
+   * lays a reflection path down the surface, off-axis, so the eye travels
+   * along it into the scene instead of stopping dead at a bright disc.
+   *
+   * It is also the one light with a visible source, which is what lets the
+   * rest of the world be lit from below without reading as a mistake.
    */
-  sunDirection: new Vector3(0.05, 0.46, -0.89).normalize(),
+  sunDirection: new Vector3(0.30, 0.36, -0.88).normalize(),
   // Moonlight is DIM but HARD.
   //
   // Night was built by turning the day lights down, which is the wrong model
@@ -79,13 +85,13 @@ export const NIGHT: Palette = {
   // extreme contrast: a single cold key that rims an edge, and genuine black
   // behind it. So the key stays low but the FILL goes to almost nothing.
   sunIntensity: 1.6,
-  keyIntensity: 0.5,
+  keyIntensity: 0.55,
   fog: new Color('#070e1a'),
   fogDensityScale: 1.35,
   monolith: new Color('#2b3138'),
   waterTint: new Color('#0a1220'),
-  ambient: new Color('#0b1a2e'),
-  ambientIntensity: 0.03,
+  ambient: new Color('#22384f'),
+  ambientIntensity: 0.5,
 }
 
 /** Linear blend between the two palettes. `t` of 0 is day, 1 is night. */

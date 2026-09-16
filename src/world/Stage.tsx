@@ -3,9 +3,9 @@
 import { Suspense, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Environment } from '@react-three/drei'
-import { EffectComposer, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { EffectComposer, N8AO, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
-import { MathUtils, type DirectionalLight, type FogExp2 } from 'three'
+import { MathUtils, type AmbientLight, type DirectionalLight, type FogExp2, type HemisphereLight } from 'three'
 import { CONFIG_DEFAULTS, useScene, effectiveMoteCount } from '@/store/scene'
 import { blendPalette, createPalette } from './atmosphere/palette'
 import { Sky } from './atmosphere/Sky'
@@ -15,7 +15,15 @@ import { Water } from './array/Water'
 import { ArrayWorld } from './array/ArrayWorld'
 import { UnderWorld } from './under/UnderWorld'
 import { IdleRig } from './camera/IdleRig'
+import { SelectionRig } from './camera/SelectionRig'
+import { PortalTransitionRig } from './camera/PortalTransitionRig'
+import { CinematicDirector } from './cinematic/CinematicDirector'
+import { CinematicCamera } from './cinematic/CinematicCamera'
+import { WaterShockwave } from './cinematic/WaterShockwave'
+import { PillarWake } from './cinematic/PillarWake'
+import { WorldReady } from './WorldReady'
 import { createAnim, type Anim } from './anim'
+import { cinematicSample, worldNight } from './cinematic/cinematicState'
 import { FlickerProbe } from './FlickerProbe'
 
 /**
@@ -33,6 +41,8 @@ export function Stage() {
   const moteCount = useScene((s) => effectiveMoteCount({ config: s.config, quality: s.quality }))
   const flags = useScene((s) => s.flags)
   const envIntensity = useScene((s) => s.envIntensity)
+  // Mirrors anim.night into render scope. Written by the frame loop below.
+  const cinematic = useScene((s) => s.cinematic)
   const setEnvIntensity = useScene((s) => s.setEnvIntensity)
   const setFlicker = useScene((s) => s.setFlicker)
 
@@ -47,6 +57,11 @@ export function Stage() {
   const sunRef = useRef<DirectionalLight>(null)
 
   const fogRef = useRef<FogExp2>(null)
+  // Lights whose intensity follows the night blend. Held by ref and written in
+  // the frame loop, because animating them through JSX props means a React
+  // render per step of a continuous value.
+  const groundUpRef = useRef<HemisphereLight>(null)
+  const nightFillRef = useRef<AmbientLight>(null)
 
   /**
    * Image-based lighting comes from <Environment> below.
@@ -68,13 +83,51 @@ export function Stage() {
     // Ease toward the target rather than snapping — the cross-fade IS the
     // day/night transition, so its duration is the feature.
     const anim = animRef.current
-    anim.night = MathUtils.damp(anim.night, night ? 1 : 0, 1.4, delta)
+    /*
+     * NIGHT HANDOFF. One authority at a time.
+     *
+     * While the cinematic runs, the timeline's night value is taken ABSOLUTELY
+     * — no damping. Damping toward it as well would leave two systems easing
+     * the same number at different rates, and the visible result is the sky
+     * lagging behind the water and the portal for the whole transition.
+     *
+     * The handover is silent because the timeline reaches exactly 1 before the
+     * clock runs out, so by the time the store's night flag flips, the damped
+     * path is already sitting on the value it would have damped toward. There
+     * is nothing left to move.
+     */
+    /*
+     * "Engaged" means playing OR scrubbed, not playing alone.
+     *
+     * Keying this on the status alone meant a scrub was checked against a
+     * world that was still damping toward day: at ?seq=0.8 the timeline said
+     * full night and the sky rendered full daylight, so every verification
+     * frame after the shift was a lie about what playback would do. A
+     * deterministic scrub is only worth having if it drives exactly what
+     * playback drives.
+     */
+    if (cinematic === 'playing' || flags.seq !== null) {
+      anim.night = cinematicSample.night
+    } else {
+      anim.night = MathUtils.damp(anim.night, night ? 1 : 0, 1.4, delta)
+    }
     blendPalette(anim.night, palette)
     // Moonlight is a fraction of dusk, not a dimmer version of it. Written to
     // the store only when it has moved enough to see, so a smooth blend does
     // not cost a render every frame.
     const nextEnv = 1.15 - anim.night * 0.95
     if (Math.abs(nextEnv - envIntensity) > 0.02) setEnvIntensity(nextEnv)
+    /*
+     * Published to a plain object, not to the store.
+     *
+     * Every consumer of this reads it inside its own frame callback to set a
+     * property on an object that already exists, so there is nothing React
+     * needs to know about it. See the note on `worldNight`.
+     */
+    worldNight.value = anim.night
+    if (groundUpRef.current) groundUpRef.current.intensity = anim.night * 2.1
+    if (nightFillRef.current) nightFillRef.current.intensity = anim.night * 0.7
+
 
     const fog = fogRef.current
     if (fog) {
@@ -144,6 +197,35 @@ export function Stage() {
         ]}
       />
       {/*
+        The galaxy underfoot is a LIGHT, and it lights from below.
+
+        With the sky emptied and the stars moved into the water, the brightest
+        thing in the world is the ground — so this is a hemisphere light turned
+        upside down: black overhead, starlight beneath. It rakes the undersides
+        of the ring and the columns, which is the one direction nothing is ever
+        lit from, and that wrongness is the whole point of the arrival. It is
+        also the honest fix for "the ring is too dark": the ring was a pure
+        silhouette because the only thing that could have lit it had been
+        deleted from the sky, and the answer is to light it from the thing that
+        replaced it rather than to quietly put the sky back.
+
+        Scaled by the blend, so it arrives exactly as the stars do.
+      */}
+      <hemisphereLight ref={groundUpRef} args={['#000000', '#7fa8ff', 0]} />
+      {/*
+        A floor under the blacks, purely to stop the ring reading as a fault.
+
+        Lit from below alone, the voussoirs came out a blue-and-black
+        checkerboard: each block is set at its own slight angle, and against a
+        single hard source from one direction that tiny difference flips a face
+        between fully lit and fully unlit. The result looked like a broken
+        texture rather than like stone. A weak omnidirectional fill compresses
+        the gap between neighbouring blocks so the ring reads as one carved
+        object, without putting any actual light back in the sky.
+      */}
+      <ambientLight ref={nightFillRef} color="#31527e" intensity={0} />
+
+      {/*
         The sun casts now. A shadow map covers a fixed volume, so the frustum
         is sized to the composition rather than to the whole world — spread
         over 1600 units every shadow would be a blurry smear, and tight to the
@@ -168,22 +250,22 @@ export function Stage() {
         shadow-normalBias={0.6}
       />
 
+      {/*
+        Everything that can suspend lives in here, and WorldReady lives in here
+        with it: React will not mount a sibling until the whole boundary has
+        resolved, which makes it an honest report that the world exists rather
+        than a timer someone has to keep in step with the asset list.
+      */}
       <Suspense fallback={null}>
+        <WorldReady />
         {flags.under ? (
           <UnderWorld palette={palette} />
         ) : (
           <>
-            {/*
-              No reflection on main.
-
-              The mirrored copy shares material instances with the real world
-              here, so it cannot be clipped at the waterline — each column's
-              submerged portion inverted UPWARD and poked through the surface
-              as a dark shelf at its base. The fix requires the mirror to own
-              its materials, which is being built on the reflection-experiment
-              branch. Until that lands, an absent reflection beats a visible
-              artefact on every pier.
-            */}
+            {/* Drawn first, so the surface composites over it. */}
+            <Mirror>
+              <ArrayWorld palette={palette} mirrored />
+            </Mirror>
 
             <Water
               palette={palette}
@@ -196,11 +278,29 @@ export function Stage() {
         )}
       </Suspense>
 
+      {/*
+        Local water response to the portal, all inert at rest.
+
+        WaterDisturbance is gone: it was a 420-unit pale specular disc floating
+        above the sea, and once the real reflector geometry started moving it
+        had nothing left to fake except a grey wash over the foreground.
+        WaterShockwave stays because it is deep red, not white, and PillarWake
+        is small and welded to each column.
+      */}
+      <WaterShockwave />
+      <PillarWake />
+
       <Motes count={flags.noMotes ? 0 : moteCount} palette={palette} />
       {/* Something in the frame with its own intent. A drifting camera over a
           still world still reads as a photograph. */}
       {!flags.still && <Birds palette={palette} />}
+      {/* First, so the clock is written before anything reads it. */}
+      <CinematicDirector />
       <IdleRig />
+      {/* Runs after IdleRig, and only while a pillar is up. */}
+      <SelectionRig />
+      <CinematicCamera />
+      <PortalTransitionRig />
 
       {/* multisampling is NOT optional.
           EffectComposer renders into its own buffer, which silently discards
@@ -226,6 +326,32 @@ export function Stage() {
             Little is lost: the sun's disc, halo and wide glow are all drawn
             analytically in the sky shader, so the light still blooms. This
             only removed a pass that added a touch more on top. */}
+        {/*
+            AMBIENT OCCLUSION — OPT-IN, because it does not fit.
+
+            It is the right effect for this scene and the largest single reason
+            everything read as plastic: MeshStandardMaterial has no concept of
+            a surface being enclosed, so the joint between two blocks and the
+            gap where rubble meets rubble were lit exactly as brightly as a
+            face pointing at open sky. Contact shadow is most of what the eye
+            uses to decide whether it is looking at stone or at a render of it.
+
+            MEASURED: 16.6ms without, 26.4ms with — on a 16.6ms budget it
+            takes sixty percent of the frame and drops the scene from 60fps to
+            about 38. Tuning did nothing; halfRes and quality="performance"
+            came back at 26.4ms too, so the cost is the depth resolve rather
+            than the sampling, and there is no setting that buys it back.
+
+            This project has blown its frame budget three times on detail that
+            looked worth it, so the effect stays behind ?ao=1 rather than
+            being paid for by default. It also matters much less now that the
+            portal is an authored asset whose maps already carry their own
+            occlusion — the case for AO was strongest when every object in
+            frame was untextured procedural geometry.
+        */}
+        {flags.ao ? (
+          <N8AO aoRadius={2.4} intensity={2.2} distanceFalloff={1} quality="performance" halfRes />
+        ) : <></>}
         {flags.noSmaa ? <></> : <SMAA />}
         <Vignette offset={0.2} darkness={0.78} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />

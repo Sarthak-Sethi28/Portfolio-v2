@@ -4,6 +4,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useRef } from 'react'
 import { MathUtils, Vector3 } from 'three'
 import { useScene } from '@/store/scene'
+import { cameraOwnedByCinematic, portalTransitionActive } from '../cinematic/cinematicState'
+import { selectionCameraActive } from '../selection/selectionState'
 
 /**
  * Pixel-stable resting camera.
@@ -36,11 +38,9 @@ import { useScene } from '@/store/scene'
  * columns become long vertical streaks — which is exactly how the reference
  * frames get their power, and why their camera sits where it does.
  */
-// Back to the elevated view. The low camera reads reflections better, but
-// the raised one is the composition that was actually liked — you can follow
-// each column from capital to waterline and the plain opens out behind them.
-const REST = new Vector3(0, 34, 132)
-const TARGET = new Vector3(0, 30, -110)
+const REST = new Vector3(0, 9, 128)
+
+const TARGET = new Vector3(0, 26, -110)
 
 const POINTER_DEADZONE = 0.08
 const AIM_X = 1.1
@@ -97,6 +97,35 @@ export function IdleRig() {
      * too deep and the hanging city is lost in the murk. This sits low enough
      * to see the columns descending past the lens and still catch the
      * membrane above them.
+     */
+    /*
+     * OWNERSHIP IS EXPLICIT.
+     *
+     * While the cinematic owns the camera this rig writes nothing at all — not
+     * position, not quaternion, not fov. Two controllers both writing and
+     * hoping mount order decides the winner is exactly how a one-frame pop
+     * gets in and then survives every attempt to find it, because it only
+     * appears on the frames where the order happened to flip.
+     */
+    if (
+      cameraOwnedByCinematic.value ||
+      portalTransitionActive.value ||
+      // A raised pillar owns the camera for as long as it is raised, and
+      // SelectionRig drops this the instant it has eased fully home — so the
+      // handback needs no coordination beyond the one boolean.
+      selectionCameraActive.value
+    ) {
+      initialized.current = false
+      return
+    }
+
+    /*
+     * The camera stays at rest otherwise.
+     *
+     * Step 4 is the world; step 5 owns the fly-through. The previous
+     * sequence-driven path has been removed rather than left half-wired,
+     * because a camera that moves on a clock nothing else reads any more is a
+     * second authority waiting to disagree with the first.
      */
     if (under) {
       camera.position.set(0, -46, 96)

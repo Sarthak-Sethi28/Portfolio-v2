@@ -3,25 +3,48 @@
 import { profile } from '@/content'
 import { useScene } from '@/store/scene'
 
-/**
- * The name, centred over the world.
- *
- * Letter-spaced far wider than type is normally set. At this tracking the name
- * stops reading as a word and starts reading as signage on the landscape,
- * which is the point. Each glyph is its own span so it can be animated
- * individually during the reveal.
- */
+/** Wide-tracked landscape title for the two held endpoints. */
 export function Title() {
   const open = useScene((s) => s.openSection ?? s.openProject)
   const noUi = useScene((s) => s.flags.noUi)
-  const letters = profile.name.toUpperCase().split('')
+  const night = useScene((s) => s.night)
+  const cinematic = useScene((s) => s.cinematic)
+  const seqFlag = useScene((s) => s.flags.seq)
+  const arrivedTitle = useScene((s) => s.arrivedTitle)
+  // The name used to arrive over an empty sky while the world was still
+  // resolving, which is most of what made a mid-boot frame look finished
+  // rather than loading. It now waits for the world it belongs to.
+  const booting = useScene((s) => s.phase) === 'booting'
+
+  const travelling = cinematic === 'playing' || seqFlag !== null
+  const returning = travelling && night
+  const arrived = arrivedTitle || cinematic === 'complete' || (cinematic === 'idle' && night)
+
+  /*
+   * On a night -> day return, keep the word PROJECTS while it fades OUT.
+   *
+   * The previous implementation switched the letters to SARTHAK SETHI the
+   * instant F was pressed but kept the long forward-departure delay. That is
+   * the stray name visible across the night portal in the recording. Only swap
+   * to the name after the tunnel has actually returned us to daylight.
+   */
+  const showProjectsWord = arrived || returning
+  const letters = (showProjectsWord ? 'PROJECTS' : profile.name.toUpperCase()).split('')
+
+  const opacity = booting || open || noUi || (travelling && !arrivedTitle) ? 0 : 1
 
   return (
     <div
       className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
       style={{
-        opacity: open || noUi ? 0 : 1,
-        transition: 'opacity 700ms ease-in-out',
+        opacity,
+        transition: arrivedTitle
+          ? 'opacity 340ms ease-out 300ms'
+          : returning
+            ? 'opacity 180ms ease-out'
+            : travelling
+              ? 'opacity 1200ms ease-in-out 2800ms'
+              : 'opacity 700ms ease-in-out',
       }}
     >
       <h1
@@ -32,9 +55,6 @@ export function Title() {
           letterSpacing: 'clamp(10px, 3.6vw, 34px)',
           paddingLeft: 'clamp(10px, 3.6vw, 34px)',
           color: 'rgba(244,241,234,0.94)',
-          // A tighter shadow. 90px of blur on text composited over an
-          // animating canvas forces a large repaint region every frame, which
-          // some compositors handle badly.
           textShadow: '0 1px 14px rgba(0,0,0,0.9)',
         }}
       >

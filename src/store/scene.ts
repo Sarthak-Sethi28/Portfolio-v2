@@ -81,6 +81,26 @@ interface SceneState {
    */
   envIntensity: number
   setEnvIntensity: (v: number) => void
+  /**
+   * COARSE cinematic status — three values in fifteen seconds.
+   *
+   * The continuous position deliberately does NOT live here. It used to, as a
+   * `sequence` float quantised to twenty steps, and both halves of that were
+   * wrong: a store write re-renders every subscriber, so a smooth value cost a
+   * render of the whole world tree each frame, and quantising it to afford
+   * that made the transition advance in visible stairs. The clock is a plain
+   * mutable object in `world/cinematic/cinematicState`; React only needs to
+   * know whether the thing is running.
+   */
+  /**
+   * True once the arrival has reached the point where the destination's title
+   * belongs on screen. Flipped ONCE, while the veil is fully opaque.
+   */
+  arrivedTitle: boolean
+  setArrivedTitle: (v: boolean) => void
+  cinematic: 'idle' | 'playing' | 'complete'
+  setCinematic: (v: 'idle' | 'playing' | 'complete') => void
+  setNight: (v: boolean) => void
   /** Peak frame-to-frame luminance delta per probe region. */
   flicker: number[]
   setFlicker: (v: number[]) => void
@@ -114,6 +134,15 @@ interface SceneState {
 export const useScene = create<SceneState>((set) => ({
   phase: 'booting',
   world: 'array',
+  /*
+   * The site opens on THE ARRIVAL, in daylight.
+   *
+   * This worktree used to boot straight into night because night was the thing
+   * being built. It is not a separate world any more — it is where the arrival
+   * takes you, and the journey from one to the other is the site. Opening at
+   * the destination would spend the whole reveal before the visitor has
+   * touched anything.
+   */
   night: false,
   rain: false,
   freelook: false,
@@ -121,6 +150,9 @@ export const useScene = create<SceneState>((set) => ({
   quality: settingsFor('high'),
   reducedMotion: false,
   flags: {
+    ao: false,
+    seq: null,
+    noGate: false,
     still: false,
     noBloom: false,
     noMotes: false,
@@ -137,6 +169,8 @@ export const useScene = create<SceneState>((set) => ({
   },
   flicker: [],
   envIntensity: 1.15,
+  arrivedTitle: false,
+  cinematic: 'idle' as const,
 
   hovered: null,
   openSection: null,
@@ -155,6 +189,9 @@ export const useScene = create<SceneState>((set) => ({
   applyFlags: () => set({ flags: readFlags() }),
   setFlicker: (flicker) => set({ flicker }),
   setEnvIntensity: (envIntensity) => set({ envIntensity }),
+  setArrivedTitle: (arrivedTitle) => set({ arrivedTitle }),
+  setCinematic: (cinematic) => set({ cinematic }),
+  setNight: (night) => set({ night }),
   setHovered: (hovered) => set({ hovered }),
   openSectionPanel: (openSection) => set({ openSection, openProject: null }),
   openProjectPanel: (openProject) => set({ openProject, openSection: null }),
