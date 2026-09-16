@@ -4,6 +4,7 @@ import { Title } from '@/overlay/Title'
 import { PillarPanels } from '@/overlay/selection/PillarPanels'
 import { Stats } from '@/overlay/Stats'
 import { HoverLabel } from '@/overlay/HoverLabel'
+import { TransitionHint } from '@/overlay/TransitionHint'
 import { Controls } from '@/overlay/Chrome/Controls'
 import { BlenderTunnelTransition } from '@/world/cinematic/BlenderTunnelTransition'
 
@@ -13,6 +14,7 @@ export default function Home() {
       <SceneCanvas />
       <Title />
       <HoverLabel />
+      <TransitionHint />
       {/* All four monuments. One shell, four sets of children. */}
       <PillarPanels />
       <Controls />
