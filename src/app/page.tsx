@@ -6,6 +6,7 @@ import { Stats } from '@/overlay/Stats'
 import { HoverLabel } from '@/overlay/HoverLabel'
 import { TransitionHint } from '@/overlay/TransitionHint'
 import { SoundToggle } from '@/overlay/SoundToggle'
+import { Webring } from '@/overlay/Webring'
 import { Controls } from '@/overlay/Chrome/Controls'
 import { BlenderTunnelTransition } from '@/world/cinematic/BlenderTunnelTransition'
 
@@ -17,6 +18,7 @@ export default function Home() {
       <HoverLabel />
       <TransitionHint />
       <SoundToggle />
+      <Webring />
       {/* All four monuments. One shell, four sets of children. */}
       <PillarPanels />
       <Controls />
