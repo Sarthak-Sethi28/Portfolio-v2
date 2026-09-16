@@ -29,12 +29,12 @@ const LINKS: { label: string; value: string; href: string | null }[] = [
   { label: 'LinkedIn', value: handle(linkedin), href: linkedin },
   { label: 'GitHub', value: handle(github), href: github },
   /*
-   * No résumé file exists in the project yet.
+   * The résumé served by the live site, brought across to this one.
    *
-   * Rather than link to a path that 404s, this renders inert and says so. Drop
-   * a PDF at public/resume.pdf and give this an href.
+   * Replacing it is dropping a new PDF at the same path — nothing here needs
+   * to change when the document is updated.
    */
-  { label: 'Résumé', value: 'Not linked yet', href: null },
+  { label: 'Résumé', value: 'PDF', href: '/resume/Sarthak-Sethi-Resume.pdf' },
 ]
 
 type Status = 'idle' | 'submitting' | 'sent' | 'error'
