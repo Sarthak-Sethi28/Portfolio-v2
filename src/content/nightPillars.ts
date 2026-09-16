@@ -39,6 +39,15 @@ const projectSchema = z.object({
   category: z.string().optional(),
   /** Shown as a badge. Only where one was actually won. */
   award: z.string().optional(),
+  /**
+   * Further achievements, each its own badge.
+   *
+   * An array rather than a string because these must stay separate: run
+   * "Y Combinator interview" and "conditional offer" together as one line and
+   * the reader infers the offer came from YC, which is a claim nothing here
+   * makes.
+   */
+  achievements: z.array(z.string().min(1).max(40)).default([]),
   /** The paragraph. Two or three sentences at most. */
   description: z.string().min(1),
   /** The product's own shape: NEED -> FIND -> COMPARE -> ... */
@@ -56,6 +65,15 @@ const projectSchema = z.object({
   demoUrl: z.string().url().optional(),
   /** Set while the final film is still to be made. The panel states it plainly. */
   mediaPending: z.boolean().default(false),
+  /**
+   * An explicit status on the cover, instead of the pending line.
+   *
+   * Some projects have no public media because none can exist, not because one
+   * has yet to be cut. That is a different fact and it deserves different words.
+   */
+  status: z
+    .object({ label: z.string().min(1).max(30), note: z.string().min(1).max(90).optional() })
+    .optional(),
 })
 
 export type ProjectMedia = z.infer<typeof mediaSchema>
@@ -97,6 +115,7 @@ export const projectsI: Project[] = [
       },
     ],
     tech: ['Autonomous agents', 'Vendor portal', 'Market research', 'Workflow'],
+    achievements: ['Y Combinator interview', 'Conditional offer'],
     media: [],
     mediaPending: true,
   }),
@@ -260,7 +279,13 @@ export const projectsIII: Project[] = [
     ],
     tech: ['React', 'TypeScript', 'NestJS', 'TypeORM', 'PostgreSQL', 'Nodemailer', 'Render', 'Vercel'],
     media: [],
-    mediaPending: true,
+    /*
+     * Not "film in production". This one is not waiting on a film — it runs
+     * inside someone else's business, which is why there is no public demo to
+     * show, and saying so is a stronger statement than an apology for missing
+     * footage.
+     */
+    status: { label: 'Internal product', note: "Built for Danier's internal inventory operations" },
     githubUrl: 'https://github.com/Sarthak-Sethi28/DANIER-S-ALERT-SYSTEM-',
   }),
   p({

@@ -292,9 +292,34 @@ function PendingCover({ project }: { project: Project }) {
             ))}
           </ol>
         )}
-        <span style={{ ...MONO, fontSize: '8.5px', letterSpacing: '0.26em', color: INK_FAINT }}>
-          Film in production
-        </span>
+        {project.status ? (
+          <div className="flex flex-col gap-1.5">
+            <span
+              className="inline-flex w-fit items-center gap-2 px-2.5 py-1.5"
+              style={{
+                border: `1px solid ${ACCENT}`,
+                background: 'rgba(196,52,34,0.10)',
+                ...MONO,
+                fontSize: '8px',
+                letterSpacing: '0.24em',
+                color: INK,
+              }}
+            >
+              {project.status.label}
+            </span>
+            {project.status.note && (
+              <span
+                style={{ ...MONO, fontSize: '8px', letterSpacing: '0.18em', color: INK_FAINT, textTransform: 'none' }}
+              >
+                {project.status.note}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span style={{ ...MONO, fontSize: '8.5px', letterSpacing: '0.26em', color: INK_FAINT }}>
+            Film in production
+          </span>
+        )}
       </div>
     </div>
   )

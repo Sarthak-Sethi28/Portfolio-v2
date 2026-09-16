@@ -89,6 +89,33 @@ export function ProjectsPanel({
           {project.descriptor}
         </p>
 
+        {/*
+          Separate badges, never one line.
+
+          Two achievements sitting in one sentence read as one claim — the
+          conditional offer would be taken as coming from YC, which is not
+          something the project data says.
+        */}
+        {project.achievements.length > 0 && (
+          <span className="mt-3 flex flex-wrap gap-2">
+            {project.achievements.map((a) => (
+              <span
+                key={a}
+                className="px-3 py-1.5"
+                style={{
+                  border: '1px solid rgba(233,230,222,0.16)',
+                  ...MONO,
+                  fontSize: '8px',
+                  letterSpacing: '0.22em',
+                  color: INK_DIM,
+                }}
+              >
+                {a}
+              </span>
+            ))}
+          </span>
+        )}
+
         {project.award && (
           <p
             className="mt-3 inline-flex items-center gap-2.5 px-3 py-1.5"
