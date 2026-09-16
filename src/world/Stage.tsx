@@ -23,6 +23,7 @@ import { CinematicCamera } from './cinematic/CinematicCamera'
 import { WaterShockwave } from './cinematic/WaterShockwave'
 import { PillarWake } from './cinematic/PillarWake'
 import { WorldReady } from './WorldReady'
+import { AudioDirector } from './audio/AudioDirector'
 import { createAnim, type Anim } from './anim'
 import { cinematicSample, worldNight } from './cinematic/cinematicState'
 import { FlickerProbe } from './FlickerProbe'
@@ -297,6 +298,8 @@ export function Stage() {
       {!flags.still && <Birds palette={palette} />}
       {/* First, so the clock is written before anything reads it. */}
       <CinematicDirector />
+      {/* Renders nothing; it is here for the frame callback. */}
+      <AudioDirector />
       <IdleRig />
       {/* Runs after IdleRig, and only while a pillar is up. */}
       <SelectionRig />
