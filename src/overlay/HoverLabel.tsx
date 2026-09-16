@@ -31,13 +31,22 @@ export function HoverLabel() {
       aria-live="polite"
     >
       <div
-        className="select-none px-5 py-2 text-xs sm:text-sm"
+        className="select-none px-10 py-4 text-xs sm:text-sm"
         style={{
           fontFamily: 'var(--font-mono), monospace',
           letterSpacing: '0.42em',
-          color: 'rgba(242,239,232,0.95)',
-          textShadow: '0 2px 26px rgba(0,0,0,0.9)',
-          borderBottom: '1px solid rgba(242,239,232,0.35)',
+          color: 'rgba(248,245,238,0.98)',
+          /*
+           * A pool of shade behind it, for the same reason as the legend.
+           *
+           * Wide-tracked type at 0.95 white still dissolved into the sea,
+           * because the moving specular highlights sit in exactly that value
+           * range. A gradient that fades to nothing at its edge gives the
+           * letters a ground without putting a panel on top of the world.
+           */
+          background:
+            'radial-gradient(56% 130% at 50% 50%, rgba(5,7,9,0.80) 0%, rgba(5,7,9,0.50) 44%, rgba(5,7,9,0.14) 74%, rgba(5,7,9,0) 100%)',
+          textShadow: '0 1px 16px rgba(0,0,0,0.95)',
         }}
       >
         {/*
