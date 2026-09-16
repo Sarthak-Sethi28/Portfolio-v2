@@ -52,11 +52,23 @@ function noiseBuffer(ctx: AudioContext, seconds: number): AudioBuffer {
    * The running value is leaked back toward zero so it cannot wander into DC.
    */
   let last = 0
+  let peak = 0
   for (let i = 0; i < length; i++) {
     const white = Math.random() * 2 - 1
     last = (last + 0.021 * white) / 1.021
-    data[i] = last * 3.4
+    data[i] = last
+    const a = Math.abs(last)
+    if (a > peak) peak = a
   }
+  /*
+   * Normalise rather than multiply by a guessed constant.
+   *
+   * The integrator's output level depends on its leak coefficient, so a fixed
+   * multiplier is a guess that was quietly wrong — the buffer came out around
+   * -28dBFS, which measured as working and was inaudible on a laptop.
+   */
+  const norm = peak > 0 ? 0.9 / peak : 1
+  for (let i = 0; i < length; i++) data[i] *= norm
 
   // Cross-fade the tail into the head so the loop point is not a discontinuity.
   const fade = Math.min(4096, (length / 4) | 0)
@@ -102,20 +114,20 @@ export function initAudio(): boolean {
   // SWELL — the body of the water.
   const swellFilter = ctx.createBiquadFilter()
   swellFilter.type = 'lowpass'
-  swellFilter.frequency.value = 420
+  swellFilter.frequency.value = 900
   swellFilter.Q.value = 0.7
   const swellGain = ctx.createGain()
-  swellGain.gain.value = 0.34
+  swellGain.gain.value = 0.45
   const swell = loopingNoise(ctx, buffer, 0.85)
   swell.connect(swellFilter).connect(swellGain).connect(master)
 
   // SURF — the texture on the surface, quieter and higher.
   const surfFilter = ctx.createBiquadFilter()
   surfFilter.type = 'bandpass'
-  surfFilter.frequency.value = 1400
-  surfFilter.Q.value = 0.6
+  surfFilter.frequency.value = 1250
+  surfFilter.Q.value = 0.5
   const surfGain = ctx.createGain()
-  surfGain.gain.value = 0.05
+  surfGain.gain.value = 0.16
   const surf = loopingNoise(ctx, buffer, 1.37)
   surf.connect(surfFilter).connect(surfGain).connect(master)
 
@@ -126,8 +138,8 @@ export function initAudio(): boolean {
    * the listener can predict. One shared rate would turn the ocean into a
    * metronome within a minute.
    */
-  const b1 = breath(ctx, swellGain.gain, 0.043, 0.14)
-  const b2 = breath(ctx, surfGain.gain, 0.067, 0.022)
+  const b1 = breath(ctx, swellGain.gain, 0.043, 0.16)
+  const b2 = breath(ctx, surfGain.gain, 0.067, 0.06)
 
   // DRONE — the machine. Silent until the ring lights.
   const droneFilter = ctx.createBiquadFilter()
@@ -188,7 +200,7 @@ const ramp = (p: AudioParam, value: number, time: number, tau = 0.25) => {
 /** Overall level. 0 mutes without tearing down the graph. */
 export function setAudioLevel(level: number): void {
   if (!engine) return
-  ramp(engine.master.gain, Math.max(0, Math.min(1, level)) * 0.5, engine.ctx.currentTime, 0.4)
+  ramp(engine.master.gain, Math.max(0, Math.min(1, level)) * 0.9, engine.ctx.currentTime, 0.4)
 }
 
 /**
@@ -211,20 +223,20 @@ export function updateAudio(state: {
   const { night, disturbance, power, ignition, shockwave, blackout } = state
 
   // The sea rises as it is disturbed, and the surf opens up with it.
-  ramp(engine.swellGain.gain, 0.30 + disturbance * 0.34, t, 0.5)
-  ramp(engine.swellFilter.frequency, 420 - night * 150 + disturbance * 320, t, 0.6)
-  ramp(engine.surfGain.gain, 0.045 + disturbance * 0.075 + shockwave * 0.06, t, 0.4)
-  ramp(engine.surfFilter.frequency, 1400 - night * 520 + disturbance * 900, t, 0.6)
+  ramp(engine.swellGain.gain, 0.42 + disturbance * 0.34, t, 0.5)
+  ramp(engine.swellFilter.frequency, 900 - night * 260 + disturbance * 420, t, 0.6)
+  ramp(engine.surfGain.gain, 0.15 + disturbance * 0.13 + shockwave * 0.08, t, 0.4)
+  ramp(engine.surfFilter.frequency, 1250 - night * 380 + disturbance * 900, t, 0.6)
 
   // The machine. Nothing until the ring has power, then a rising resonance.
   const machine = Math.max(power, ignition)
-  ramp(engine.droneGain.gain, machine * 0.16, t, 0.5)
+  ramp(engine.droneGain.gain, machine * 0.30, t, 0.5)
   ramp(engine.droneFilter.frequency, 90 + ignition * 130 + shockwave * 90, t, 0.4)
   ramp(engine.droneFilter.Q, 6 + ignition * 10, t, 0.5)
 
   // Everything ducks into the blackout, so the tunnel is entered in near
   // silence and the world comes back with its own sound.
-  ramp(engine.master.gain, (1 - blackout * 0.92) * 0.5 * currentLevel, t, 0.25)
+  ramp(engine.master.gain, (1 - blackout * 0.92) * 0.9 * currentLevel, t, 0.25)
 }
 
 /** Remembered so updateAudio can duck relative to the user's chosen level. */
