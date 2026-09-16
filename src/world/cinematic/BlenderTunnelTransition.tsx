@@ -61,11 +61,6 @@ export function BlenderTunnelTransition() {
       after.current = 0
 
       if (cinematicDirection.value < 0) {
-        /*
-         * We are on the blackest frame of the tunnel, so this is the safe place
-         * to change worlds. Nothing visibly runs backwards: on the next rendered
-         * frame the hidden R3F scene is already DAY at its home camera.
-         */
         returnJourney.active = false
         returnJourney.elapsed = 0
         setCinematicTime(0)
@@ -135,8 +130,6 @@ export function BlenderTunnelTransition() {
         blenderTunnelActive.value = false
 
         if (direction < 0) {
-          // The day scene is already underneath; release camera ownership only
-          // after the black tunnel frame has completely cleared.
           tunnelVideo.fullscreen = false
           cinematicClock.running = false
           setCinematic('idle')
@@ -164,9 +157,7 @@ export function BlenderTunnelTransition() {
   return (
     <video
       ref={video}
-      // The query token deliberately invalidates Chrome's cached 943KB preview
-      // once the 2560x1440 master is copied over this public path.
-      src="/cinematic/tunnel-move.mp4?v=master-2560-20260916"
+      src="/cinematic/tunnel-move-master.mp4"
       muted
       playsInline
       preload="auto"
