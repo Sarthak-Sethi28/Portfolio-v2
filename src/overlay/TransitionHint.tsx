@@ -86,7 +86,7 @@ export function TransitionHint() {
       >
         <Item>
           <Key>Click</Key>
-          <span>a pillar for experience</span>
+          <span>a pillar to know more</span>
         </Item>
 
         <span aria-hidden style={{ color: 'rgba(233,230,222,0.18)' }}>
