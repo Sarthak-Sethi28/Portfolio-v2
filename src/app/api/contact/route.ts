@@ -41,11 +41,22 @@ const LIMITS = { name: 120, email: 200, subject: 200, message: 5000 }
  * holding down a script. A serverless instance being recycled resets it, which
  * is an acceptable trade for a contact form.
  */
-const WINDOW_MS = 60_000
-const MAX_PER_WINDOW = 3
+const WINDOW_MS = 10 * 60_000
+const MAX_PER_WINDOW = 12
 const hits = new Map<string, number[]>()
 
+/**
+ * Never in development.
+ *
+ * Every request from this machine shares one address, so a few test sends used
+ * up the whole allowance and then refused the real message typed right after
+ * them. A limit that blocks the person building the site is not protecting
+ * anything.
+ */
+const RATE_LIMIT_ENABLED = process.env.NODE_ENV === 'production'
+
 function rateLimited(ip: string): boolean {
+  if (!RATE_LIMIT_ENABLED) return false
   const now = Date.now()
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS)
   recent.push(now)
@@ -79,7 +90,7 @@ export async function POST(request: Request) {
     'unknown'
   if (rateLimited(ip)) {
     return NextResponse.json(
-      { error: 'Too many messages just now. Try again in a minute.' },
+      { error: 'Too many messages just now. Please try again shortly.' },
       { status: 429 },
     )
   }

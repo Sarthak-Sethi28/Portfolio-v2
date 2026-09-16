@@ -57,9 +57,9 @@ export async function sendMessage(payload: ContactMessage): Promise<void> {
   if (res.ok) return
 
   const body = (await res.json().catch(() => null)) as { error?: string } | null
-  throw new SendError(
-    body?.error
-      ? `${body.error} Please use the email link above.`
-      : 'Could not send. Please use the email link above.',
-  )
+  // The server's message is used as written. Appending "please use the email
+  // link above" to everything produced sentences like "Try again in a minute.
+  // Please use the email link above." — two different instructions in one
+  // breath. The Open-in-mail link sits right beside this and says it better.
+  throw new SendError(body?.error ?? 'Could not send. Please use the email link above.')
 }
