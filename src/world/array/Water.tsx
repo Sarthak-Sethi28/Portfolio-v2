@@ -78,7 +78,11 @@ export function Water({
     foam.setUsage(DynamicDrawUsage)
     geometry.setAttribute('aFoam', foam)
 
-    return { geometry, baseXY, grain, foam }
+    // Heights are written in one pass and read back in a second, because a
+    // vertex cannot know whether it is a crest until its neighbours exist.
+    const heights = new Float32Array(position.count)
+
+    return { geometry, baseXY, grain, foam, heights }
   }, [])
 
   useEffect(() => () => geometryData.geometry.dispose(), [geometryData])
@@ -135,22 +139,42 @@ export function Water({
           }
 
           void main() {
-            if (vFoam < 0.02) discard;
+            if (vFoam < 0.04) discard;
 
-            // Tear the foam apart at two scales so it reads as bubbles and
-            // streaks rather than as painted coverage.
-            float coarse = noise(vPos * 0.055);
-            float fine = noise(vPos * 0.34);
-            float bite = smoothstep(0.28, 0.84, coarse * 0.62 + fine * 0.38);
+            /*
+             * THE MASK HAS TO CUT, NOT DIM.
+             *
+             * The previous smoothstep averaged around 0.4 almost everywhere,
+             * so it lowered the foam's opacity uniformly instead of removing
+             * it in places — which is the difference between broken whitewater
+             * and a translucent sheet. These octaves are an order of magnitude
+             * higher in frequency and are thresholded near the TOP of their
+             * range, so most fragments fail outright and the survivors are
+             * small. The first octave is stretched 4:1 so what does survive
+             * runs in streaks along the crest rather than in round dabs.
+             */
+            vec2 streak = vec2(vPos.x * 0.085, vPos.y * 0.34);
+            float o1 = noise(streak);
+            float o2 = noise(vPos * 0.62);
+            float o3 = noise(vPos * 1.45);
+            float mask = o1 * 0.5 + o2 * 0.32 + o3 * 0.18;
+
+            // Strong foam is allowed to survive a slightly lower bar, so caps
+            // build up rather than dissolving evenly with everything else.
+            float bar = mix(0.62, 0.44, clamp(vFoam, 0.0, 1.0));
+            float bite = smoothstep(bar, bar + 0.16, mask);
+            if (bite <= 0.0) discard;
 
             float a = vFoam * bite;
-            if (a < 0.02) discard;
+            if (a < 0.05) discard;
 
-            vec3 day = vec3(0.88, 0.93, 0.95);
-            vec3 night = vec3(0.40, 0.48, 0.56);
+            vec3 day = vec3(0.84, 0.89, 0.92);
+            vec3 night = vec3(0.34, 0.42, 0.50);
             vec3 colour = mix(day, night, clamp(uNight, 0.0, 1.0));
 
-            gl_FragColor = vec4(colour, min(a, 0.62));
+            // Capped well below opaque: even a full cap is spray over water,
+            // and the reflector underneath must stay readable through it.
+            gl_FragColor = vec4(colour, min(a, 0.34));
           }
         `,
       }),
@@ -228,6 +252,7 @@ export function Water({
     const position = geometry.attributes.position as BufferAttribute
 
     const foamAttr = geometryData.foam
+    const heights = geometryData.heights
 
     if (active < 0.002) {
       if (wasDeformed.current) {
@@ -290,26 +315,53 @@ export function Water({
 
       const height = storm + localBreak + drawDown + surge + nightSwell
       position.setZ(i, height)
+      heights[i] = height
+    }
 
-      /*
-       * FOAM IS EARNED BY THE WATER, NOT PAINTED ON IT.
-       *
-       * Three sources, all of them physical: a crest that has risen far enough
-       * to break, the steep local shear right around the machine, and the face
-       * of the travelling front. Nothing here is a radial mask, so foam cannot
-       * form a disc, ring or blanket — it appears only where this particular
-       * vertex is actually doing something violent.
-       */
-      const breaking = Math.max(0, height - 2.35) * 0.30
-      const shear = Math.max(0, Math.abs(localBreak) - 1.5) * nearGate * 0.26
-      const frontFace = Math.max(0, frontBand - 0.42) * surgeAmount * 0.85
+    /*
+     * FOAM SITS ON CRESTS, AND ONLY ON CRESTS.
+     *
+     * The previous pass asked "is this vertex high?" and got back half the
+     * ocean: a broad swell passes a height test along its entire flank, and a
+     * value that varies smoothly across a 16-unit grid then interpolates into
+     * exactly the soft pale gradient this is supposed to prevent.
+     *
+     * But a crest is not a high point, it is a SHARP one — water standing above
+     * the water immediately around it. So this second pass reads each vertex
+     * against its four grid neighbours and asks two different questions: how
+     * far does it stand proud of its own neighbourhood, and how steep is the
+     * surface there. Both fall to zero down a smooth face, so the result can
+     * only ever be a cap or a streak. Nothing radial is consulted at all, which
+     * is what makes a halo around the machine impossible rather than merely
+     * unlikely.
+     */
+    const ROW = WATER_SEGMENTS + 1
+    const CELL = WATER_SIZE / WATER_SEGMENTS
+
+    for (let i = 0; i < position.count; i++) {
+      const col = i % ROW
+      const row = (i / ROW) | 0
+
+      // An edge vertex has no outside neighbour; falling back to its own value
+      // makes both measures zero there rather than inventing a cliff.
+      const c = heights[i]
+      const l = col > 0 ? heights[i - 1] : c
+      const r = col < ROW - 1 ? heights[i + 1] : c
+      const u = row > 0 ? heights[i - ROW] : c
+      const dn = row < ROW - 1 ? heights[i + ROW] : c
+
+      // Positive only at caps, negative in every trough, ~0 down a smooth face.
+      const proud = c - (l + r + u + dn) * 0.25
+      const slope = ((Math.abs(r - l) + Math.abs(dn - u)) * 0.5) / CELL
+
+      const cap = Math.max(0, proud - 0.30) * 0.9
+      const steep = Math.max(0, slope - 0.030) * 6.5
       const g = geometryData.grain[i]
 
-      let foam = (breaking + shear + frontFace) * (0.30 + g * 1.25)
-      // A hard floor keeps the calm majority of the ocean completely clean;
-      // without it a faint wash creeps across every vertex and that wash is
-      // precisely what used to read as a white sheet.
-      foam = foam > 0.16 ? Math.min(1, (foam - 0.16) * 1.05) : 0
+      // Both must hold. Taking the PRODUCT means a tall but gently sloping
+      // swell earns nothing at all, however high it rises.
+      let foam = cap * steep * (0.25 + g * 1.5)
+      foam = foam > 0.20 ? Math.min(1, (foam - 0.20) * 0.85) : 0
       foamAttr.setX(i, foam)
     }
 
