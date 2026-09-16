@@ -8,22 +8,21 @@ import {
   cinematicClock,
   cinematicDirection,
   resetCinematic,
+  returnJourney,
+  setCinematicTime,
   DURATION,
 } from './cinematicState'
 import { PortalGatewayLighting } from './PortalGatewayLighting'
 import { TunnelAperture } from './TunnelAperture'
 import { OceanChaos } from './OceanChaos'
-import { OceanWhitewater } from './OceanWhitewater'
 
 /**
- * One deterministic journey in either direction.
+ * Forward is the authored 15s DAY -> NIGHT event.
  *
- * Forward: day -> storm -> portal -> Blender tunnel -> night.
- * Reverse: night -> tunnel -> portal -> storm unwinds -> day.
- *
- * The same timeline is sampled backward rather than inventing a second set of
- * effects, so pillars, red charge, whitewater and daylight all return through
- * the exact values they used on the way in.
+ * Return is intentionally NOT that event at negative speed. Pressing F at
+ * night starts a new forward portal approach, the Blender tunnel covers the
+ * screen, and DAY is restored underneath that darkness. Nothing visibly runs
+ * backward anymore.
  */
 export function CinematicDirector() {
   const status = useScene((s) => s.cinematic)
@@ -34,7 +33,6 @@ export function CinematicDirector() {
   const arrivedTitle = useScene((s) => s.arrivedTitle)
   const setArrivedTitle = useScene((s) => s.setArrivedTitle)
 
-  // A scrub is authoritative: nothing may advance the clock behind it.
   useEffect(() => {
     cinematicClock.scrub = seqFlag === null ? null : seqFlag * DURATION
   }, [seqFlag])
@@ -46,7 +44,7 @@ export function CinematicDirector() {
 
     if (reducedMotion) {
       if (direction > 0) {
-        cinematicClock.elapsed = DURATION
+        setCinematicTime(DURATION)
         cinematicClock.running = false
         setNight(true)
         setArrivedTitle(true)
@@ -60,50 +58,49 @@ export function CinematicDirector() {
       return
     }
 
-    // Start from the endpoint we are physically standing at.
-    cinematicClock.elapsed = direction > 0 ? 0 : DURATION
-    cinematicClock.running = true
-
-    // The destination word belongs only to the held night shot. It clears the
-    // instant a return trip begins and is raised again only on forward arrival.
     setArrivedTitle(false)
+
+    if (direction > 0) {
+      returnJourney.active = false
+      returnJourney.elapsed = 0
+      setCinematicTime(0)
+      cinematicClock.running = true
+      return
+    }
+
+    // Hold the finished night world exactly as-is while the dedicated return
+    // camera flies INTO the red ring. The tunnel later hides the DAY reset.
+    setCinematicTime(DURATION)
+    cinematicClock.running = false
+    returnJourney.active = true
+    returnJourney.elapsed = 0
   }, [status, reducedMotion, setNight, setCinematic, setArrivedTitle])
 
   useFrame((_, delta) => {
-    // A restored/background tab must not jump the entire piece in one update.
     advanceCinematic(Math.min(delta, 1 / 20))
 
     const t = cinematicClock.elapsed
-    const direction = cinematicDirection.value
 
     if (arrivedTitle && t < 14.30 && cinematicClock.scrub !== null) {
       setArrivedTitle(false)
     }
 
-    if (!cinematicClock.running) return
-
-    if (direction > 0 && t >= DURATION) {
+    if (
+      cinematicDirection.value > 0 &&
+      cinematicClock.running &&
+      t >= DURATION
+    ) {
       cinematicClock.running = false
       setNight(true)
       setCinematic('complete')
-      return
-    }
-
-    if (direction < 0 && t <= 0) {
-      cinematicClock.running = false
-      setNight(false)
-      setArrivedTitle(false)
-      setCinematic('idle')
     }
   })
 
   return (
     <>
-      {/* Full-ocean rough whitewater first, then the stronger local gate event. */}
-      <OceanWhitewater />
+      {/* The real Water mesh now owns the whole-ocean deformation. */}
       <OceanChaos />
       <PortalGatewayLighting />
-      {/* Blender owns the transit completely; no procedural corridor stacked on it. */}
       <TunnelAperture />
     </>
   )
