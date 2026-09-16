@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useScene } from '@/store/scene'
 import type { SectionId, PillarCompany } from '@/content'
 import { SelectionShell } from './SelectionShell'
-import { Card, Details, Label, Switcher, Tags, useStagger, MONO, INK, INK_DIM, INK_FAINT, ACCENT } from './kit'
+import { Card, Label, Switcher, Tags, useStagger, MONO, INK, INK_DIM, INK_FAINT, ACCENT } from './kit'
 
 /**
  * Both experience monuments, from one component.
@@ -145,7 +145,6 @@ export function ExperiencePanel({
         ))}
       </div>
 
-      <Details lines={role.detail} open={open} />
       <Tags items={role.stack} open={open} />
     </SelectionShell>
   )

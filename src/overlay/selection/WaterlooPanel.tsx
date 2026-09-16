@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useScene } from '@/store/scene'
 import { coursework, education, leadership } from '@/content'
 import { SelectionShell } from './SelectionShell'
-import { Card, Details, Label, Switcher, Tags, useStagger, MONO, INK, INK_DIM, INK_FAINT } from './kit'
+import { Card, Label, Switcher, Tags, useStagger, MONO, INK, INK_DIM, INK_FAINT } from './kit'
 
 type Segment = 'education' | 'coursework' | 'leadership'
 
@@ -62,18 +62,15 @@ export function WaterlooPanel() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Card
-              open={open}
-              index={0}
-              card={{ label: 'Degree', value: 'Honours Bachelor of Computer Science', metric: false }}
-            />
-            <Card
-              open={open}
-              index={1}
-              card={{ label: 'Coursework', value: `${coursework.length} relevant courses`, metric: false }}
-            />
-          </div>
+          {/*
+            No cards under Education.
+
+            There were two: a count of the courses sitting one tab away, which
+            said nothing about any of them, and a Degree tile that repeated the
+            line directly above it word for word. The heading already carries
+            the school, the degree, the years and the place — everything a card
+            here could have said.
+          */}
         </>
       )}
 
@@ -106,7 +103,6 @@ export function WaterlooPanel() {
             ))}
           </div>
 
-          <Details lines={role.detail} open={open} />
         </>
       )}
     </SelectionShell>

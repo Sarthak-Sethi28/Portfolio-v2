@@ -70,7 +70,14 @@ export function useStagger(open: boolean, index: number, step = 34): CSSProperti
   }
 }
 
-/** One content box. `metric` promotes the value to the thing you read first. */
+/**
+ * One content box.
+ *
+ * Label, headline, and then the sentence that used to be folded away. The fold
+ * was a bet that people click to read more, and they do not — so the substance
+ * is here, in the first thing they look at. `metric` promotes the headline to
+ * the thing readable from across the room.
+ */
 export function Card({
   card,
   index,
@@ -84,7 +91,7 @@ export function Card({
 
   return (
     <article
-      className="px-4 py-3.5"
+      className="flex flex-col px-4 py-3.5"
       style={{
         ...enter,
         background: 'rgba(233,230,222,0.028)',
@@ -95,14 +102,22 @@ export function Card({
       <p
         className={card.metric ? 'mt-2 text-[15px]' : 'mt-2 text-[12.5px]'}
         style={{
-          color: card.metric ? INK : 'rgba(234,230,222,0.78)',
+          color: card.metric ? INK : 'rgba(234,230,222,0.82)',
           letterSpacing: card.metric ? '0.02em' : 0,
-          lineHeight: 1.45,
+          lineHeight: 1.4,
           fontFamily: card.metric ? 'var(--font-mono), monospace' : undefined,
         }}
       >
         {card.value}
       </p>
+      {card.note && (
+        <p
+          className="mt-2 text-[11.5px] leading-[1.55]"
+          style={{ color: 'rgba(230,226,218,0.56)' }}
+        >
+          {card.note}
+        </p>
+      )}
     </article>
   )
 }
@@ -130,71 +145,6 @@ export function Tags({ items, open, from = 6 }: { items: string[]; open: boolean
         </li>
       ))}
     </ul>
-  )
-}
-
-/** The long prose, folded away until asked for. */
-export function Details({ lines, open }: { lines: string[]; open: boolean }) {
-  const [expanded, setExpanded] = useState(false)
-  const enter = useStagger(open, 7)
-
-  useEffect(() => {
-    if (open) return
-    // Deferred for the same reason as the stagger above, and it doubles as the
-    // fold closing after the panel has gone rather than in front of the visitor.
-    const id = window.setTimeout(() => setExpanded(false), 0)
-    return () => window.clearTimeout(id)
-  }, [open])
-
-  if (lines.length === 0) return null
-
-  return (
-    <div style={enter}>
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center justify-between py-2"
-        style={{ ...MONO, fontSize: '9px', letterSpacing: '0.3em', color: INK_DIM }}
-      >
-        <span>{expanded ? 'Hide detail' : 'Detail'}</span>
-        <span
-          aria-hidden
-          style={{
-            transform: `rotate(${expanded ? 180 : 0}deg)`,
-            transition: 'transform 260ms ease',
-          }}
-        >
-          ⌄
-        </span>
-      </button>
-
-      <div
-        style={{
-          display: 'grid',
-          // Animating grid rows rather than max-height means the transition is
-          // the content's real size, not a guess that clips long entries.
-          gridTemplateRows: expanded ? '1fr' : '0fr',
-          transition: 'grid-template-rows 320ms cubic-bezier(0.22,0.61,0.36,1)',
-        }}
-      >
-        <div className="overflow-hidden">
-          <ul className="flex flex-col gap-2 pb-1 pt-1">
-            {lines.map((line, i) => (
-              <li
-                key={i}
-                className="pl-3 text-[12px] leading-relaxed"
-                style={{
-                  color: 'rgba(232,228,220,0.66)',
-                  borderLeft: '1px solid rgba(233,230,222,0.10)',
-                }}
-              >
-                {line}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
   )
 }
 

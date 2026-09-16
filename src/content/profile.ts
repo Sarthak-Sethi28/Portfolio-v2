@@ -10,10 +10,10 @@ export const profile: Profile = profileSchema.parse({
     'Currently a software developer intern at Constellation Software / Volaris Group in Waterloo, shipping enterprise product features across cross-functional teams.',
     'Before that: an AI chatbot and alerting system at Danier, a HIPAA-compliant healthcare platform at Prompt Solutions, and bug-tracking infrastructure at Nokia.',
   ],
-  email: 'sneh.sethi@volarisgroup.com',
+  email: 's36sethi@uwaterloo.ca',
   socials: [
     { label: 'GitHub', href: 'https://github.com/Sarthak-Sethi28' },
-    { label: 'LinkedIn', href: 'https://www.linkedin.com/in/sarthak-sethi' },
+    { label: 'LinkedIn', href: 'https://www.linkedin.com/in/sarthak2803' },
   ],
   stack: [
     'Python', 'TypeScript', 'JavaScript', 'C++',
