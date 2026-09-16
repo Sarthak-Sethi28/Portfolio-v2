@@ -42,10 +42,10 @@ const projectSchema = z.object({
   /**
    * Further achievements, each its own badge.
    *
-   * An array rather than a string because these must stay separate: run
-   * "Y Combinator interview" and "conditional offer" together as one line and
-   * the reader infers the offer came from YC, which is a claim nothing here
-   * makes.
+   * An array rather than a string, and each entry names its own firm. These are
+   * two different outcomes from two different houses — a YC interview and an
+   * a16z conditional offer — and a single combined line would read as one
+   * result from one of them.
    */
   achievements: z.array(z.string().min(1).max(40)).default([]),
   /** The paragraph. Two or three sentences at most. */
@@ -115,7 +115,7 @@ export const projectsI: Project[] = [
       },
     ],
     tech: ['Autonomous agents', 'Vendor portal', 'Market research', 'Workflow'],
-    achievements: ['Y Combinator interview', 'Conditional offer'],
+    achievements: ['Y Combinator interview', 'a16z conditional offer'],
     media: [],
     mediaPending: true,
   }),
