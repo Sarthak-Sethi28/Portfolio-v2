@@ -16,7 +16,10 @@ const mono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: `${profile.name} — Signal Array`,
+  // The name alone. "Signal Array" is what the thing is called internally; a
+  // browser tab is where someone looks to find him again among twenty others,
+  // and a project codename there is noise.
+  title: profile.name,
   description: `${profile.role}. ${profile.education}.`,
 }
 
