@@ -1,26 +1,28 @@
 /**
  * THE ONLY PLACE A MESSAGE LEAVES THE BROWSER.
  *
- * Nothing is wired up yet, and this deliberately does not pretend otherwise: it
- * rejects, the form shows its error state, and no one is told their message was
- * delivered when it was thrown away. A contact form that fakes success is worse
- * than no contact form, because the sender stops trying.
+ * EmailJS — the same service the live portfolio used before its contact form
+ * was deleted in the July revamp. That revamp's own spec lists "no EmailJS code
+ * or deps remain" on its checklist, so the working configuration was recovered
+ * from the commit before the deletion, along with the three template variables
+ * it expects.
  *
- * TO CONNECT IT, pick one and replace the body of `sendMessage`:
+ * The three identifiers are PUBLIC by design: EmailJS ships its public key in
+ * the browser bundle, and the service and template ids are visible in any
+ * network tab. They are nonetheless read from the environment rather than
+ * written here, so the account can be rotated without touching code and so
+ * nothing account-shaped sits in the repository. See .env.local.
  *
- *   Formspree   POST to https://formspree.io/f/<id> with this JSON. No server,
- *               no secret in the bundle. Quickest by some distance.
- *
- *   Resend      Needs an API route — the key must never reach the client. Add
- *               app/api/contact/route.ts, keep RESEND_API_KEY server-side, and
- *               POST to '/api/contact' from here.
- *
- *   EmailJS     Client-side with a public key. Fine, but the key is visible and
- *               the free tier is rate-limited.
- *
- * Whichever it is, the signature below does not change, so nothing in the form
- * needs touching.
+ * The recovered template renders `from_name`, `from_email` and `message`, and
+ * has no subject field of its own — so the subject is carried into the body as
+ * well as passed through. An unused parameter is ignored; a dropped one is not.
  */
+
+import emailjs from '@emailjs/browser'
+
+const SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID ?? ''
+const TEMPLATE_ID = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID ?? ''
+const PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY ?? ''
 
 export interface ContactMessage {
   name: string
@@ -32,14 +34,46 @@ export interface ContactMessage {
 /** Thrown for anything the sender could act on; the form shows `message`. */
 export class SendError extends Error {}
 
-export async function sendMessage(payload: ContactMessage): Promise<void> {
-  // Referenced so the parameter is part of the signature a transport must
-  // honour, and so this file does not quietly drift out of shape while unused.
-  void payload
-  throw new SendError(
-    'Message transport is not connected yet — please use the email link above.',
-  )
-}
+/**
+ * Whether a transport is configured.
+ *
+ * Checked against the real values rather than assumed, so a deploy that forgets
+ * the environment tells the visitor to use the email link instead of failing at
+ * them after they have typed out a message.
+ */
+export const SEND_ENABLED = Boolean(SERVICE_ID && TEMPLATE_ID && PUBLIC_KEY)
 
-/** Whether a transport exists, so the form can say so honestly up front. */
-export const SEND_ENABLED = false
+export async function sendMessage(payload: ContactMessage): Promise<void> {
+  if (!SEND_ENABLED) {
+    throw new SendError(
+      'Message transport is not configured here — please use the email link above.',
+    )
+  }
+
+  try {
+    await emailjs.send(
+      SERVICE_ID,
+      TEMPLATE_ID,
+      {
+        from_name: payload.name,
+        from_email: payload.email,
+        subject: payload.subject,
+        message: `${payload.subject}\n\n${payload.message}`,
+        reply_to: payload.email,
+      },
+      { publicKey: PUBLIC_KEY },
+    )
+  } catch (err) {
+    // EmailJS rejects with { status, text }. Surface the text: "invalid
+    // template id" is worth seeing, and a bare "failed" is not.
+    const detail =
+      typeof err === 'object' && err !== null && 'text' in err
+        ? String((err as { text: unknown }).text)
+        : ''
+    throw new SendError(
+      detail
+        ? `Could not send (${detail}). Please use the email link above.`
+        : 'Could not send. Please use the email link above.',
+    )
+  }
+}
