@@ -56,6 +56,8 @@ export function Water({
   const nightMat = useRef<MeshStandardMaterial>(null)
   const wasDeformed = useRef(false)
   const normalTick = useRef(0)
+  /** Accumulated normal-map travel. See the note in the frame loop. */
+  const scroll = useRef({ x: 0, y: 0 })
 
   const geometryData = useMemo(() => {
     const geometry = new PlaneGeometry(WATER_SIZE, WATER_SIZE, WATER_SEGMENTS, WATER_SEGMENTS)
@@ -213,7 +215,7 @@ export function Water({
   const normalScale = useMemo(() => new Vector2(amp, amp), [amp])
 
   /* eslint-disable react-hooks/immutability */
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     if (nightMat.current) nightMat.current.emissiveIntensity = worldNight.value * 5.5
     foamMaterial.uniforms.uNight.value = worldNight.value
 
@@ -243,10 +245,28 @@ export function Water({
     // actual geometry breaks up. It is detail on the waves, not the waves.
     const normalBoost = 1 + disturbance * 2.15 + surgeAmount * 0.65
     normalScale.set(amp * normalBoost, amp * normalBoost)
-    coarse.offset.set(
-      t * (0.0075 + disturbance * 0.014),
-      t * (0.0046 + disturbance * 0.010),
-    )
+
+    /*
+     * THE SCROLL IS INTEGRATED, NOT RECOMPUTED.
+     *
+     * This used to be `offset = elapsedTime * (base + disturbance * k)` — a
+     * position derived from absolute time multiplied by a speed that CHANGES.
+     * The instant F was pressed and `disturbance` left zero, the whole
+     * expression jumped by `elapsedTime * disturbance * k`, and the ocean's
+     * surface texture slid bodily sideways before a single wave had moved.
+     *
+     * Worse, the size of that jump was proportional to how long the page had
+     * been open: barely visible a few seconds in, and around nine texture tiles
+     * of instant sideways travel after half a minute of looking at the view.
+     * Which is exactly why it read as the sea itself shifting left.
+     *
+     * Accumulating distance per frame instead means a change of speed is only
+     * ever a change of speed. There is no term left for a jump to appear in.
+     */
+    const dt = Math.min(delta, 1 / 20)
+    scroll.current.x += dt * (0.0075 + disturbance * 0.014)
+    scroll.current.y += dt * (0.0046 + disturbance * 0.010)
+    coarse.offset.set(scroll.current.x, scroll.current.y)
 
     const geometry = geometryData.geometry
     const position = geometry.attributes.position as BufferAttribute
