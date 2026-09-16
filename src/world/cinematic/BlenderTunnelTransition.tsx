@@ -27,12 +27,28 @@ export function BlenderTunnelTransition() {
   const setArrivedTitle = useScene((s) => s.setArrivedTitle)
   const setNight = useScene((s) => s.setNight)
   const setCinematic = useScene((s) => s.setCinematic)
+  const worldUp = useScene((s) => s.phase) !== 'booting'
   const video = useRef<HTMLVideoElement>(null)
   const started = useRef(false)
   const ended = useRef(false)
   const after = useRef(0)
   const titled = useRef(false)
   const lastDirection = useRef<1 | -1>(1)
+
+  /*
+   * Fetch the tunnel only once the world it sits over actually exists.
+   *
+   * Eleven seconds of exterior have to play before this file is needed, so it
+   * has no business competing with the pillars and the portal for the first
+   * second of a cold load. Starting it here still leaves it many seconds of
+   * head start over any plausible press of F.
+   */
+  useEffect(() => {
+    const el = video.current
+    if (!el || !worldUp) return
+    el.preload = 'auto'
+    el.load()
+  }, [worldUp])
 
   useEffect(() => {
     const el = video.current
@@ -160,7 +176,16 @@ export function BlenderTunnelTransition() {
       src="/cinematic/tunnel-move-master.mp4"
       muted
       playsInline
-      preload="auto"
+      /*
+       * NOT preload="auto".
+       *
+       * At 2560x1440 this file is 4.2MB, and with preload="auto" the browser
+       * asked for it 63ms into a cold load — ahead of every pillar, texture and
+       * the portal itself, on the same origin and against the same connection
+       * budget. It is needed eleven seconds later at the earliest. The fetch is
+       * started by hand once the world is up; see the effect above.
+       */
+      preload="none"
       crossOrigin="anonymous"
       style={{
         position: 'fixed',

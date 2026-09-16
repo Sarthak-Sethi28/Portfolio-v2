@@ -197,7 +197,22 @@ export function Water({
     const disturbance = Math.max(0, Math.min(1, s.disturbance))
     const pull = Math.max(0, Math.min(1, s.pull))
     const surgeAmount = Math.max(0, Math.min(1, s.shockwave))
-    const active = Math.max(disturbance, pull, surgeAmount)
+
+    /*
+     * THE NIGHT SEA IS NOT A MIRROR.
+     *
+     * Every deformation above is an envelope off the forward timeline, and all
+     * of them are spent by the time the destination is reached — so the arrival
+     * held a dead, perfectly flat ocean, and the return journey set out across
+     * it. This keeps a real swell running for as long as the world is dark. It
+     * is driven by worldNight rather than by the clock, so it survives the hold
+     * at PROJECTS, stays alive through the whole return approach, and recedes
+     * on its own as day comes back up underneath the tunnel.
+     *
+     * Day is untouched: at worldNight 0 this term is exactly zero.
+     */
+    const living = Math.max(0, Math.min(1, worldNight.value))
+    const active = Math.max(disturbance, pull, surgeAmount, living * 0.9)
     const t = clock.elapsedTime
 
     // The photographic micro-normal remains, but becomes rougher/faster as the
@@ -265,7 +280,15 @@ export function Water({
       const frontBand = gaussian(worldZ - crookedFront, 48) * gaussian(x, 360)
       const surge = frontBand * surgeAmount * (5.8 + disturbance * 3.0)
 
-      const height = storm + localBreak + drawDown + surge
+      // The night swell: long, slow, crossing at a different angle to the storm
+      // so the two never beat against each other into a standing pattern.
+      const nightSwell =
+        (Math.sin(x * 0.0126 + worldZ * 0.0193 - t * 0.78) * 1.32 +
+          Math.sin(x * 0.0295 - worldZ * 0.0162 + t * 1.07 + 2.4) * 0.74 +
+          Math.sin(x * 0.0615 + worldZ * 0.0472 - t * 1.85 + 1.1) * 0.29) *
+        living
+
+      const height = storm + localBreak + drawDown + surge + nightSwell
       position.setZ(i, height)
 
       /*

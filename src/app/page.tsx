@@ -1,4 +1,5 @@
 import { SceneCanvas } from '@/overlay/SceneCanvas'
+import { BootCover } from '@/overlay/BootCover'
 import { Title } from '@/overlay/Title'
 import { Stats } from '@/overlay/Stats'
 import { HoverLabel } from '@/overlay/HoverLabel'
@@ -15,6 +16,8 @@ export default function Home() {
       {/* Preview layer: the real Blender tunnel render, over the live scene. */}
       <BlenderTunnelTransition />
       <Stats />
+      {/* Last, so it covers everything above until the world is really there. */}
+      <BootCover />
     </main>
   )
 }

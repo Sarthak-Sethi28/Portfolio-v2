@@ -33,6 +33,19 @@ export function CinematicDirector() {
   const arrivedTitle = useScene((s) => s.arrivedTitle)
   const setArrivedTitle = useScene((s) => s.setArrivedTitle)
 
+  /*
+   * Every mount begins in DAY, from zero.
+   *
+   * The clock, the direction and the return journey live in module scope, and
+   * module scope does not survive a reload — but it DOES survive a remount, and
+   * "a refresh will have cleared it" is the sort of assumption that holds right
+   * up until the day it doesn't. Saying it costs one call and removes the whole
+   * class of question.
+   */
+  useEffect(() => {
+    resetCinematic()
+  }, [])
+
   useEffect(() => {
     cinematicClock.scrub = seqFlag === null ? null : seqFlag * DURATION
   }, [seqFlag])

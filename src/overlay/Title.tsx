@@ -11,6 +11,10 @@ export function Title() {
   const cinematic = useScene((s) => s.cinematic)
   const seqFlag = useScene((s) => s.flags.seq)
   const arrivedTitle = useScene((s) => s.arrivedTitle)
+  // The name used to arrive over an empty sky while the world was still
+  // resolving, which is most of what made a mid-boot frame look finished
+  // rather than loading. It now waits for the world it belongs to.
+  const booting = useScene((s) => s.phase) === 'booting'
 
   const travelling = cinematic === 'playing' || seqFlag !== null
   const returning = travelling && night
@@ -27,7 +31,7 @@ export function Title() {
   const showProjectsWord = arrived || returning
   const letters = (showProjectsWord ? 'PROJECTS' : profile.name.toUpperCase()).split('')
 
-  const opacity = open || noUi || (travelling && !arrivedTitle) ? 0 : 1
+  const opacity = booting || open || noUi || (travelling && !arrivedTitle) ? 0 : 1
 
   return (
     <div

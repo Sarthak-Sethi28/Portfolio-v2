@@ -21,6 +21,7 @@ import { CinematicDirector } from './cinematic/CinematicDirector'
 import { CinematicCamera } from './cinematic/CinematicCamera'
 import { WaterShockwave } from './cinematic/WaterShockwave'
 import { PillarWake } from './cinematic/PillarWake'
+import { WorldReady } from './WorldReady'
 import { createAnim, type Anim } from './anim'
 import { cinematicSample, worldNight } from './cinematic/cinematicState'
 import { FlickerProbe } from './FlickerProbe'
@@ -249,7 +250,14 @@ export function Stage() {
         shadow-normalBias={0.6}
       />
 
+      {/*
+        Everything that can suspend lives in here, and WorldReady lives in here
+        with it: React will not mount a sibling until the whole boundary has
+        resolved, which makes it an honest report that the world exists rather
+        than a timer someone has to keep in step with the asset list.
+      */}
       <Suspense fallback={null}>
+        <WorldReady />
         {flags.under ? (
           <UnderWorld palette={palette} />
         ) : (
