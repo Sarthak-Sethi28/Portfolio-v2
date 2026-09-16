@@ -6,7 +6,7 @@ import type { SectionId } from '@/content'
 import type { Project } from '@/content/nightPillars'
 import { SelectionShell } from './SelectionShell'
 import { ProjectMediaViewer } from './ProjectMedia'
-import { Card, Switcher, Tags, useStagger, MONO, INK, INK_DIM, INK_FAINT, ACCENT } from './kit'
+import { Card, Switcher, useStagger, MONO, INK, INK_DIM, INK_FAINT, ACCENT } from './kit'
 
 /**
  * A night monument: two projects, one panel.
@@ -130,6 +130,47 @@ export function ProjectsPanel({
             <span style={{ ...MONO, fontSize: '8.5px', letterSpacing: '0.24em', color: INK }}>
               {project.award}
             </span>
+            {project.awardNote && (
+              <span
+                style={{ ...MONO, fontSize: '8px', letterSpacing: '0.2em', color: INK_DIM }}
+              >
+                {project.awardNote}
+              </span>
+            )}
+          </p>
+        )}
+
+        {/*
+          The status badge belongs here as well as on the pending cover.
+
+          A project can have media AND a status worth stating — GIM's render is
+          a concept visualisation, not a photograph of a manufactured device,
+          and that has to be said next to the name rather than only in the place
+          used by projects that have no media at all.
+        */}
+        {project.status && (
+          <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span
+              className="px-3 py-1.5"
+              style={{
+                border: `1px solid ${ACCENT}`,
+                background: 'rgba(196,52,34,0.10)',
+                ...MONO,
+                fontSize: '8px',
+                letterSpacing: '0.24em',
+                color: INK,
+              }}
+            >
+              {project.status.label}
+            </span>
+            {project.status.note && (
+              <span
+                className="text-[10.5px]"
+                style={{ color: INK_FAINT, textTransform: 'none' }}
+              >
+                {project.status.note}
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -171,7 +212,34 @@ export function ProjectsPanel({
         ))}
       </div>
 
-      <Tags items={project.tech} open={open} from={6} />
+      {/*
+        SKILLS / TECHNOLOGY, grouped.
+
+        A named group with its members on one line is read in about two seconds.
+        The same fifteen items as equal pills is a wall, and a wall gets skipped.
+      */}
+      {project.skills.length > 0 && (
+        <div className="flex flex-col gap-2.5" style={body}>
+          <span
+            style={{ ...MONO, fontSize: '8.5px', letterSpacing: '0.3em', color: INK_FAINT }}
+          >
+            Skills / Technology
+          </span>
+          {project.skills.map((g) => (
+            <div key={g.group} className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
+              <span
+                className="shrink-0 sm:w-28"
+                style={{ ...MONO, fontSize: '8px', letterSpacing: '0.22em', color: ACCENT }}
+              >
+                {g.group}
+              </span>
+              <span className="text-[11.5px]" style={{ color: 'rgba(232,228,220,0.72)' }}>
+                {g.items.join('  ·  ')}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {(project.githubUrl || project.demoUrl) && (
         <div className="flex flex-wrap gap-2" style={body}>

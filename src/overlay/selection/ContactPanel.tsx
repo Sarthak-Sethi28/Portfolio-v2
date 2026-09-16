@@ -29,12 +29,13 @@ const LINKS: { label: string; value: string; href: string | null }[] = [
   { label: 'LinkedIn', value: handle(linkedin), href: linkedin },
   { label: 'GitHub', value: handle(github), href: github },
   /*
-   * The résumé served by the live site, brought across to this one.
+   * Deliberately not linked.
    *
-   * Replacing it is dropping a new PDF at the same path — nothing here needs
-   * to change when the document is updated.
+   * The PDF the live site serves is out of date, and an out-of-date CV behind a
+   * confident link is worse than no link — the card says so instead. Restore
+   * the href once the current document is in place.
    */
-  { label: 'Résumé', value: 'PDF', href: '/resume/Sarthak-Sethi-Resume.pdf' },
+  { label: 'Résumé', value: 'On request', href: null },
 ]
 
 type Status = 'idle' | 'submitting' | 'sent' | 'error'

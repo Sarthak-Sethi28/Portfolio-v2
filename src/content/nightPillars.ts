@@ -39,6 +39,8 @@ const projectSchema = z.object({
   category: z.string().optional(),
   /** Shown as a badge. Only where one was actually won. */
   award: z.string().optional(),
+  /** Context beside the award, e.g. the size of the field it was won against. */
+  awardNote: z.string().max(40).optional(),
   /**
    * Further achievements, each its own badge.
    *
@@ -53,7 +55,16 @@ const projectSchema = z.object({
   /** The product's own shape: NEED -> FIND -> COMPARE -> ... */
   flow: z.array(z.string()).default([]),
   cards: z.array(cardSchema).min(1).max(6),
-  tech: z.array(z.string()).default([]),
+  /**
+   * Grouped, not a cloud.
+   *
+   * Fifteen equal pills is a wall nobody reads. Three or four named groups of
+   * three or four each is scannable in about two seconds, which is all the
+   * attention this section ever gets.
+   */
+  skills: z
+    .array(z.object({ group: z.string().min(1).max(20), items: z.array(z.string()).min(1).max(6) }))
+    .default([]),
   /**
    * Ordered. The first entry is the hero until the visitor picks another.
    * Empty means the project has no real media yet and the panel says so
@@ -114,10 +125,19 @@ export const projectsI: Project[] = [
         note: 'The full path from requirement to authorised order, with approval gates where a human decides.',
       },
     ],
-    tech: ['Autonomous agents', 'Vendor portal', 'Market research', 'Workflow'],
+    skills: [
+      { group: 'AI / Automation', items: ['AI agents', 'Autonomous workflows', 'AI negotiation'] },
+      { group: 'Procurement', items: ['Vendor discovery', 'Supplier intelligence', 'RFQ', 'LOI', 'Purchase orders'] },
+      { group: 'Engineering', items: ['Full-stack engineering', 'Workflow architecture', 'Product engineering'] },
+    ],
     achievements: ['Y Combinator interview', 'a16z conditional offer'],
-    media: [],
-    mediaPending: true,
+    media: [
+      { kind: 'video', src: '/projects/valldor/hero.mp4', poster: '/projects/valldor/poster.jpg', label: 'Product film' },
+      { kind: 'image', src: '/projects/valldor/compare.jpg', label: 'Vendor comparison' },
+      { kind: 'image', src: '/projects/valldor/negotiate.jpg', label: 'Negotiation' },
+      { kind: 'image', src: '/projects/valldor/order.jpg', label: 'Purchase order' },
+    ],
+    githubUrl: 'https://github.com/Sarthak-Sethi28/openclaw',
   }),
   p({
     id: 'muse-sketch-studio',
@@ -125,6 +145,7 @@ export const projectsI: Project[] = [
     descriptor: 'AI-powered fashion design pipeline from idea to runway.',
     category: 'Generative product',
     award: '1st place — Replicate AI Hackathon',
+    awardNote: '100+ participants',
     description:
       'A prompt becomes a professional fashion sketch, the sketch is coloured, the design is worn by a generated model, and the look walks a generated runway. Every stage is downloadable, so the pipeline produces assets rather than previews.',
     flow: ['Prompt', 'Sketch', 'Colour', 'Model', 'Runway'],
@@ -150,15 +171,18 @@ export const projectsI: Project[] = [
         note: 'The finished look is animated into a runway sequence, downloadable with every other stage.',
       },
     ],
-    tech: ['React', 'TypeScript', 'Node.js', 'Replicate', 'Google Nano Banana', 'Veo'],
+    skills: [
+      { group: 'Generative AI', items: ['Image generation', 'Video generation', 'Multimodal', 'Prompt engineering'] },
+      { group: 'Product', items: ['React', 'TypeScript', 'Node.js'] },
+      { group: 'AI services', items: ['Replicate', 'Google Nano Banana', 'Veo'] },
+    ],
+    // Three supporting stills, not seven: sketch, colour, model — the pipeline
+    // in the fewest frames that still explain it.
     media: [
       { kind: 'video', src: '/projects/muse/demo.mp4', poster: '/projects/muse/poster.jpg', label: 'Full demo' },
       { kind: 'image', src: '/projects/muse/01-sketch.jpg', label: 'Sketch' },
-      { kind: 'image', src: '/projects/muse/03-colour.jpg', label: 'Coloured design' },
+      { kind: 'image', src: '/projects/muse/03-colour.jpg', label: 'Coloured' },
       { kind: 'image', src: '/projects/muse/04-model.jpg', label: 'On model' },
-      { kind: 'video', src: '/projects/muse/runway.mp4', poster: '/projects/muse/runway-poster.jpg', label: 'Runway' },
-      { kind: 'image', src: '/projects/muse/05-sketch-gown.jpg', label: 'Gown sketch' },
-      { kind: 'image', src: '/projects/muse/06-colour-gown.jpg', label: 'Gown coloured' },
     ],
     githubUrl: 'https://github.com/Sarthak-Sethi28/muse-sketch-studio',
   }),
@@ -197,9 +221,16 @@ export const projectsII: Project[] = [
         note: 'Rendered from the same measurements, with a true-scale/AR direction in the system.',
       },
     ],
-    tech: ['Parcel geometry', 'Measurement', 'Design engine', 'Mobile'],
+    skills: [
+      { group: 'Spatial', items: ['Property geometry', 'Computational geometry', 'Mapping / spatial data'] },
+      { group: 'Visualization', items: ['3D visualization', 'Interactive graphics', 'Digital twin'] },
+      { group: 'Product', items: ['Product engineering', 'Frontend engineering', 'AI-assisted workflows'] },
+    ],
     media: [],
     mediaPending: true,
+    // The capture package does not exist yet, so the cover says where the
+    // product actually is rather than promising a film.
+    status: { label: 'In development' },
   }),
   p({
     id: 'danier-chatbot',
@@ -232,7 +263,11 @@ export const projectsII: Project[] = [
         note: 'Answers resolve to real, season-aware products a shopper can open.',
       },
     ],
-    tech: ['React', 'Tailwind', 'Express', 'OpenAI', 'Product search pipeline'],
+    skills: [
+      { group: 'AI', items: ['Conversational AI', 'Product discovery', 'Context handling'] },
+      { group: 'Product', items: ['React', 'Tailwind CSS'] },
+      { group: 'Backend', items: ['FastAPI', 'Product search', 'Caching', 'Analytics'] },
+    ],
     media: [
       { kind: 'video', src: '/projects/chatbot/demo.mp4', poster: '/projects/chatbot/poster.jpg', label: 'Full demo' },
       { kind: 'image', src: '/projects/chatbot/shot-1.jpg', label: 'Assistant' },
@@ -277,7 +312,11 @@ export const projectsIII: Project[] = [
         note: 'Ingests the spreadsheets the business already produces.',
       },
     ],
-    tech: ['React', 'TypeScript', 'NestJS', 'TypeORM', 'PostgreSQL', 'Nodemailer', 'Render', 'Vercel'],
+    skills: [
+      { group: 'Backend', items: ['Python', 'FastAPI', 'SQLAlchemy'] },
+      { group: 'Data', items: ['Pandas', 'OpenPyXL', 'Data processing'] },
+      { group: 'Automation', items: ['Inventory automation', 'Email automation'] },
+    ],
     media: [],
     /*
      * Not "film in production". This one is not waiting on a film — it runs
@@ -319,12 +358,14 @@ export const projectsIII: Project[] = [
         note: 'An external camera maps road quality against GPS, intended to make road surveys cheaper.',
       },
     ],
-    tech: ['Arduino', 'Raspberry Pi', 'GPS', 'Ultrasonic sensors', 'Ethanol sensor', 'Camera', 'GSM', 'LCD', 'Buzzers'],
+    skills: [
+      { group: 'Hardware', items: ['Arduino', 'Raspberry Pi', 'Sensors', 'GPS', 'GSM'] },
+      { group: 'Perception', items: ['Camera / computer vision', 'Ultrasonic sensing', 'Alcohol detection'] },
+      { group: 'Engineering', items: ['Embedded systems', 'Hardware prototyping', 'IoT'] },
+    ],
     media: [
-      { kind: 'image', src: '/projects/caraksha/prototype-1.jpg', label: 'Prototype' },
-      { kind: 'image', src: '/projects/caraksha/prototype-2.jpg', label: 'Build detail' },
+      { kind: 'image', src: '/projects/caraksha/hero.jpg', label: 'Prototype' },
       { kind: 'image', src: '/projects/caraksha/components.jpg', label: 'Components' },
-      { kind: 'image', src: '/projects/caraksha/poster.jpg', label: 'Project document' },
     ],
     githubUrl: 'https://github.com/Sarthak-Sethi28/CaRaksha',
   }),
@@ -363,14 +404,16 @@ export const projectsIV: Project[] = [
         note: 'A 2D scanner measures each note’s dimensions as it passes.',
       },
     ],
-    tech: ['Raspberry Pi', 'C++', '2D scanning', 'Audio output'],
+    skills: [
+      { group: 'Accessibility', items: ['Assistive technology', 'Accessibility engineering'] },
+      { group: 'Hardware', items: ['Raspberry Pi', 'Motors', '2D scanning', 'Audio output'] },
+      { group: 'Software', items: ['C++', 'Embedded processing', 'Hardware / software integration'] },
+    ],
     media: [
-      // The hand-drawn mechanism — input tray, 2D laser scanner, collection
-      // chamber, motors, speaker — lifted from the project document. It is the
-      // only real drawing of the device that exists, and it leads.
+      { kind: 'image', src: '/projects/imoney/hero.jpg', label: 'Device' },
+      // The hand-drawn mechanism from the project document: input tray, 2D laser
+      // scanner, collection chamber, motors, speaker. Secondary, but authentic.
       { kind: 'image', src: '/projects/imoney/schematic.jpg', label: 'Mechanism' },
-      { kind: 'image', src: '/projects/imoney/overview.jpg', label: 'Specification' },
-      { kind: 'image', src: '/projects/imoney/poster.jpg', label: 'Project document' },
     ],
     githubUrl: 'https://github.com/Sarthak-Sethi28/iMoney',
   }),
@@ -404,7 +447,11 @@ export const projectsIV: Project[] = [
         note: 'Accelerometer and gyroscope to detect unexpected movement or impact.',
       },
     ],
-    tech: ['Embedded systems', 'GPS', 'Accelerometer / gyroscope', 'Audio / video', 'Cloud', 'Mobile'],
+    skills: [
+      { group: 'Wearable', items: ['Wearable technology', 'Embedded systems', 'Hardware prototyping'] },
+      { group: 'Sensing', items: ['GPS', 'Accelerometer', 'Gyroscope', 'Camera', 'Microphone'] },
+      { group: 'Connected', items: ['Emergency alerting', 'Wireless', 'Cloud integration', 'Mobile'] },
+    ],
     /*
      * No media, deliberately.
      *
@@ -414,8 +461,18 @@ export const projectsIV: Project[] = [
      * of prose to hero imagery, this carries the designed cover and says the
      * film is still to come, which is the truth.
      */
-    media: [],
-    mediaPending: true,
+    media: [
+      { kind: 'image', src: '/projects/gim/hero.jpg', label: 'Concept visualization' },
+    ],
+    /*
+     * Labelled, not passed off.
+     *
+     * GIM reached proposal and prototype stage. This render is a concept
+     * visualisation built from that documentation, and the badge says so — a
+     * polished image of a device that was never manufactured would otherwise
+     * read as a photograph of a finished product.
+     */
+    status: { label: 'Concept visualization', note: 'Developed to proposal and prototype stage' },
     githubUrl: 'https://github.com/Sarthak-Sethi28/GIM',
   }),
 ]

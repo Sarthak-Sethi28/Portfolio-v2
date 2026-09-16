@@ -92,7 +92,7 @@ export function ProjectMediaViewer({ project, open }: { project: Project; open: 
               playsInline
               autoPlay
               preload="metadata"
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
             />
             {/* Restrained controls of our own. The browser's default bar is a
                 grey slab with rounded buttons and it belongs to no design. */}
@@ -115,7 +115,17 @@ export function ProjectMediaViewer({ project, open }: { project: Project; open: 
           /* eslint-disable-next-line @next/next/no-img-element --
              project assets of unknown intrinsic size, served straight from
              /public; next/image would demand dimensions we do not have. */
-          <img src={hero.src} alt={hero.label} className="h-full w-full object-cover" />
+          /*
+           * contain, not cover.
+           *
+           * These are curated case-study assets of several different shapes —
+           * a 16:9 render, a wide top-down photograph, a landscape diagram.
+           * `cover` fills the frame by cutting the edges off whichever one does
+           * not match, which crops the subject out of exactly the images that
+           * were composed most carefully. The frame is already dark, so the
+           * letterbox reads as a mount rather than as a gap.
+           */
+          <img src={hero.src} alt={hero.label} className="h-full w-full object-contain" />
         )}
 
         <button
@@ -153,9 +163,11 @@ export function ProjectMediaViewer({ project, open }: { project: Project; open: 
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
+                {/* Thumbnails MAY crop: they are navigation, not the work. */}
                 <img
                   src={m.kind === 'video' ? (m.poster ?? '') : m.src}
                   alt=""
+                  loading="lazy"
                   className="h-full w-full object-cover"
                 />
                 {m.kind === 'video' && (

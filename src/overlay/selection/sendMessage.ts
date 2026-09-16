@@ -24,6 +24,9 @@ const SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID ?? ''
 const TEMPLATE_ID = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID ?? ''
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY ?? ''
 
+/** Where contact messages are delivered. */
+const DESTINATION = 'sarthaksethi2803@gmail.com'
+
 export interface ContactMessage {
   name: string
   email: string
@@ -55,6 +58,13 @@ export async function sendMessage(payload: ContactMessage): Promise<void> {
       SERVICE_ID,
       TEMPLATE_ID,
       {
+        // Where the message lands. The template's own To field may already be
+        // set, in which case this is ignored — but if it is bound to a variable
+        // this is what routes it, and an unused parameter costs nothing.
+        to_email: DESTINATION,
+        // The VISITOR's details. from_email and reply_to are deliberately the
+        // sender's address, not the destination: the whole point of the field is
+        // knowing who wrote and being able to answer them with one click.
         from_name: payload.name,
         from_email: payload.email,
         subject: payload.subject,
