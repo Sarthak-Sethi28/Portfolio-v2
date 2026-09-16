@@ -14,7 +14,17 @@ import {
 } from './cinematicState'
 import { tunnelVideo } from './tunnelVideo'
 
-const APERTURE_ON = 11.55
+/*
+ * Brought forward for the faster forward clock.
+ *
+ * This is a position on the AUTHORED timeline, but the video it starts is three
+ * real seconds long whatever the timeline is doing. Running the journey at 2.2x
+ * left only 0.56s of tunnel visible inside the ring before the crossing,
+ * against the return's 1.21 — the two directions had drifted apart again. Ten
+ * and a bit puts the reveal back at roughly the same real-time distance ahead
+ * of the crossing as the return has.
+ */
+const APERTURE_ON = 10.2
 const APERTURE_FADE = 0.82
 // Both directions now bring the tunnel into the ring 0.80s after the push
 // begins, over the same fade. The return used to do it in 0.50s from a

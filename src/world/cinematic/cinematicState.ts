@@ -108,6 +108,26 @@ export function setCinematicTime(t: number): void {
 }
 
 /** Advance and re-sample. Called from exactly one place. */
+/**
+ * How much faster the DAY -> NIGHT journey runs than it was authored.
+ *
+ * The two directions were badly mismatched: night -> day takes about 6.2
+ * seconds — a hold, a 3.55s approach, and roughly 1.8s of tunnel — while day ->
+ * night ran the full fifteen-second authored timeline before the tunnel even
+ * began. Going one way felt decisive and coming back felt like waiting.
+ *
+ * Scaling the CLOCK rather than rewriting the beat sheet keeps every envelope
+ * in its authored proportion — the ocean still breaks before the ring lights,
+ * the columns still go down in the same order — and it keeps the tunnel in
+ * step for free: the aperture crossing is geometric, so a flight that takes
+ * less time still crosses at the same fraction of itself, and the video still
+ * starts the same distance before that crossing.
+ *
+ * 15 / 2.2 puts the forward journey at roughly 6.8 seconds, alongside the
+ * return's 6.2.
+ */
+export const FORWARD_SPEED = 2.2
+
 export function advanceCinematic(delta: number): void {
   if (cinematicClock.scrub !== null) {
     setCinematicTime(cinematicClock.scrub)
@@ -117,7 +137,7 @@ export function advanceCinematic(delta: number): void {
   if (cinematicClock.running) {
     // The authored exterior sequence only runs forward. Return travel is a
     // separate portal/tunnel journey, not a negative-speed version of this.
-    setCinematicTime(cinematicClock.elapsed + delta)
+    setCinematicTime(cinematicClock.elapsed + delta * FORWARD_SPEED)
     return
   }
 

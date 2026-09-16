@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useScene } from '@/store/scene'
 
 /**
@@ -17,7 +16,6 @@ import { useScene } from '@/store/scene'
  * obvious of the two and was going unsaid entirely.
  */
 export function TransitionHint() {
-  const phase = useScene((s) => s.phase)
   const cinematic = useScene((s) => s.cinematic)
   const night = useScene((s) => s.night)
   const openSection = useScene((s) => s.openSection)
@@ -26,18 +24,23 @@ export function TransitionHint() {
   const seq = useScene((s) => s.flags.seq)
   const reducedMotion = useScene((s) => s.reducedMotion)
 
-  const [ready, setReady] = useState(false)
-
-  useEffect(() => {
-    if (phase === 'booting') return
-    // Early. The previous 2.2s landed after the eye had already started
-    // wandering, and a hint nobody is looking at is a hint nobody reads.
-    const id = window.setTimeout(() => setReady(true), 700)
-    return () => window.clearTimeout(id)
-  }, [phase])
+  /*
+   * NO TIMER, AND NOTHING TO WAIT FOR.
+   *
+   * This has been late twice for two different reasons. First it waited for
+   * every model and texture to load, which put it four to five seconds after a
+   * reload. Then it waited on a JS timer, which cannot start until the bundle
+   * has downloaded and React has hydrated — three seconds of a cold load, and
+   * three.js is not a small bundle.
+   *
+   * So it waits for neither. The element is in the server-rendered HTML with
+   * its entrance as a CSS animation, which means the browser starts it on first
+   * paint: no JavaScript involved in getting it on screen. The boot cover is a
+   * dark ground and the line reads perfectly well against it, so it is simply
+   * already there by the time the water appears.
+   */
 
   const visible =
-    ready &&
     !noUi &&
     seq === null &&
     !reducedMotion &&
@@ -52,12 +55,15 @@ export function TransitionHint() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 z-20 flex justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-4"
       style={{
         bottom: '4.5%',
-        opacity: visible ? 1 : 0,
-        transform: `translateY(${visible ? 0 : 8}px)`,
-        transition: 'opacity 420ms ease, transform 420ms ease',
+        // The entrance is the CSS animation; this transition only handles it
+        // leaving and returning once JavaScript is running.
+        animation: 'hint-in 520ms ease-out 200ms both',
+        opacity: visible ? undefined : 0,
+        transform: visible ? undefined : 'translateY(8px)',
+        transition: 'opacity 260ms ease, transform 260ms ease',
       }}
       aria-hidden={!visible}
     >
@@ -80,7 +86,7 @@ export function TransitionHint() {
       >
         <Item>
           <Key>Click</Key>
-          <span>a pillar</span>
+          <span>a pillar for experience</span>
         </Item>
 
         <span aria-hidden style={{ color: 'rgba(233,230,222,0.18)' }}>
@@ -89,7 +95,7 @@ export function TransitionHint() {
 
         <Item>
           <Key>F</Key>
-          <span>{night ? 'to return' : 'to cross'}</span>
+          <span>{night ? 'to return' : 'for a surprise'}</span>
         </Item>
       </div>
     </div>

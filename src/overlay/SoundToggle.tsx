@@ -77,13 +77,6 @@ export function SoundToggle() {
       >
         {on ? 'Sound on' : 'Sound'}
       </span>
-
-      <style>{`
-        @keyframes sound-bar {
-          0%, 100% { height: 3px; }
-          50%      { height: 12px; }
-        }
-      `}</style>
     </button>
   )
 }
