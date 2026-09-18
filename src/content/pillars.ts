@@ -133,7 +133,7 @@ export const experienceI: PillarCompany[] = companies([
       {
         id: 'software-developer',
         title: 'Software Developer',
-        period: 'May 2025 – Aug 2025',
+        period: 'June 2025 – Aug 2025',
         where: 'Vaughan, Ontario · Hybrid',
         cards: [
           {
